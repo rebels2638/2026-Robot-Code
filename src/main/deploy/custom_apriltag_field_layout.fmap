@@ -1,0 +1,26 @@
+{
+  "tags": [
+    {
+      "ID": 1,
+      "pose": {
+        "translation": {
+          "x": 50,
+          "y": 50,
+          "z": 0.302
+        },
+        "rotation": {
+          "quaternion": {
+            "W": 0,
+            "X": 0.0,
+            "Y": 0,
+            "Z": 0.0
+          }
+        }
+      }
+    }
+  ],
+  "field": {
+    "length": 100,
+    "width": 100
+  }
+}

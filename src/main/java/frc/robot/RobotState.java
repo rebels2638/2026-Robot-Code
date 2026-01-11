@@ -1,0 +1,279 @@
+package frc.robot;
+
+import edu.wpi.first.math.*;
+import edu.wpi.first.math.estimator.SwerveDrivePoseEstimator;
+import edu.wpi.first.math.geometry.*;
+import edu.wpi.first.math.interpolation.*;
+import edu.wpi.first.math.kinematics.ChassisSpeeds;
+import edu.wpi.first.math.kinematics.SwerveDriveKinematics;
+import edu.wpi.first.math.kinematics.SwerveModulePosition;
+import edu.wpi.first.math.kinematics.SwerveModuleState;
+import edu.wpi.first.math.numbers.N1;
+import edu.wpi.first.math.numbers.N3;
+import edu.wpi.first.wpilibj.DriverStation;
+import edu.wpi.first.wpilibj.Timer;
+import frc.robot.constants.Constants;
+import frc.robot.constants.robotState.RobotStateConfigBase;
+import frc.robot.constants.robotState.RobotStateConfigProto;
+import frc.robot.constants.robotState.RobotStateConfigSim;
+import frc.robot.constants.robotState.RobotStateConfigComp;
+import frc.robot.constants.swerve.drivetrainConfigs.SwerveDrivetrainConfigBase;
+import frc.robot.constants.swerve.drivetrainConfigs.SwerveDrivetrainConfigComp;
+import frc.robot.constants.swerve.drivetrainConfigs.SwerveDrivetrainConfigProto;
+import frc.robot.constants.swerve.drivetrainConfigs.SwerveDrivetrainConfigSim;
+import frc.robot.subsystems.swerve.SwerveDrive;
+
+import java.util.NoSuchElementException;
+import org.littletonrobotics.junction.AutoLogOutput;
+import org.littletonrobotics.junction.Logger;
+
+// TODO: Make it so that if it is tracking / shooting, the center of rotation for the robot is around the shooter's position
+public class RobotState {
+    private static RobotState instance;
+    public static RobotState getInstance() {
+        if (instance == null) {
+            instance = new RobotState();
+        }
+        return instance;
+    }
+  
+    public record OdometryObservation(
+        double timestampsSeconds,
+        boolean isGyroConnected,
+        SwerveModulePosition[] modulePositions, 
+        SwerveModuleState[] moduleStates,
+        Rotation2d yawPosition,
+        double yawVelocityRadPerSec
+    ) {}
+
+
+    public record VisionObservation(
+        Pose2d visionRobotPoseMeters,
+        double timestampSeconds,
+        Matrix<N3, N1> visionMeasurementStdDevs
+    ) {}
+
+
+    private static final double poseBufferSizeSeconds = 2.0;
+    private final TimeInterpolatableBuffer<Pose2d> poseBuffer = TimeInterpolatableBuffer.createBuffer(poseBufferSizeSeconds);
+
+    private final SwerveDrivePoseEstimator swerveDrivePoseEstimator;
+
+    private double lastEstimatedPoseUpdateTime = 0;
+    private int visionObservationsAccepted = 0;
+    private int visionObservationsRejected = 0;
+
+    private double lastGyroResetTime = Timer.getTimestamp();
+    private double gyroTimeoutSeconds = 1.0;
+
+    private Rotation2d lastGyroAngle = new Rotation2d();
+
+    // Odometry
+    private final SwerveDriveKinematics kinematics;
+    private SwerveModulePosition[] lastWheelPositions = {
+        new SwerveModulePosition(),
+        new SwerveModulePosition(),
+        new SwerveModulePosition(),
+        new SwerveModulePosition()
+    };
+
+    private double lastYawVelocityRadPerSec = 0;
+    private ChassisSpeeds lastRobotRelativeSpeeds = new ChassisSpeeds();
+
+    private final SwerveDrivetrainConfigBase drivetrainConfig;
+    private final RobotStateConfigBase robotStateConfig;
+
+    private RobotState() {
+        switch (Constants.currentMode) {
+            case COMP:
+                drivetrainConfig = SwerveDrivetrainConfigComp.getInstance();
+                robotStateConfig = RobotStateConfigComp.getInstance();
+
+                break;
+
+            case PROTO:
+                drivetrainConfig = SwerveDrivetrainConfigProto.getInstance();
+                robotStateConfig = RobotStateConfigProto.getInstance();
+
+                break;
+            
+            case SIM:
+                drivetrainConfig = SwerveDrivetrainConfigSim.getInstance();
+                robotStateConfig = RobotStateConfigSim.getInstance();
+
+                break;
+
+            case REPLAY:
+                drivetrainConfig = SwerveDrivetrainConfigComp.getInstance();
+                robotStateConfig = RobotStateConfigComp.getInstance();
+
+                break;
+
+            default:
+                drivetrainConfig = SwerveDrivetrainConfigComp.getInstance();
+                robotStateConfig = RobotStateConfigComp.getInstance();
+
+                break;
+        }
+
+        kinematics = new SwerveDriveKinematics(
+            drivetrainConfig.getFrontLeftPositionMeters(),
+            drivetrainConfig.getFrontRightPositionMeters(),
+            drivetrainConfig.getBackLeftPositionMeters(),
+            drivetrainConfig.getBackRightPositionMeters()
+        ); 
+
+        swerveDrivePoseEstimator = new SwerveDrivePoseEstimator(
+            kinematics,
+            new Rotation2d(), 
+            lastWheelPositions, 
+            new Pose2d(),
+            VecBuilder.fill(
+                robotStateConfig.getOdomTranslationDevBase(),
+                robotStateConfig.getOdomTranslationDevBase(),
+                robotStateConfig.getOdomRotationDevBase()
+
+            ),
+            VecBuilder.fill(
+                robotStateConfig.getVisionTranslationDevBase(),
+                robotStateConfig.getVisionTranslationDevBase(),
+                robotStateConfig.getVisionRotationDevBase()
+            )
+        );  
+    }   
+
+    /** Add odometry observation */
+    public void addOdometryObservation(OdometryObservation observation) {
+        observation = new OdometryObservation(
+            observation.timestampsSeconds(),
+            observation.isGyroConnected(),
+            observation.modulePositions().clone(),
+            observation.moduleStates().clone(),
+            observation.yawPosition(),
+            observation.yawVelocityRadPerSec()
+        );
+        
+        Logger.recordOutput("RobotState/odometry/timestamp", observation.timestampsSeconds());
+        Logger.recordOutput("RobotState/odometry/isGyroConnected", observation.isGyroConnected());
+        Logger.recordOutput("RobotState/odometry/modulePositions", observation.modulePositions());
+        Logger.recordOutput("RobotState/odometry/moduleStates", observation.moduleStates());
+        Logger.recordOutput("RobotState/odometry/yawPosition", observation.yawPosition());
+        Logger.recordOutput("RobotState/odometry/yawVelocityRadPerSec", observation.yawVelocityRadPerSec());
+
+        // update robotState member variables
+        lastRobotRelativeSpeeds = kinematics.toChassisSpeeds(observation.moduleStates);
+        lastRobotRelativeSpeeds.omegaRadiansPerSecond = observation.isGyroConnected ? observation.yawVelocityRadPerSec() : lastRobotRelativeSpeeds.omegaRadiansPerSecond;
+        lastYawVelocityRadPerSec = observation.isGyroConnected ? observation.yawVelocityRadPerSec() : lastRobotRelativeSpeeds.omegaRadiansPerSecond;
+
+        swerveDrivePoseEstimator.updateWithTime(
+            observation.timestampsSeconds(), 
+            observation.isGyroConnected() ? 
+                observation.yawPosition() : 
+                new Rotation2d(
+                    swerveDrivePoseEstimator.getEstimatedPosition().getRotation().getRadians() + 
+                    kinematics.toTwist2d(lastWheelPositions, observation.modulePositions()).dtheta
+                ),
+            observation.modulePositions()
+        );
+
+        lastGyroAngle = observation.isGyroConnected() ? observation.yawPosition() : swerveDrivePoseEstimator.getEstimatedPosition().getRotation();
+
+        lastWheelPositions = observation.modulePositions();
+
+        lastEstimatedPoseUpdateTime = observation.timestampsSeconds();
+
+
+        // Add pose to buffer at timestamp
+        poseBuffer.addSample(lastEstimatedPoseUpdateTime, swerveDrivePoseEstimator.getEstimatedPosition()); 
+    }
+
+    public void addVisionObservation(VisionObservation observation) {
+        // If measurement is old enough to be outside the pose buffer's timespan, skip.
+        try {
+            if (poseBuffer.getInternalBuffer().lastKey() - poseBufferSizeSeconds > observation.timestampSeconds()) {
+                visionObservationsRejected++;
+                Logger.recordOutput("RobotState/vision/visionObservationsRejected", visionObservationsRejected);
+                return;
+            }
+        } 
+        
+        catch (NoSuchElementException ex) {
+            visionObservationsRejected++;
+            Logger.recordOutput("RobotState/vision/visionObservationsRejected", visionObservationsRejected);
+            return;
+        }
+
+        visionObservationsAccepted++;
+
+        Logger.recordOutput("RobotState/vision/stdDevTranslation", observation.visionMeasurementStdDevs().get(0,0));
+        Logger.recordOutput("RobotState/vision/stdDevRotation", observation.visionMeasurementStdDevs().get(2,0));
+        Logger.recordOutput("RobotState/vision/visionPose", observation.visionRobotPoseMeters());
+        Logger.recordOutput("RobotState/vision/visionObservationsAccepted", visionObservationsAccepted);
+        Logger.recordOutput("RobotState/vision/visionObservationsRejected", visionObservationsRejected);
+        Logger.recordOutput("RobotState/vision/visionLatency", Timer.getFPGATimestamp() - observation.timestampSeconds());
+
+
+        if (DriverStation.isDisabled() && Timer.getTimestamp() - lastGyroResetTime > gyroTimeoutSeconds && observation.visionMeasurementStdDevs().get(2,0) < 300) {
+                resetPose(new Pose2d(getEstimatedPose().getTranslation(), observation.visionRobotPoseMeters().getRotation()));
+                lastGyroResetTime = Timer.getTimestamp();
+                
+                Logger.recordOutput("RobotState/vision/gyroReset", true);
+                Logger.recordOutput("RobotState/vision/gyroRestRotation", observation.visionRobotPoseMeters().getRotation());
+            
+        } else {
+            Logger.recordOutput("RobotState/vision/gyroReset", false);
+        }
+
+        swerveDrivePoseEstimator.addVisionMeasurement(observation.visionRobotPoseMeters(), observation.timestampSeconds(), observation.visionMeasurementStdDevs());
+        lastEstimatedPoseUpdateTime = Timer.getTimestamp();
+    }
+
+    /**
+     * Reset estimated pose and odometry pose to pose <br>
+     * Clear pose buffer
+     */
+    public void resetPose(Pose2d initialPose) {
+        SwerveDrive.getInstance().resetGyro(initialPose.getRotation());
+        swerveDrivePoseEstimator.resetPosition(initialPose.getRotation(), lastWheelPositions, initialPose);
+
+        poseBuffer.clear();
+    }
+
+    public void zeroGyro() {
+        resetPose(new Pose2d(getEstimatedPose().getTranslation(), new Rotation2d()));
+    }
+
+    @AutoLogOutput(key = "RobotState/estimatedPose")
+    public Pose2d getEstimatedPose() {
+        return swerveDrivePoseEstimator.getEstimatedPosition();
+    }
+
+    public double getYawVelocityRadPerSec() {
+        return lastYawVelocityRadPerSec;
+    }
+
+    public ChassisSpeeds getRobotRelativeSpeeds() {
+        return lastRobotRelativeSpeeds;
+    }
+
+    @AutoLogOutput(key = "RobotState/fieldRelativeSpeeds")
+    public ChassisSpeeds getFieldRelativeSpeeds() { 
+        return ChassisSpeeds.fromRobotRelativeSpeeds(lastRobotRelativeSpeeds, getEstimatedPose().getRotation());
+    }
+
+    public Pose2d getPredictedPose(double translationLookaheadS, double rotationLookaheadS) {
+        return getEstimatedPose()
+            .transformBy(
+                new Transform2d(
+                    lastRobotRelativeSpeeds.vxMetersPerSecond * translationLookaheadS,
+                    lastRobotRelativeSpeeds.vyMetersPerSecond * translationLookaheadS,
+                    Rotation2d.fromRadians(lastRobotRelativeSpeeds.omegaRadiansPerSecond * rotationLookaheadS)
+                )
+            );
+    }
+
+    public Pose2d getPredictedPose(double timestamp) {
+        return getPredictedPose(timestamp - lastEstimatedPoseUpdateTime, timestamp - lastEstimatedPoseUpdateTime);
+    }
+
+}

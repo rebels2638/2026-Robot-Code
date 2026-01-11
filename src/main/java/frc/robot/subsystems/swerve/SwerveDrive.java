@@ -1,0 +1,1070 @@
+package frc.robot.subsystems.swerve;
+
+import static edu.wpi.first.units.Units.Second;
+import static edu.wpi.first.units.Units.Seconds;
+import static edu.wpi.first.units.Units.Volts;
+
+import java.util.ArrayList;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
+import java.util.function.DoubleSupplier;
+import java.util.function.Supplier;
+
+import org.littletonrobotics.junction.AutoLogOutput;
+import org.littletonrobotics.junction.Logger;
+
+import edu.wpi.first.math.MathUtil;
+import edu.wpi.first.math.controller.PIDController;
+import edu.wpi.first.math.geometry.Pose2d;
+import edu.wpi.first.math.geometry.Rotation2d;
+import edu.wpi.first.math.kinematics.ChassisSpeeds;
+import edu.wpi.first.math.kinematics.SwerveModulePosition;
+import edu.wpi.first.math.kinematics.SwerveModuleState;
+import edu.wpi.first.math.kinematics.SwerveDriveKinematics;
+import edu.wpi.first.wpilibj.Timer;
+import edu.wpi.first.wpilibj2.command.Command;
+import edu.wpi.first.wpilibj2.command.SubsystemBase;
+import edu.wpi.first.wpilibj2.command.sysid.SysIdRoutine;
+import edu.wpi.first.wpilibj2.command.sysid.SysIdRoutine.Direction;
+import frc.robot.RobotState;
+import frc.robot.RobotState.OdometryObservation;
+import frc.robot.constants.Constants;
+import frc.robot.constants.swerve.drivetrainConfigs.SwerveDrivetrainConfigBase;
+import frc.robot.constants.swerve.drivetrainConfigs.SwerveDrivetrainConfigComp;
+import frc.robot.constants.swerve.drivetrainConfigs.SwerveDrivetrainConfigProto;
+import frc.robot.constants.swerve.drivetrainConfigs.SwerveDrivetrainConfigSim;
+import frc.robot.constants.swerve.moduleConfigs.SwerveModuleGeneralConfigBase;
+import frc.robot.constants.swerve.moduleConfigs.comp.SwerveModuleGeneralConfigComp;
+import frc.robot.constants.swerve.moduleConfigs.comp.SwerveModuleSpecificBLConfigComp;
+import frc.robot.constants.swerve.moduleConfigs.comp.SwerveModuleSpecificBRConfigComp;
+import frc.robot.constants.swerve.moduleConfigs.comp.SwerveModuleSpecificFLConfigComp;
+import frc.robot.constants.swerve.moduleConfigs.comp.SwerveModuleSpecificFRConfigComp;
+import frc.robot.constants.swerve.moduleConfigs.proto.SwerveModuleGeneralConfigProto;
+import frc.robot.constants.swerve.moduleConfigs.proto.SwerveModuleSpecificBLConfigProto;
+import frc.robot.constants.swerve.moduleConfigs.proto.SwerveModuleSpecificFRConfigProto;
+import frc.robot.constants.swerve.moduleConfigs.sim.SwerveModuleGeneralConfigSim;
+import frc.robot.lib.BLine.ChassisRateLimiter;
+import frc.robot.lib.BLine.FollowPath;
+import frc.robot.lib.BLine.Path;
+import frc.robot.subsystems.swerve.gyro.GyroIO;
+import frc.robot.subsystems.swerve.gyro.GyroIOInputsAutoLogged;
+import frc.robot.subsystems.swerve.gyro.GyroIOPigeon2;
+import frc.robot.subsystems.swerve.module.ModuleIO;
+import frc.robot.subsystems.swerve.module.ModuleIOInputsAutoLogged;
+import frc.robot.subsystems.swerve.module.ModuleIOSim;
+import frc.robot.subsystems.swerve.module.ModuleIOTalonFX;
+
+public class SwerveDrive extends SubsystemBase {
+    private static SwerveDrive instance = null;
+    public static SwerveDrive getInstance() {
+        if (instance == null) {
+            instance = new SwerveDrive();
+        }
+
+        return instance;
+    }
+
+    // FSM State Enums
+    public enum DesiredSystemState {
+        STOPPED,
+        IDLE,
+        TELEOP,
+        FOLLOW_PATH,
+        PREPARE_FOR_AUTO,
+        SYSID
+    }
+
+    public enum CurrentSystemState {
+        STOPPED,
+        IDLE,
+        TELEOP,
+        FOLLOW_PATH,
+        PREPARE_FOR_AUTO,
+        READY_FOR_AUTO,
+        SYSID
+    }
+
+    public enum DesiredOmegaOverrideState {
+        NONE,
+        RANGED_ROTATION,
+    }
+
+    public enum CurrentOmegaOverrideState {
+        NONE,
+        RANGED_ROTATION_NOMINAL,
+        RANGED_ROTATION_RETURNING,
+    }
+
+    public enum DesiredTranslationOverrideState {
+        NONE,
+        FROZEN,
+        CAPPED
+    }
+
+    public enum CurrentTranslationOverrideState {
+        NONE,
+        FROZEN,
+        CAPPED
+    }
+
+
+    // FSM State Variables
+    private DesiredSystemState desiredSystemState = DesiredSystemState.STOPPED;
+    private CurrentSystemState currentSystemState = CurrentSystemState.STOPPED;
+    private CurrentSystemState previousSystemState = CurrentSystemState.STOPPED;
+
+    private DesiredOmegaOverrideState desiredOmegaOverrideState = DesiredOmegaOverrideState.NONE;
+    private CurrentOmegaOverrideState currentOmegaOverrideState = CurrentOmegaOverrideState.NONE;
+    private CurrentOmegaOverrideState previousOmegaOverrideState = CurrentOmegaOverrideState.NONE;
+
+    private DesiredTranslationOverrideState desiredTranslationOverrideState = DesiredTranslationOverrideState.NONE;
+    private CurrentTranslationOverrideState currentTranslationOverrideState = CurrentTranslationOverrideState.NONE;
+    private CurrentTranslationOverrideState previousTranslationOverrideState = CurrentTranslationOverrideState.NONE;
+
+    // Teleop input suppliers (normalized -1 to 1)
+    private DoubleSupplier vxNormalizedSupplier = () -> 0.0;
+    private DoubleSupplier vyNormalizedSupplier = () -> 0.0;
+    private DoubleSupplier omegaNormalizedSupplier = () -> 0.0;
+
+    // Path following
+    private Supplier<Path> pathSupplier = () -> null;
+    private Supplier<Boolean> shouldPoseResetSupplier = () -> false;
+    private Command currentPathCommand = null;
+    private FollowPath.Builder followPathBuilder;
+
+    // Ranged rotation
+    private Rotation2d rotationRangeMin = Rotation2d.fromDegrees(-180);
+    private Rotation2d rotationRangeMax = Rotation2d.fromDegrees(180);
+    private PIDController rangedRotationPIDController;
+    private static final double RANGED_ROTATION_MAX_VELOCITY_FACTOR = 0.6;
+    private static final double RANGED_ROTATION_BUFFER_RAD = Math.toRadians(15.0); // Buffer to prevent oscillation at boundaries
+
+    private boolean shouldOverrideOmega = false;
+    private double omegaOverride = 0.0;
+    private double lastUnoverriddenOmega = 0.0;
+
+    // Translational speed freezing (used during shooting) - only vx/vy are frozen, omega remains controlled
+    private boolean shouldOverrideTranslationalSpeedsFrozen = false;
+    private double frozenVxMetersPerSec = 0.0;
+    private double frozenVyMetersPerSec = 0.0;
+
+    // Shooting velocity cap (limits max translational velocity during shooting)
+    private boolean shouldOverrideVelocityCap = false;
+    private double velocityCapMaxVelocityMetersPerSec = 1.0;
+
+    // Alliance-based inversion
+    private int invert = 1;
+
+    private double modulesAlignmentToleranceDeg = 15.0;
+    private Rotation2d modulesAlignmentTargetRotation = Rotation2d.fromDegrees(0);
+
+    public static final double ODOMETRY_FREQUENCY = 250;
+
+    public static final Lock odometryLock = new ReentrantLock();
+
+    private ModuleIO[] modules;
+    private ModuleIOInputsAutoLogged[] moduleInputs = {
+            new ModuleIOInputsAutoLogged(),
+            new ModuleIOInputsAutoLogged(),
+            new ModuleIOInputsAutoLogged(),
+            new ModuleIOInputsAutoLogged()
+    };
+
+    private final GyroIO gyroIO;
+    private GyroIOInputsAutoLogged gyroInputs = new GyroIOInputsAutoLogged();
+
+    private SwerveModulePosition[] modulePositions = new SwerveModulePosition[] {
+        new SwerveModulePosition(),
+        new SwerveModulePosition(),
+        new SwerveModulePosition(),
+        new SwerveModulePosition()
+    };  
+    private SwerveModuleState[] moduleStates = new SwerveModuleState[] {
+        new SwerveModuleState(),
+        new SwerveModuleState(),
+        new SwerveModuleState(),
+        new SwerveModuleState()
+    };
+
+    private ChassisSpeeds desiredRobotRelativeSpeeds = new ChassisSpeeds();
+    private ChassisSpeeds obtainableFieldRelativeSpeeds = new ChassisSpeeds();
+
+    double prevLoopTime = Timer.getTimestamp();
+    double prevDriveTime = Timer.getTimestamp();
+
+    private final SwerveModuleGeneralConfigBase moduleGeneralConfig;
+    private final SwerveDrivetrainConfigBase drivetrainConfig;
+    private SwerveDriveKinematics kinematics;
+
+    private final SysIdRoutine driveCharacterizationSysIdRoutine;
+    private final SysIdRoutine steerCharacterizationSysIdRoutine;
+
+    @SuppressWarnings("static-access")
+    private SwerveDrive() {
+        switch (Constants.currentMode) {
+            case COMP:
+                drivetrainConfig = SwerveDrivetrainConfigComp.getInstance();
+                moduleGeneralConfig = SwerveModuleGeneralConfigComp.getInstance();
+
+                modules = new ModuleIO[] {
+                    new ModuleIOTalonFX(moduleGeneralConfig, SwerveModuleSpecificFLConfigComp.getInstance()),
+                    new ModuleIOTalonFX(moduleGeneralConfig, SwerveModuleSpecificFRConfigComp.getInstance()),
+                    new ModuleIOTalonFX(moduleGeneralConfig, SwerveModuleSpecificBLConfigComp.getInstance()),
+                    new ModuleIOTalonFX(moduleGeneralConfig, SwerveModuleSpecificBRConfigComp.getInstance())
+                };
+                
+                gyroIO = new GyroIOPigeon2();
+                PhoenixOdometryThread.getInstance().start();
+
+                break;
+
+            case PROTO:
+                drivetrainConfig = SwerveDrivetrainConfigProto.getInstance();
+                moduleGeneralConfig = SwerveModuleGeneralConfigProto.getInstance();
+
+                modules = new ModuleIO[] {
+                    new ModuleIOTalonFX(moduleGeneralConfig, SwerveModuleSpecificBLConfigProto.getInstance()),
+                    new ModuleIOTalonFX(moduleGeneralConfig, SwerveModuleSpecificFRConfigProto.getInstance()),
+                    new ModuleIOTalonFX(moduleGeneralConfig, SwerveModuleSpecificBLConfigProto.getInstance()),
+                    new ModuleIOTalonFX(moduleGeneralConfig, SwerveModuleSpecificBLConfigProto.getInstance())
+                };
+                
+                gyroIO = new GyroIOPigeon2();
+                PhoenixOdometryThread.getInstance().start();
+                break;
+
+            case SIM:
+                drivetrainConfig = SwerveDrivetrainConfigSim.getInstance();
+                moduleGeneralConfig = SwerveModuleGeneralConfigSim.getInstance();
+
+                modules = new ModuleIO[] {
+                    new ModuleIOSim(moduleGeneralConfig, 0),
+                    new ModuleIOSim(moduleGeneralConfig, 1),
+                    new ModuleIOSim(moduleGeneralConfig, 2),
+                    new ModuleIOSim(moduleGeneralConfig, 3)
+                };
+
+                gyroIO = new GyroIO() {};
+                break;
+
+            case REPLAY:
+                drivetrainConfig = SwerveDrivetrainConfigComp.getInstance();
+                moduleGeneralConfig = SwerveModuleGeneralConfigComp.getInstance();
+
+                modules = new ModuleIO[] {
+                    new ModuleIO() {},
+                    new ModuleIO() {},
+                    new ModuleIO() {},
+                    new ModuleIO() {}
+                };
+
+                gyroIO = new GyroIOPigeon2();
+
+                break;
+
+            default:
+                drivetrainConfig = SwerveDrivetrainConfigComp.getInstance();
+                moduleGeneralConfig = SwerveModuleGeneralConfigComp.getInstance();
+
+                modules = new ModuleIO[] {
+                    new ModuleIOTalonFX(moduleGeneralConfig, SwerveModuleSpecificFLConfigComp.getInstance()),
+                    new ModuleIOTalonFX(moduleGeneralConfig, SwerveModuleSpecificFRConfigComp.getInstance()),
+                    new ModuleIOTalonFX(moduleGeneralConfig, SwerveModuleSpecificBLConfigComp.getInstance()),
+                    new ModuleIOTalonFX(moduleGeneralConfig, SwerveModuleSpecificBRConfigComp.getInstance())
+                };
+                
+                gyroIO = new GyroIOPigeon2();
+                PhoenixOdometryThread.getInstance().start();
+
+                break;
+                
+        }
+
+        kinematics = new SwerveDriveKinematics(
+            drivetrainConfig.getFrontLeftPositionMeters(),
+            drivetrainConfig.getFrontRightPositionMeters(),
+            drivetrainConfig.getBackLeftPositionMeters(),
+            drivetrainConfig.getBackRightPositionMeters()
+        );
+
+        // Create the SysId routine - this is going to be in torque current foc units not voltage
+        driveCharacterizationSysIdRoutine = new SysIdRoutine(
+            new SysIdRoutine.Config(
+                Volts.of(1.5).per(Second), Volts.of(12), Seconds.of(15), // Use default config
+                (state) -> Logger.recordOutput("DriveCharacterizationSysIdRoutineState", state.toString())
+            ),
+            new SysIdRoutine.Mechanism(
+                (torqueCurrentFOC) -> {
+                    for (ModuleIO module : modules) {
+                        module.setDriveTorqueCurrentFOC(torqueCurrentFOC.in(Volts), new Rotation2d(0));
+                    }
+                },
+                null, // No log consumer, since data is recorded by AdvantageKit
+                this
+            )
+        );
+
+        steerCharacterizationSysIdRoutine = new SysIdRoutine(
+            new SysIdRoutine.Config(
+                Volts.of(1).per(Second), Volts.of(7), Seconds.of(10), // Use default config
+                (state) -> Logger.recordOutput("SteerCharacterizationSysIdRoutineState", state.toString())
+            ),
+            new SysIdRoutine.Mechanism(
+                (torqueCurrentFOC) -> {
+                    for (ModuleIO module : modules) {
+                        module.setSteerTorqueCurrentFOC(torqueCurrentFOC.in(Volts), 0);
+                    }
+                },
+                null, // No log consumer, since data is recorded by AdvantageKit
+                this
+            )
+        );
+
+        // Configure FollowPath builder using drivetrain config
+        followPathBuilder = new FollowPath.Builder(
+            this,
+            RobotState.getInstance()::getEstimatedPose,
+            RobotState.getInstance()::getRobotRelativeSpeeds,
+            this::driveRobotRelative,
+            new PIDController(
+                drivetrainConfig.getFollowPathTranslationKP(),
+                drivetrainConfig.getFollowPathTranslationKI(),
+                drivetrainConfig.getFollowPathTranslationKD()
+            ),
+            new PIDController(
+                drivetrainConfig.getFollowPathRotationKP(),
+                drivetrainConfig.getFollowPathRotationKI(),
+                drivetrainConfig.getFollowPathRotationKD()
+            ),
+            new PIDController(
+                drivetrainConfig.getFollowPathCrossTrackKP(),
+                drivetrainConfig.getFollowPathCrossTrackKI(),
+                drivetrainConfig.getFollowPathCrossTrackKD()
+            )
+        ).withDefaultShouldFlip();
+
+        // Configure ranged rotation PID controller with velocity limiting
+        rangedRotationPIDController = new PIDController(
+            drivetrainConfig.getRangedRotationKP(),
+            drivetrainConfig.getRangedRotationKI(),
+            drivetrainConfig.getRangedRotationKD()
+        );
+        rangedRotationPIDController.enableContinuousInput(-Math.PI, Math.PI);
+        // rangedRotationPIDController.setTolerance(Math.toRadians(drivetrainConfig.getRangedRotationToleranceDeg()));
+
+    }
+
+    @Override
+    public void periodic() {
+        double dt = Timer.getTimestamp() - prevLoopTime; 
+        prevLoopTime = Timer.getTimestamp();
+
+        Logger.recordOutput("SwerveDrive/dtPeriodic", dt);
+
+        // Thread safe reading of the gyro and swerve inputs.
+        // The read lock is released only after inputs are written via the write lock
+        odometryLock.lock();
+        try {
+            Logger.recordOutput("SwerveDrive/stateLockAcquired", true);
+            gyroIO.updateInputs(gyroInputs);
+            Logger.processInputs("SwerveDrive/gyro", gyroInputs);
+
+            for (int i = 0; i < 4; i++) {
+                modules[i].updateInputs(moduleInputs[i]);
+                Logger.processInputs("SwerveDrive/module" + i, moduleInputs[i]);
+            }
+        } finally {
+            odometryLock.unlock();
+        }
+
+        for (int i = 0; i < 4; i++) {
+            moduleStates[i] = new SwerveModuleState(
+                moduleInputs[i].driveVelocityMetersPerSec,
+                moduleInputs[i].steerPosition
+            );
+        }
+
+        ArrayList<Pose2d> updatedPoses = new ArrayList<Pose2d>();
+
+        double[] odometryTimestampsSeconds = moduleInputs[0].odometryTimestampsSeconds;
+        for (int i = 0; i < odometryTimestampsSeconds.length; i++) {
+            for (int j = 0; j < 4; j++) {
+                modulePositions[j] = new SwerveModulePosition(
+                    moduleInputs[j].odometryDrivePositionsMeters[i],
+                    moduleInputs[j].odometrySteerPositions[i]
+                );
+            }
+            
+            RobotState.getInstance().addOdometryObservation(
+                new OdometryObservation(
+                    odometryTimestampsSeconds[i],
+                    gyroInputs.isConnected,
+                    modulePositions,
+                    moduleStates,
+                    gyroInputs.isConnected ? gyroInputs.odometryYawPositions[i] : new Rotation2d(),
+                    gyroInputs.isConnected ? gyroInputs.yawVelocityRadPerSec : 0
+                )
+            );
+
+            updatedPoses.add(RobotState.getInstance().getEstimatedPose());
+        }
+
+        Logger.recordOutput("SwerveDrive/updatedPoses", updatedPoses.toArray(new Pose2d[0]));
+        Logger.recordOutput("SwerveDrive/measuredModuleStates", moduleStates);
+        Logger.recordOutput("SwerveDrive/measuredModulePositions", modulePositions);
+
+        // FSM processing
+        handleStateTransitions();
+        handleCurrentState();
+
+        Logger.recordOutput("SwerveDrive/CurrentCommand", this.getCurrentCommand() == null ? "" : this.getCurrentCommand().toString());
+    }
+
+    /**
+     * Determines the next measured state based on the desired state.
+     */
+    private void handleStateTransitions() {
+        switch (desiredSystemState) {
+            case STOPPED:
+                currentSystemState = CurrentSystemState.STOPPED;
+                break;
+            case IDLE:
+                currentSystemState = CurrentSystemState.IDLE;
+                break;
+            case TELEOP:
+                currentSystemState = CurrentSystemState.TELEOP;
+                break;
+
+            case FOLLOW_PATH:
+                if (currentPathCommand != null && currentPathCommand.isFinished()) {
+                    currentSystemState = CurrentSystemState.IDLE;
+                    desiredSystemState = DesiredSystemState.IDLE;
+                } else {
+                    currentSystemState = CurrentSystemState.FOLLOW_PATH;
+                }
+                break;
+                
+            case PREPARE_FOR_AUTO:
+                if (pathSupplier.get() != null) {
+                    modulesAlignmentTargetRotation = pathSupplier.get().getInitialModuleDirection();
+                    modulesAlignmentToleranceDeg = 15;
+                }
+                if (areModulesAligned()) {
+                    currentSystemState = CurrentSystemState.READY_FOR_AUTO;
+                } else {
+                    currentSystemState = CurrentSystemState.PREPARE_FOR_AUTO;
+                }
+                break;
+
+            case SYSID:
+                currentSystemState = CurrentSystemState.SYSID;
+                break;
+        }
+
+        switch (desiredOmegaOverrideState) {
+            case NONE:
+                currentOmegaOverrideState = CurrentOmegaOverrideState.NONE;
+                break;
+            case RANGED_ROTATION:
+                if (isWithinRotationRange()) {
+                    currentOmegaOverrideState = CurrentOmegaOverrideState.RANGED_ROTATION_NOMINAL;
+                } else {
+                    currentOmegaOverrideState = CurrentOmegaOverrideState.RANGED_ROTATION_RETURNING;
+                }
+                break;
+        }
+
+        switch (desiredTranslationOverrideState) {
+            case NONE:
+                currentTranslationOverrideState = CurrentTranslationOverrideState.NONE;
+                break;
+            case FROZEN:
+                currentTranslationOverrideState = CurrentTranslationOverrideState.FROZEN;
+                break;
+            case CAPPED:
+                currentTranslationOverrideState = CurrentTranslationOverrideState.CAPPED;
+                break;
+        }
+    }
+
+    /**
+     * Executes behavior for the current state.
+     */
+    private void handleCurrentState() {
+        switch (currentSystemState) {
+            case STOPPED:
+                handleStoppedSystemState();
+                break;
+            case IDLE:
+                handleIdleSystemState();
+                break;
+            case TELEOP:
+                handleTeleopSystemState();
+                break;
+            case FOLLOW_PATH:
+                handleFollowPathSystemState();
+                break;
+            case PREPARE_FOR_AUTO:
+                handlePrepareForAutoSystemState();
+                break;
+            case READY_FOR_AUTO:
+                handleReadyForAutoSystemState();
+                break;
+            case SYSID:
+                handleSysIdSystemState();
+                break;
+        }
+
+        switch (currentOmegaOverrideState) {
+            case NONE:
+                handleNoneOmegaOverrideState();
+                break;
+            case RANGED_ROTATION_NOMINAL:
+                handleRangedRotationNominalOmegaOverrideState();
+                break;
+            case RANGED_ROTATION_RETURNING:
+                handleRangedRotationReturningOmegaOverrideState();
+                break;
+        }
+
+        switch (currentTranslationOverrideState) {
+            case NONE:
+                handleNoneTranslationOverrideState();
+                break;
+            case FROZEN:
+                handleFrozenTranslationOverrideState();
+                break;
+            case CAPPED:
+                handleCappedTranslationOverrideState();
+                break;
+        }
+
+
+    }
+    private void cancelPathCommand() {
+        if (currentPathCommand != null && currentPathCommand.isScheduled()) {
+            currentPathCommand.cancel();
+        }
+        currentPathCommand = null;
+    }
+
+    private void handleStoppedSystemState() {
+        if (previousSystemState != CurrentSystemState.STOPPED) {
+            setWheelCoast(true);
+        }
+        cancelPathCommand();
+        
+        driveFieldRelative(new ChassisSpeeds(0, 0, 0));
+
+        previousSystemState = CurrentSystemState.STOPPED;
+    }
+
+    private void handleIdleSystemState() {
+        if (previousSystemState == CurrentSystemState.STOPPED) {
+            setWheelCoast(false);
+        }
+        cancelPathCommand();
+
+        // Only cancel running commands, but don't null out finished commands
+        // This prevents re-scheduling when path completes while desired state is still FOLLOW_PATH
+        if (currentPathCommand != null && currentPathCommand.isScheduled()) {
+            currentPathCommand.cancel();
+        }
+        driveFieldRelative(new ChassisSpeeds(0, 0, 0));
+
+        previousSystemState = CurrentSystemState.IDLE;
+    }
+
+    private void handleTeleopSystemState() {
+        if (previousSystemState == CurrentSystemState.STOPPED) {
+            setWheelCoast(false);
+        }
+        cancelPathCommand();
+
+        invert = Constants.shouldFlipPath() ? -1 : 1;
+
+        ChassisSpeeds desiredFieldRelativeSpeeds = new ChassisSpeeds(
+            vxNormalizedSupplier.getAsDouble() * drivetrainConfig.getMaxTranslationalVelocityMetersPerSec() * invert,
+            vyNormalizedSupplier.getAsDouble() * drivetrainConfig.getMaxTranslationalVelocityMetersPerSec() * invert,
+            omegaNormalizedSupplier.getAsDouble() * drivetrainConfig.getMaxAngularVelocityRadiansPerSec()
+        );
+        driveFieldRelative(desiredFieldRelativeSpeeds);
+
+        previousSystemState = CurrentSystemState.TELEOP;
+    }
+
+    private void handleFollowPathSystemState() {
+        if (previousSystemState == CurrentSystemState.STOPPED) {
+            setWheelCoast(false);
+        }
+        
+        // Schedule path command if not already running
+        Path path = pathSupplier.get();
+        if (path != null && (currentPathCommand == null || (!currentPathCommand.isScheduled() && !currentPathCommand.isFinished()))) {
+            currentPathCommand = buildPathCommand(path);
+            currentPathCommand.schedule();
+        }
+        // The path command handles driving via the callback
+
+        previousSystemState = CurrentSystemState.FOLLOW_PATH;
+    }
+
+    private void prepareForAuto() {
+        if (previousSystemState != CurrentSystemState.PREPARE_FOR_AUTO && previousSystemState != CurrentSystemState.READY_FOR_AUTO) {
+            setWheelCoast(false);
+        }
+        cancelPathCommand();
+
+        if (pathSupplier.get() != null) {
+            alignModules(pathSupplier.get().getInitialModuleDirection(), 15);
+        }
+    }
+
+    private void handlePrepareForAutoSystemState() {
+        prepareForAuto();
+        previousSystemState = CurrentSystemState.PREPARE_FOR_AUTO;
+    }
+
+    private void handleReadyForAutoSystemState() {
+        prepareForAuto();
+        previousSystemState = CurrentSystemState.READY_FOR_AUTO;
+    }
+
+    private void handleSysIdSystemState() {
+        if (previousSystemState == CurrentSystemState.STOPPED) {
+            setWheelCoast(false);
+        }
+        cancelPathCommand();
+
+        previousSystemState = CurrentSystemState.SYSID;
+        // SysId routines handle their own motor control
+        // This state just prevents other states from interfering
+    }
+
+    private void handleNoneOmegaOverrideState() {
+        shouldOverrideOmega = false;
+        omegaOverride = 0.0;
+
+        previousOmegaOverrideState = CurrentOmegaOverrideState.NONE;
+    }
+    
+    private void handleRangedRotationOmegaOverrideState() {
+        shouldOverrideOmega = true;
+        if (isWithinRotationRange(RANGED_ROTATION_BUFFER_RAD-Math.toRadians(drivetrainConfig.getRangedRotationToleranceDeg()))) {
+            omegaOverride = limitOmegaForRange(lastUnoverriddenOmega); // TODO: BAD FIX
+        } else {
+            omegaOverride = calculateReturnToRangeOmega();
+        }
+    }
+
+    private void handleRangedRotationNominalOmegaOverrideState() {
+        handleRangedRotationOmegaOverrideState();
+        previousOmegaOverrideState = CurrentOmegaOverrideState.RANGED_ROTATION_NOMINAL;
+    }
+    
+    private void handleRangedRotationReturningOmegaOverrideState() {
+        handleRangedRotationOmegaOverrideState();
+        previousOmegaOverrideState = CurrentOmegaOverrideState.RANGED_ROTATION_RETURNING;
+    }
+
+    private void handleNoneTranslationOverrideState() {
+        shouldOverrideVelocityCap = false;
+        shouldOverrideTranslationalSpeedsFrozen = false;
+
+        previousTranslationOverrideState = CurrentTranslationOverrideState.NONE;
+    }
+
+    private void handleFrozenTranslationOverrideState() {
+        shouldOverrideTranslationalSpeedsFrozen = true;
+        shouldOverrideVelocityCap = false;
+
+        if (previousTranslationOverrideState != CurrentTranslationOverrideState.FROZEN) {
+            frozenVxMetersPerSec = RobotState.getInstance().getFieldRelativeSpeeds().vxMetersPerSecond;
+            frozenVyMetersPerSec = RobotState.getInstance().getFieldRelativeSpeeds().vyMetersPerSecond;
+        }
+
+        previousTranslationOverrideState = CurrentTranslationOverrideState.FROZEN;
+    }
+
+    private void handleCappedTranslationOverrideState() {
+        shouldOverrideVelocityCap = true;
+        shouldOverrideTranslationalSpeedsFrozen = false;
+
+        previousTranslationOverrideState = CurrentTranslationOverrideState.CAPPED;
+    }
+
+    /**
+     * Builds a path command using the followPathBuilder, applying pose reset if configured.
+     */
+    private Command buildPathCommand(Path path) {
+        if (shouldPoseResetSupplier.get()) {
+            return followPathBuilder.withPoseReset(RobotState.getInstance()::resetPose).build(path);
+        }
+        return followPathBuilder.withPoseReset((Pose2d pose) -> {}).build(path);
+    }
+
+    
+
+    /**
+     * Checks if robot rotation is within the specified range.
+     */
+    private boolean isWithinRotationRange() {
+        return isWithinRotationRange(0);
+    }
+
+    /**
+     * Checks if robot rotation is within the specified range with an optional buffer.
+     * @param buffer The buffer in radians to constrict the range by (applied to both min and max)
+     */
+    private boolean isWithinRotationRange(double buffer) {
+        Rotation2d currentRotation = RobotState.getInstance().getEstimatedPose().getRotation();
+        
+        // Normalize angles to -PI to PI for comparison
+        double current = MathUtil.angleModulus(currentRotation.getRadians());
+        double min = MathUtil.angleModulus(rotationRangeMin.getRadians() + buffer);
+        double max = MathUtil.angleModulus(rotationRangeMax.getRadians() - buffer);
+        
+        // Handle wrap-around case
+        if (min <= max) {
+            return current >= min && current <= max;
+        } else {
+            // Range wraps around (e.g., min=170deg, max=-170deg)
+            return current >= min || current <= max;
+        }
+    }
+
+    /**
+     * Checks if robot rotation is within the padded/constricted range.
+     * The padded range is the user-supplied range reduced by RANGED_ROTATION_BUFFER_RAD on each side.
+     */
+    private boolean isWithinPaddedRotationRange() {
+        return isWithinRotationRange(RANGED_ROTATION_BUFFER_RAD);
+    }
+
+    /**
+     * Limits omega using sqrt(2*a*d) formula to prevent exceeding the padded rotation bounds.
+     * Uses the padded range (user range constricted by buffer) as the boundary.
+     * Accounts for current robot angular velocity to be more conservative when already
+     * moving towards a boundary.
+     */
+    private double limitOmegaForRange(double desiredOmega) {
+        Rotation2d currentRotation = RobotState.getInstance().getEstimatedPose().getRotation();
+        double currentOmega = RobotState.getInstance().getYawVelocityRadPerSec();
+        
+        double current = currentRotation.getRadians();
+        // Use padded range bounds (constricted by buffer)
+        double min = rotationRangeMin.getRadians() + RANGED_ROTATION_BUFFER_RAD;
+        double max = rotationRangeMax.getRadians() - RANGED_ROTATION_BUFFER_RAD;
+        
+        // Calculate distance to padded bounds (using Rotation2d for proper wrapping)
+        double distToMin = Math.abs(MathUtil.angleModulus(current - min));
+        double distToMax = Math.abs(MathUtil.angleModulus(max - current));
+        
+        double maxAngularAccel = drivetrainConfig.getMaxAngularAccelerationRadiansPerSecSec();
+        
+        // Calculate stopping distance from current velocity: d = ω² / (2α)
+        double stoppingDistFromCurrent = (currentOmega * currentOmega) / (2 * maxAngularAccel);
+        
+        // Adjust effective distances based on current velocity direction
+        // If moving towards a boundary, reduce effective distance by stopping distance
+        double effectiveDistToMax = distToMax;
+        double effectiveDistToMin = distToMin;
+        
+        if (currentOmega > 0) {
+            // Moving towards max, reduce effective distance to max
+            effectiveDistToMax = Math.max(0, distToMax - stoppingDistFromCurrent);
+        } else if (currentOmega < 0) {
+            // Moving towards min (negative omega), reduce effective distance to min
+            effectiveDistToMin = Math.max(0, distToMin - stoppingDistFromCurrent);
+        }
+        
+        // sqrt(2*a*d) formula for max velocity to stop at boundary using effective distances
+        double maxOmegaToMin = Math.sqrt(2 * maxAngularAccel * effectiveDistToMin);
+        double maxOmegaToMax = Math.sqrt(2 * maxAngularAccel * effectiveDistToMax);
+
+        if (currentRotation.getRadians() < min) {
+            return Math.max(desiredOmega, 0);
+        }
+        if (currentRotation.getRadians() > max) {
+            return Math.min(desiredOmega, 0);
+        }        
+
+        // Clamp omega based on direction
+        if (desiredOmega > 0) {
+            // Rotating towards max bound
+            return Math.min(desiredOmega, maxOmegaToMax);
+        } else {
+            // Rotating towards min bound
+            return Math.max(desiredOmega, -maxOmegaToMin);
+        }
+    }
+
+    /**
+     * Calculates omega to return to rotation range using PID with velocity limiting.
+     * Uses an internal buffer to target slightly inside the range to prevent oscillation at boundaries.
+     */
+    private double calculateReturnToRangeOmega() {
+        Rotation2d currentRotation = RobotState.getInstance().getEstimatedPose().getRotation();
+        
+        double current = currentRotation.getRadians();
+        double min = rotationRangeMin.getRadians();
+        double max = rotationRangeMax.getRadians();
+        
+        // Find closest bound
+        double distToMin = Math.abs(MathUtil.angleModulus(current - min));
+        double distToMax = Math.abs(MathUtil.angleModulus(current - max));
+        
+        double targetAngle;
+        if (distToMin < distToMax) {
+            // Target slightly inside the min boundary (add buffer)
+            targetAngle = min + RANGED_ROTATION_BUFFER_RAD;
+        } else {
+            // Target slightly inside the max boundary (subtract buffer)
+            targetAngle = max - RANGED_ROTATION_BUFFER_RAD;
+        }
+        
+        // Calculate PID output
+        rangedRotationPIDController.setSetpoint(targetAngle);
+        double pidOutput = rangedRotationPIDController.calculate(current);
+        
+        // Apply velocity limit (0.6 of max omega)
+        double maxOmega = drivetrainConfig.getMaxAngularVelocityRadiansPerSec() * RANGED_ROTATION_MAX_VELOCITY_FACTOR;
+
+        
+        return MathUtil.clamp(pidOutput, -maxOmega, maxOmega);
+    }
+
+    // Supplier setters
+    public void setTeleopInputSuppliers(
+        DoubleSupplier vxNormalized,
+        DoubleSupplier vyNormalized,
+        DoubleSupplier omegaNormalized
+    ) {
+        this.vxNormalizedSupplier = vxNormalized;
+        this.vyNormalizedSupplier = vyNormalized;
+        this.omegaNormalizedSupplier = omegaNormalized;
+    }
+
+    public void setPathSupplier(Supplier<Path> pathSupplier) {
+        this.pathSupplier = pathSupplier;
+        this.shouldPoseResetSupplier = () -> false;
+        // Clear existing command to allow fresh path to be scheduled
+        cancelPathCommand();
+    }
+
+    public void setPathSupplier(Supplier<Path> pathSupplier, Supplier<Boolean> shouldPoseResetSupplier) {
+        this.pathSupplier = pathSupplier;
+        this.shouldPoseResetSupplier = shouldPoseResetSupplier;
+        // Clear existing command to allow fresh path to be scheduled
+        cancelPathCommand();
+    }
+
+    public void setRotationRange(Rotation2d min, Rotation2d max) {
+        this.rotationRangeMin = min;
+        this.rotationRangeMax = max;
+
+        Logger.recordOutput("SwerveDrive/rotationRangeMin", min);
+        Logger.recordOutput("SwerveDrive/rotationRangeMax", max);
+    }
+
+    public void setVelocityCapMaxVelocityMetersPerSec(double maxVelocity) {
+        this.velocityCapMaxVelocityMetersPerSec = maxVelocity;
+    }
+
+    // System State getters/setters
+    @AutoLogOutput(key = "SwerveDrive/desiredSystemState")
+    public DesiredSystemState getDesiredSystemState() {
+        return desiredSystemState;
+    }
+
+    @AutoLogOutput(key = "SwerveDrive/currentSystemState")
+    public CurrentSystemState getCurrentSystemState() {
+        return currentSystemState;
+    }
+
+    public void setDesiredSystemState(DesiredSystemState desiredState) {
+        this.desiredSystemState = desiredState;
+    }
+
+    // Omega Override State getters/setters
+    @AutoLogOutput(key = "SwerveDrive/desiredOmegaOverrideState")
+    public DesiredOmegaOverrideState getDesiredOmegaOverrideState() {
+        return desiredOmegaOverrideState;
+    }
+
+    @AutoLogOutput(key = "SwerveDrive/currentOmegaOverrideState")
+    public CurrentOmegaOverrideState getCurrentOmegaOverrideState() {
+        return currentOmegaOverrideState;
+    }
+
+    public void setDesiredOmegaOverrideState(DesiredOmegaOverrideState desiredOmegaOverrideState) {
+        this.desiredOmegaOverrideState = desiredOmegaOverrideState;
+    }
+
+    // Translation Override State getters/setters
+    @AutoLogOutput(key = "SwerveDrive/desiredTranslationOverrideState")
+    public DesiredTranslationOverrideState getDesiredTranslationOverrideState() {
+        return desiredTranslationOverrideState;
+    }
+
+    @AutoLogOutput(key = "SwerveDrive/currentTranslationOverrideState")
+    public CurrentTranslationOverrideState getCurrentTranslationOverrideState() {
+        return currentTranslationOverrideState;
+    }
+
+    public void setDesiredTranslationOverrideState(DesiredTranslationOverrideState desiredTranslationOverrideState) {
+        this.desiredTranslationOverrideState = desiredTranslationOverrideState;
+    }
+
+    // Existing drive methods
+    private ChassisSpeeds compensateRobotRelativeSpeeds(ChassisSpeeds speeds) {
+        Rotation2d angularVelocity = new Rotation2d(speeds.omegaRadiansPerSecond * drivetrainConfig.getRotationCompensationCoefficient());
+        if (angularVelocity.getRadians() != 0.0) {
+            speeds = ChassisSpeeds.fromFieldRelativeSpeeds(
+                ChassisSpeeds.fromRobotRelativeSpeeds( // why should this be split into two?
+                    speeds.vxMetersPerSecond,
+                    speeds.vyMetersPerSecond,
+                    speeds.omegaRadiansPerSecond,
+                    RobotState.getInstance().getEstimatedPose().getRotation().plus(angularVelocity)
+                ),
+                RobotState.getInstance().getEstimatedPose().getRotation()
+            );
+        }
+
+        return speeds;
+    }
+
+    // return a supplier that is true if the modules are aligned within the tolerance
+    private void alignModules(Rotation2d targetRotation, double toleranceDeg) {
+        modulesAlignmentTargetRotation = targetRotation;
+        modulesAlignmentToleranceDeg = toleranceDeg;
+        for (int i = 0; i < 4; i++) {
+            SwerveModuleState state = new SwerveModuleState(0, targetRotation);
+            state.optimize(moduleStates[i].angle);
+            modules[i].setState(state);
+        }
+    }
+
+    private boolean areModulesAligned() {
+        for (int i = 0; i < 4; i++) {
+            if (Math.abs(moduleStates[i].angle.minus(modulesAlignmentTargetRotation).getDegrees()) > modulesAlignmentToleranceDeg && 
+                Math.abs(moduleStates[i].angle.plus(Rotation2d.fromDegrees(180)).minus(modulesAlignmentTargetRotation).getDegrees()) > modulesAlignmentToleranceDeg) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    public void driveRobotRelative(ChassisSpeeds speeds) {
+        double dt = Timer.getTimestamp() - prevDriveTime; 
+        prevDriveTime = Timer.getTimestamp();
+
+        lastUnoverriddenOmega = speeds.omegaRadiansPerSecond;
+        desiredRobotRelativeSpeeds = speeds;
+
+        if (shouldOverrideOmega) {
+            desiredRobotRelativeSpeeds = new ChassisSpeeds(
+                desiredRobotRelativeSpeeds.vxMetersPerSecond,
+                desiredRobotRelativeSpeeds.vyMetersPerSecond,
+                omegaOverride
+            );
+        }
+
+        // TODO: SIM BUG WERE robot kind of goes off in a direction and then control comes back. happens randomly in capped state?
+        if (shouldOverrideVelocityCap) {
+            double maxVelocity = velocityCapMaxVelocityMetersPerSec;
+            double currentMagnitude = Math.hypot(desiredRobotRelativeSpeeds.vxMetersPerSecond, desiredRobotRelativeSpeeds.vyMetersPerSecond);
+            if (currentMagnitude > maxVelocity && currentMagnitude > 0) {
+                double scale = maxVelocity / currentMagnitude;
+                desiredRobotRelativeSpeeds = new ChassisSpeeds(
+                    desiredRobotRelativeSpeeds.vxMetersPerSecond * scale,
+                    desiredRobotRelativeSpeeds.vyMetersPerSecond * scale,
+                    desiredRobotRelativeSpeeds.omegaRadiansPerSecond
+                );
+            }
+        }
+
+        if (shouldOverrideTranslationalSpeedsFrozen) {
+            ChassisSpeeds frozenFieldRelativeSpeeds = new ChassisSpeeds(
+                frozenVxMetersPerSec,
+                frozenVyMetersPerSec,
+                desiredRobotRelativeSpeeds.omegaRadiansPerSecond
+            );
+
+            desiredRobotRelativeSpeeds = ChassisSpeeds.fromFieldRelativeSpeeds(frozenFieldRelativeSpeeds, RobotState.getInstance().getEstimatedPose().getRotation());
+        }
+
+        ChassisSpeeds desiredFieldRelativeSpeeds = ChassisSpeeds.fromRobotRelativeSpeeds(desiredRobotRelativeSpeeds, RobotState.getInstance().getEstimatedPose().getRotation());
+        Logger.recordOutput("SwerveDrive/desiredFieldRelativeSpeeds", desiredFieldRelativeSpeeds);
+        Logger.recordOutput("SwerveDrive/desiredRobotRelativeSpeeds", desiredRobotRelativeSpeeds);
+        
+        // Limit acceleration to prevent sudden changes in speed
+        obtainableFieldRelativeSpeeds = ChassisRateLimiter.limit(
+            desiredFieldRelativeSpeeds, 
+            obtainableFieldRelativeSpeeds, 
+            dt, 
+            drivetrainConfig.getMaxTranslationalAccelerationMetersPerSecSec(), 
+            drivetrainConfig.getMaxAngularAccelerationRadiansPerSecSec(),
+            drivetrainConfig.getMaxTranslationalVelocityMetersPerSec(),
+            drivetrainConfig.getMaxAngularVelocityRadiansPerSec()
+        );
+        
+        Logger.recordOutput("SwerveDrive/obtainableFieldRelativeSpeeds", obtainableFieldRelativeSpeeds);
+
+        ChassisSpeeds obtainableRobotRelativeSpeeds = ChassisSpeeds.fromFieldRelativeSpeeds(obtainableFieldRelativeSpeeds, RobotState.getInstance().getEstimatedPose().getRotation());
+        Logger.recordOutput("SwerveDrive/obtainableRobotRelativeSpeeds", obtainableRobotRelativeSpeeds);
+
+        SwerveModuleState[] moduleSetpoints = kinematics.toSwerveModuleStates(obtainableRobotRelativeSpeeds);
+
+        SwerveDriveKinematics.desaturateWheelSpeeds(
+            moduleSetpoints, 
+            drivetrainConfig.getMaxModuleVelocity()
+        );
+        Logger.recordOutput("SwerveDrive/desaturatedModuleSetpoints", moduleSetpoints);
+
+        for (int i = 0; i < 4; i++) {
+            moduleSetpoints[i].optimize(moduleStates[i].angle);
+            modules[i].setState(moduleSetpoints[i]);
+        }
+        Logger.recordOutput("SwerveDrive/optimizedModuleSetpoints", moduleSetpoints);
+    }
+
+    public void driveFieldRelative(ChassisSpeeds speeds) {
+        speeds = ChassisSpeeds.fromFieldRelativeSpeeds(speeds, RobotState.getInstance().getEstimatedPose().getRotation());
+        driveRobotRelative(speeds);
+    }
+
+    public void resetGyro(Rotation2d yaw) {
+        gyroIO.resetGyro(yaw);
+    }
+
+    public Rotation2d getGyroAngle() {
+        return gyroInputs.yawPosition;
+    }
+
+    public void setWheelCoast(boolean isCoast) {
+        for (ModuleIO module : modules) {
+            module.setWheelCoast(isCoast);
+        }
+    }
+
+    public Command getDynamicDriveCharacterizationSysIdRoutine(Direction direction) {
+        return driveCharacterizationSysIdRoutine.dynamic(direction);
+    }
+
+    public Command getDynamicSteerCharacterizationSysIdRoutine(Direction direction) {
+        return steerCharacterizationSysIdRoutine.dynamic(direction);
+    }
+
+    public Command getQuasistaticDriveCharacterizationSysIdRoutine(Direction direction) {
+        return driveCharacterizationSysIdRoutine.quasistatic(direction);
+    }
+
+    public Command getQuasistaticSteerCharacterizationSysIdRoutine(Direction direction) {
+        return steerCharacterizationSysIdRoutine.quasistatic(direction);
+    }
+
+    public FollowPath.Builder getFollowPathBuilder() {
+        return followPathBuilder;
+    }
+}
