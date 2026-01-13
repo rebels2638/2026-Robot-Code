@@ -65,9 +65,11 @@ public abstract class ShooterConfigBase {
     public abstract double getTurretMaxVelocityDegPerSec();
     public abstract double getTurretMaxAccelerationDegPerSec2();
 
-    // Flywheel motor config (velocity control)
+    // Flywheel motor config (velocity control) - 2 motors with 1:1 gearing (leader/follower)
     public abstract int getFlywheelCanId();
+    public abstract int getFlywheelFollowerCanId();
     public abstract boolean getIsFlywheelInverted();
+    public abstract boolean getIsFlywheelFollowerOppositeDirection();
 
     public abstract double getFlywheelSupplyCurrentLimit();
     public abstract double getFlywheelSupplyCurrentLimitLowerTime();
@@ -89,52 +91,10 @@ public abstract class ShooterConfigBase {
     // Shooter pose relative to robot center
     public abstract Pose3d getShooterPose3d();
 
-    // Feeder motor config (velocity control)
-    public abstract int getFeederCanId();
-    public abstract boolean getIsFeederInverted();
-
-    public abstract double getFeederSupplyCurrentLimit();
-    public abstract double getFeederSupplyCurrentLimitLowerTime();
-    public abstract double getFeederSupplyCurrentLimitLowerLimit();
-    public abstract double getFeederStatorCurrentLimit();
-    public abstract double getFeederPeakForwardTorqueCurrent();
-    public abstract double getFeederPeakReverseTorqueCurrent();
-
-    public abstract double getFeederKS();
-    public abstract double getFeederKV();
-    public abstract double getFeederKA();
-    public abstract double getFeederKP();
-    public abstract double getFeederKI();
-    public abstract double getFeederKD();
-
-    public abstract double getFeederMotorToOutputShaftRatio();
-
-    // Indexer motor config (velocity control)
-    public abstract int getIndexerCanId();
-    public abstract boolean getIsIndexerInverted();
-
-    public abstract double getIndexerSupplyCurrentLimit();
-    public abstract double getIndexerSupplyCurrentLimitLowerTime();
-    public abstract double getIndexerSupplyCurrentLimitLowerLimit();
-    public abstract double getIndexerStatorCurrentLimit();
-    public abstract double getIndexerPeakForwardTorqueCurrent();
-    public abstract double getIndexerPeakReverseTorqueCurrent();
-
-    public abstract double getIndexerKS();
-    public abstract double getIndexerKV();
-    public abstract double getIndexerKA();
-    public abstract double getIndexerKP();
-    public abstract double getIndexerKI();
-    public abstract double getIndexerKD();
-
-    public abstract double getIndexerMotorToOutputShaftRatio();
-
     // Tolerances
     public abstract double getHoodAngleToleranceRotations();
     public abstract double getTurretAngleToleranceRotations();
     public abstract double getFlywheelVelocityToleranceRPS();
-    public abstract double getFeederVelocityToleranceRPS();
-    public abstract double getIndexerVelocityToleranceRPS();
 
     // Shot distance limits (from shooter, not robot center)
     public abstract double getMinShotDistFromShooterMeters();

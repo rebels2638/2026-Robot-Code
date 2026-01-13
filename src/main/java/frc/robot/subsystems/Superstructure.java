@@ -23,6 +23,9 @@ import frc.robot.VisualizeShot;
 import frc.robot.constants.Constants;
 import frc.robot.lib.util.ShotCalculator;
 import frc.robot.lib.util.ShotCalculator.ShotData;
+import frc.robot.subsystems.kicker.Kicker;
+import frc.robot.subsystems.kicker.Kicker.KickerCurrentState;
+import frc.robot.subsystems.kicker.Kicker.KickerDesiredState;
 import frc.robot.subsystems.shooter.Shooter;
 import frc.robot.subsystems.shooter.Shooter.ShooterCurrentState;
 import frc.robot.subsystems.shooter.Shooter.ShooterDesiredState;
@@ -59,6 +62,7 @@ public class Superstructure extends SubsystemBase {
     private CurrentState previousState = CurrentState.STOPPED;
 
     private final Shooter shooter = Shooter.getInstance();
+    private final Kicker kicker = Kicker.getInstance();
     private final SwerveDrive swerveDrive = SwerveDrive.getInstance();
     private final RobotState robotState = RobotState.getInstance();
 
@@ -179,6 +183,7 @@ public class Superstructure extends SubsystemBase {
 
     private void handleStoppedState() {
         shooter.setDesiredState(ShooterDesiredState.STOPPED);
+        kicker.setDesiredState(KickerDesiredState.STOPPED);
         swerveDrive.setDesiredSystemState(SwerveDrive.DesiredSystemState.STOPPED);
         swerveDrive.setDesiredOmegaOverrideState(SwerveDrive.DesiredOmegaOverrideState.NONE);
         swerveDrive.setDesiredTranslationOverrideState(SwerveDrive.DesiredTranslationOverrideState.NONE);
@@ -186,12 +191,14 @@ public class Superstructure extends SubsystemBase {
 
     private void handleHomeState() {
         shooter.setDesiredState(ShooterDesiredState.HOME);
+        kicker.setDesiredState(KickerDesiredState.HOME);
         swerveDrive.setDesiredOmegaOverrideState(SwerveDrive.DesiredOmegaOverrideState.NONE);
         swerveDrive.setDesiredTranslationOverrideState(SwerveDrive.DesiredTranslationOverrideState.NONE);
     }
 
     private void handleTrackingState() {
         shooter.setDesiredState(ShooterDesiredState.TRACKING);
+        kicker.setDesiredState(KickerDesiredState.HOME);
         swerveDrive.setDesiredOmegaOverrideState(SwerveDrive.DesiredOmegaOverrideState.NONE);
         swerveDrive.setDesiredTranslationOverrideState(SwerveDrive.DesiredTranslationOverrideState.NONE);
     }
@@ -202,6 +209,7 @@ public class Superstructure extends SubsystemBase {
 
 
         shooter.setDesiredState(ShooterDesiredState.READY_FOR_SHOT);
+        kicker.setDesiredState(KickerDesiredState.FEEDING);
         swerveDrive.setDesiredOmegaOverrideState(SwerveDrive.DesiredOmegaOverrideState.RANGED_ROTATION);
         swerveDrive.setDesiredTranslationOverrideState(SwerveDrive.DesiredTranslationOverrideState.CAPPED);
     }
@@ -211,6 +219,7 @@ public class Superstructure extends SubsystemBase {
         swerveDrive.setVelocityCapMaxVelocityMetersPerSec(MAX_TRANSLATIONAL_VELOCITY_DURING_SHOT_METERS_PER_SEC);
 
         shooter.setDesiredState(ShooterDesiredState.READY_FOR_SHOT);
+        kicker.setDesiredState(KickerDesiredState.FEEDING);
         swerveDrive.setDesiredOmegaOverrideState(SwerveDrive.DesiredOmegaOverrideState.RANGED_ROTATION);
         swerveDrive.setDesiredTranslationOverrideState(SwerveDrive.DesiredTranslationOverrideState.CAPPED);
     }
@@ -220,6 +229,7 @@ public class Superstructure extends SubsystemBase {
         swerveDrive.setVelocityCapMaxVelocityMetersPerSec(MAX_TRANSLATIONAL_VELOCITY_DURING_SHOT_METERS_PER_SEC);
 
         shooter.setDesiredState(ShooterDesiredState.SHOOTING);
+        kicker.setDesiredState(KickerDesiredState.KICKING);
         swerveDrive.setDesiredOmegaOverrideState(SwerveDrive.DesiredOmegaOverrideState.RANGED_ROTATION);
 
         if (Timer.getTimestamp() - lastShotTime < SHOT_DURATION_SECONDS) {
@@ -232,7 +242,7 @@ public class Superstructure extends SubsystemBase {
     /**
      * Checks if all mechanisms are at their setpoints and ready to shoot.
      * Requires swerve to be in nominal ranged rotation, shooter to be ready,
-     * and robot to be within valid shooting distance.
+     * kicker to be ready, and robot to be within valid shooting distance.
      */
     private boolean isReadyForShot() {
         // Check if swerve is in a nominal ranged rotation state
@@ -243,8 +253,14 @@ public class Superstructure extends SubsystemBase {
                 robotState.getFieldRelativeSpeeds().vyMetersPerSecond
             ) < MAX_TRANSLATIONAL_VELOCITY_DURING_SHOT_METERS_PER_SEC;
         Logger.recordOutput("Superstructure/swerveReady", swerveReady);
+        
         // Check if shooter is ready
         boolean shooterReady = shooter.getCurrentState() == ShooterCurrentState.READY_FOR_SHOT;
+        Logger.recordOutput("Superstructure/shooterReady", shooterReady);
+        
+        // Check if kicker is ready (feeding and at setpoint)
+        boolean kickerReady = kicker.getCurrentState() == KickerCurrentState.FEEDING && kicker.isKickerAtSetpoint();
+        Logger.recordOutput("Superstructure/kickerReady", kickerReady);
         
         // Check if within valid shooting distance
         ShotData shotData = calculateShotData();
@@ -254,7 +270,7 @@ public class Superstructure extends SubsystemBase {
         
         Logger.recordOutput("Superstructure/withinShotDistance", withinShotDistance);
 
-        return swerveReady && shooterReady && withinShotDistance;
+        return swerveReady && shooterReady && kickerReady && withinShotDistance;
     }
 
     /**

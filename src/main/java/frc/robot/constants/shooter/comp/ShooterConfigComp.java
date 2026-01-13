@@ -285,14 +285,26 @@ public class ShooterConfigComp extends ShooterConfigBase {
         return 3000.0;
     }
 
-    // Flywheel motor config
+    // Flywheel motor config - 2 motors with 1:1 gearing (leader/follower)
     @Override
     public int getFlywheelCanId() {
         return 16;
     }
 
     @Override
+    public int getFlywheelFollowerCanId() {
+        // TODO: Update to actual CAN ID for second flywheel motor
+        return 17;
+    }
+
+    @Override
     public boolean getIsFlywheelInverted() {
+        return false;
+    }
+
+    @Override
+    public boolean getIsFlywheelFollowerOppositeDirection() {
+        // Set to true if follower motor is mounted opposite to leader
         return false;
     }
 
@@ -358,7 +370,7 @@ public class ShooterConfigComp extends ShooterConfigBase {
 
     @Override
     public double getFlywheelMotorToOutputShaftRatio() {
-        return 18.0/12.0; // Direct drive
+        return 18.0/12.0; // 1:1 gearing as specified
     }
 
     @Override
@@ -379,158 +391,6 @@ public class ShooterConfigComp extends ShooterConfigBase {
         );
     }
 
-    // Feeder motor config
-    @Override
-    public int getFeederCanId() {
-        return 35;
-    }
-
-    @Override
-    public boolean getIsFeederInverted() {
-        return false;
-    }
-
-    @Override
-    public double getFeederSupplyCurrentLimit() {
-        return 90.0;
-    }
-
-    @Override
-    public double getFeederSupplyCurrentLimitLowerTime() {
-        return 1.0;
-    }
-
-    @Override
-    public double getFeederSupplyCurrentLimitLowerLimit() {
-        return 90.0;
-    }
-
-    @Override
-    public double getFeederStatorCurrentLimit() {
-        return 90.0;
-    }
-
-    @Override
-    public double getFeederPeakForwardTorqueCurrent() {
-        return 90.0;
-    }
-
-    @Override
-    public double getFeederPeakReverseTorqueCurrent() {
-        return -90.0;
-    }
-
-    @Override
-    public double getFeederKS() {
-        return 0.0;
-    }
-
-    @Override
-    public double getFeederKV() {
-        return 0.3;
-    }
-
-    @Override
-    public double getFeederKA() {
-        return 0.000;
-    }
-
-    @Override
-    public double getFeederKP() {
-        return 0.1;
-    }
-
-    @Override
-    public double getFeederKI() {
-        return 0.0;
-    }
-
-    @Override
-    public double getFeederKD() {
-        return 0.0;
-    }
-
-    @Override
-    public double getFeederMotorToOutputShaftRatio() {
-        return 3.0; // 5:1 gear ratio
-    }
-
-    // Indexer motor config
-    @Override
-    public int getIndexerCanId() {
-        return 20;
-    }
-
-    @Override
-    public boolean getIsIndexerInverted() {
-        return true;
-    }
-
-    @Override
-    public double getIndexerSupplyCurrentLimit() {
-        return 90.0;
-    }
-
-    @Override
-    public double getIndexerSupplyCurrentLimitLowerTime() {
-        return 1.0;
-    }
-
-    @Override
-    public double getIndexerSupplyCurrentLimitLowerLimit() {
-        return 90.0;
-    }
-
-    @Override
-    public double getIndexerStatorCurrentLimit() {
-        return 90.0;
-    }
-
-    @Override
-    public double getIndexerPeakForwardTorqueCurrent() {
-        return 90.0;
-    }
-
-    @Override
-    public double getIndexerPeakReverseTorqueCurrent() {
-        return -90.0;
-    }
-
-    @Override
-    public double getIndexerKS() {
-        return 0.0;
-    }
-
-    @Override
-    public double getIndexerKV() {
-        return 0.3;
-    }
-
-    @Override
-    public double getIndexerKA() {
-        return 0.0;
-    }
-
-    @Override
-    public double getIndexerKP() {
-        return 0.1;
-    }
-
-    @Override
-    public double getIndexerKI() {
-        return 0.0;
-    }
-
-    @Override
-    public double getIndexerKD() {
-        return 0.0;
-    }
-
-    @Override
-    public double getIndexerMotorToOutputShaftRatio() {
-        return 3.0; // 5:1 gear ratio
-    }
-
     @Override
     public double getHoodAngleToleranceRotations() {
         return 2.0 / 360.0;
@@ -545,15 +405,5 @@ public class ShooterConfigComp extends ShooterConfigBase {
     @Override
     public double getFlywheelVelocityToleranceRPS() {
         return 3.0;
-    }
-
-    @Override
-    public double getFeederVelocityToleranceRPS() {
-        return 5.0;
-    }
-
-    @Override
-    public double getIndexerVelocityToleranceRPS() {
-        return 5.0;
     }
 }
