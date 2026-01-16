@@ -5,6 +5,7 @@ import static edu.wpi.first.units.Units.Fahrenheit;
 import static edu.wpi.first.units.Units.RotationsPerSecond;
 
 import com.ctre.phoenix6.BaseStatusSignal;
+import com.ctre.phoenix6.CANBus;
 import com.ctre.phoenix6.StatusSignal;
 import com.ctre.phoenix6.configs.TalonFXConfiguration;
 import com.ctre.phoenix6.controls.VelocityVoltage;
@@ -64,7 +65,7 @@ public class HopperIOTalonFX implements HopperIO {
 
         hopperConfig.FutureProofConfigs = false;
 
-        hopperMotor = new TalonFX(config.hopperCanId, config.canBusName);
+        hopperMotor = new TalonFX(config.hopperCanId, new CANBus(config.canBusName));
         PhoenixUtil.tryUntilOk(5, () -> hopperMotor.getConfigurator().apply(hopperConfig, 0.25));
 
         hopperTorqueCurrent = hopperMotor.getTorqueCurrent().clone();

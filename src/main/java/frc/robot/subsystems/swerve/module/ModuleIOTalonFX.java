@@ -10,6 +10,7 @@ import static edu.wpi.first.units.Units.RotationsPerSecond;
 import java.util.Queue;
 
 import com.ctre.phoenix6.BaseStatusSignal;
+import com.ctre.phoenix6.CANBus;
 import com.ctre.phoenix6.StatusSignal;
 import com.ctre.phoenix6.configs.CANcoderConfiguration;
 import com.ctre.phoenix6.configs.TalonFXConfiguration;
@@ -116,7 +117,7 @@ public class ModuleIOTalonFX implements ModuleIO {
 
         driveConfig.FutureProofConfigs = true;
         
-        driveMotor = new TalonFX(specificConfig.driveCanId, generalConfig.canBusName);
+        driveMotor = new TalonFX(specificConfig.driveCanId, new CANBus(generalConfig.canBusName));
         PhoenixUtil.tryUntilOk(5, () -> driveMotor.getConfigurator().apply(driveConfig, 0.25));
 
         // ABS encoder
@@ -177,7 +178,7 @@ public class ModuleIOTalonFX implements ModuleIO {
 
         steerConfig.FutureProofConfigs = true;
 
-        steerMotor = new TalonFX(specificConfig.steerCanId, generalConfig.canBusName);
+        steerMotor = new TalonFX(specificConfig.steerCanId, new CANBus(generalConfig.canBusName));
         PhoenixUtil.tryUntilOk(5, () -> steerMotor.getConfigurator().apply(steerConfig, 0.25));
 
         // status signals

@@ -5,6 +5,7 @@ import static edu.wpi.first.units.Units.Fahrenheit;
 import static edu.wpi.first.units.Units.RotationsPerSecond;
 
 import com.ctre.phoenix6.BaseStatusSignal;
+import com.ctre.phoenix6.CANBus;
 import com.ctre.phoenix6.StatusSignal;
 import com.ctre.phoenix6.configs.TalonFXConfiguration;
 import com.ctre.phoenix6.controls.VelocityVoltage;
@@ -64,7 +65,7 @@ public class IntakeIOTalonFX implements IntakeIO {
 
         intakeConfig.FutureProofConfigs = false;
 
-        intakeMotor = new TalonFX(config.intakeCanId, config.canBusName);
+        intakeMotor = new TalonFX(config.intakeCanId, new CANBus(config.canBusName));
         PhoenixUtil.tryUntilOk(5, () -> intakeMotor.getConfigurator().apply(intakeConfig, 0.25));
 
         intakeTorqueCurrent = intakeMotor.getTorqueCurrent().clone();

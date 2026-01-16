@@ -8,6 +8,7 @@ import static edu.wpi.first.units.Units.RotationsPerSecond;
 import org.littletonrobotics.junction.Logger;
 
 import com.ctre.phoenix6.BaseStatusSignal;
+import com.ctre.phoenix6.CANBus;
 import com.ctre.phoenix6.StatusSignal;
 import com.ctre.phoenix6.configs.TalonFXConfiguration;
 import com.ctre.phoenix6.controls.Follower;
@@ -107,7 +108,7 @@ public class ShooterIOTalonFX implements ShooterIO {
 
         hoodConfig.FutureProofConfigs = false;
 
-        hoodMotor = new TalonFX(config.hoodCanId, config.canBusName);
+        hoodMotor = new TalonFX(config.hoodCanId, new CANBus(config.canBusName));
         PhoenixUtil.tryUntilOk(5, () -> hoodMotor.getConfigurator().apply(hoodConfig, 0.25));
         PhoenixUtil.tryUntilOk(5, () -> hoodMotor.setPosition(config.hoodStartingAngleRotations, 0.25));
 
@@ -154,7 +155,7 @@ public class ShooterIOTalonFX implements ShooterIO {
 
         turretConfig.FutureProofConfigs = false;
 
-        turretMotor = new TalonFX(config.turretCanId, config.canBusName);
+        turretMotor = new TalonFX(config.turretCanId, new CANBus(config.canBusName));
         PhoenixUtil.tryUntilOk(5, () -> turretMotor.getConfigurator().apply(turretConfig, 0.25));
         PhoenixUtil.tryUntilOk(5, () -> turretMotor.setPosition(config.turretStartingAngleDeg / 360.0, 0.25));
 
@@ -190,7 +191,7 @@ public class ShooterIOTalonFX implements ShooterIO {
 
         flywheelConfig.FutureProofConfigs = false;
 
-        flywheelMotor = new TalonFX(config.flywheelCanId, config.canBusName);
+        flywheelMotor = new TalonFX(config.flywheelCanId, new CANBus(config.canBusName));
         PhoenixUtil.tryUntilOk(5, () -> flywheelMotor.getConfigurator().apply(flywheelConfig, 0.25));
 
         // Flywheel follower motor configuration - uses same config as leader but set as follower
@@ -213,7 +214,7 @@ public class ShooterIOTalonFX implements ShooterIO {
 
         flywheelFollowerConfig.FutureProofConfigs = false;
 
-        flywheelFollowerMotor = new TalonFX(config.flywheelFollowerCanId, config.canBusName);
+        flywheelFollowerMotor = new TalonFX(config.flywheelFollowerCanId, new CANBus(config.canBusName));
         PhoenixUtil.tryUntilOk(5, () -> flywheelFollowerMotor.getConfigurator().apply(flywheelFollowerConfig, 0.25));
 
         // Set follower to follow the leader motor

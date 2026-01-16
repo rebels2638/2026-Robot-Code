@@ -6,6 +6,7 @@ import static edu.wpi.first.units.Units.Rotations;
 import static edu.wpi.first.units.Units.RotationsPerSecond;
 
 import com.ctre.phoenix6.BaseStatusSignal;
+import com.ctre.phoenix6.CANBus;
 import com.ctre.phoenix6.StatusSignal;
 import com.ctre.phoenix6.configs.TalonFXConfiguration;
 import com.ctre.phoenix6.controls.MotionMagicVoltage;
@@ -77,7 +78,7 @@ public class ClimberIOTalonFX implements ClimberIO {
 
         climberConfig.FutureProofConfigs = false;
 
-        climberMotor = new TalonFX(config.climberCanId, config.canBusName);
+        climberMotor = new TalonFX(config.climberCanId, new CANBus(config.canBusName));
         PhoenixUtil.tryUntilOk(5, () -> climberMotor.getConfigurator().apply(climberConfig, 0.25));
         PhoenixUtil.tryUntilOk(5, () -> climberMotor.setPosition(config.climberStartingPositionRotations, 0.25));
 

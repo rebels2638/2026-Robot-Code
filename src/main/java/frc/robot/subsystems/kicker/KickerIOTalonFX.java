@@ -5,6 +5,7 @@ import static edu.wpi.first.units.Units.Fahrenheit;
 import static edu.wpi.first.units.Units.RotationsPerSecond;
 
 import com.ctre.phoenix6.BaseStatusSignal;
+import com.ctre.phoenix6.CANBus;
 import com.ctre.phoenix6.StatusSignal;
 import com.ctre.phoenix6.configs.TalonFXConfiguration;
 import com.ctre.phoenix6.controls.VelocityVoltage;
@@ -68,7 +69,7 @@ public class KickerIOTalonFX implements KickerIO {
 
         kickerConfig.FutureProofConfigs = false;
 
-        kickerMotor = new TalonFX(config.kickerCanId, config.canBusName);
+        kickerMotor = new TalonFX(config.kickerCanId, new CANBus(config.canBusName));
         PhoenixUtil.tryUntilOk(5, () -> kickerMotor.getConfigurator().apply(kickerConfig, 0.25));
 
         // Status signals
