@@ -4,11 +4,9 @@ import org.littletonrobotics.junction.AutoLogOutput;
 import org.littletonrobotics.junction.Logger;
 
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
-import frc.robot.constants.Constants;
-import frc.robot.constants.kicker.KickerConfigBase;
-import frc.robot.constants.kicker.comp.KickerConfigComp;
-import frc.robot.constants.kicker.proto.KickerConfigProto;
-import frc.robot.constants.kicker.sim.KickerConfigSim;
+import edu.wpi.first.wpilibj.RobotBase;
+import frc.robot.configs.KickerConfig;
+import frc.robot.lib.util.ConfigLoader;
 import frc.robot.lib.util.DashboardMotorControlLoopConfigurator;
 
 public class Kicker extends SubsystemBase {
@@ -43,48 +41,24 @@ public class Kicker extends SubsystemBase {
     private final KickerIO kickerIO;
     private final KickerIOInputsAutoLogged kickerInputs = new KickerIOInputsAutoLogged();
 
-    private final KickerConfigBase config;
+    private final KickerConfig config;
 
     private final DashboardMotorControlLoopConfigurator kickerControlLoopConfigurator;
 
     private double kickerSetpointRPS = 0.0;
 
     private Kicker() {
-        switch (Constants.currentMode) {
-            case COMP:
-                config = KickerConfigComp.getInstance();
-                kickerIO = new KickerIOTalonFX(config);
-                break;
-
-            case PROTO:
-                config = KickerConfigProto.getInstance();
-                kickerIO = new KickerIOTalonFX(config);
-                break;
-
-            case SIM:
-                config = KickerConfigSim.getInstance();
-                kickerIO = new KickerIOSim(config);
-                break;
-
-            case REPLAY:
-                config = KickerConfigComp.getInstance();
-                kickerIO = new KickerIOTalonFX(config);
-                break;
-
-            default:
-                config = KickerConfigComp.getInstance();
-                kickerIO = new KickerIOTalonFX(config);
-                break;
-        }
+        config = ConfigLoader.load("kicker", KickerConfig.class);
+        kickerIO = RobotBase.isSimulation() ? new KickerIOSim(config) : new KickerIOTalonFX(config);
 
         kickerControlLoopConfigurator = new DashboardMotorControlLoopConfigurator("Kicker/kickerControlLoop",
             new DashboardMotorControlLoopConfigurator.MotorControlLoopConfig(
-                config.getKickerKP(),
-                config.getKickerKI(),
-                config.getKickerKD(),
-                config.getKickerKS(),
-                config.getKickerKV(),
-                config.getKickerKA()
+                config.kickerKP,
+                config.kickerKI,
+                config.kickerKD,
+                config.kickerKS,
+                config.kickerKV,
+                config.kickerKA
             )
         );
     }
@@ -157,11 +131,11 @@ public class Kicker extends SubsystemBase {
     }
 
     private void handleFeedingState() {
-        setKickerVelocity(config.getFeedingVelocityRPS());
+        setKickerVelocity(config.feedingVelocityRPS);
     }
 
     private void handleKickingState() {
-        setKickerVelocity(config.getKickingVelocityRPS());
+        setKickerVelocity(config.kickingVelocityRPS);
     }
 
     private void setKickerVelocity(double velocityRotationsPerSec) {
@@ -193,7 +167,7 @@ public class Kicker extends SubsystemBase {
     // Setpoint check methods
     @AutoLogOutput(key = "Kicker/isKickerAtSetpoint")
     public boolean isKickerAtSetpoint() {
-        return Math.abs(kickerInputs.velocityRotationsPerSec - kickerSetpointRPS) < config.getKickerVelocityToleranceRPS();
+        return Math.abs(kickerInputs.velocityRotationsPerSec - kickerSetpointRPS) < config.kickerVelocityToleranceRPS;
     }
 
     /**

@@ -12,15 +12,10 @@ import edu.wpi.first.math.numbers.N1;
 import edu.wpi.first.math.numbers.N3;
 import edu.wpi.first.wpilibj.DriverStation;
 import edu.wpi.first.wpilibj.Timer;
-import frc.robot.constants.Constants;
-import frc.robot.constants.robotState.RobotStateConfigBase;
-import frc.robot.constants.robotState.RobotStateConfigProto;
-import frc.robot.constants.robotState.RobotStateConfigSim;
-import frc.robot.constants.robotState.RobotStateConfigComp;
-import frc.robot.constants.swerve.drivetrainConfigs.SwerveDrivetrainConfigBase;
-import frc.robot.constants.swerve.drivetrainConfigs.SwerveDrivetrainConfigComp;
-import frc.robot.constants.swerve.drivetrainConfigs.SwerveDrivetrainConfigProto;
-import frc.robot.constants.swerve.drivetrainConfigs.SwerveDrivetrainConfigSim;
+import frc.robot.configs.RobotStateConfig;
+import frc.robot.configs.SwerveConfig;
+import frc.robot.configs.SwerveDrivetrainConfig;
+import frc.robot.lib.util.ConfigLoader;
 import frc.robot.subsystems.swerve.SwerveDrive;
 
 import java.util.NoSuchElementException;
@@ -80,41 +75,13 @@ public class RobotState {
     private double lastYawVelocityRadPerSec = 0;
     private ChassisSpeeds lastRobotRelativeSpeeds = new ChassisSpeeds();
 
-    private final SwerveDrivetrainConfigBase drivetrainConfig;
-    private final RobotStateConfigBase robotStateConfig;
+    private final SwerveDrivetrainConfig drivetrainConfig;
+    private final RobotStateConfig robotStateConfig;
 
     private RobotState() {
-        switch (Constants.currentMode) {
-            case COMP:
-                drivetrainConfig = SwerveDrivetrainConfigComp.getInstance();
-                robotStateConfig = RobotStateConfigComp.getInstance();
-
-                break;
-
-            case PROTO:
-                drivetrainConfig = SwerveDrivetrainConfigProto.getInstance();
-                robotStateConfig = RobotStateConfigProto.getInstance();
-
-                break;
-            
-            case SIM:
-                drivetrainConfig = SwerveDrivetrainConfigSim.getInstance();
-                robotStateConfig = RobotStateConfigSim.getInstance();
-
-                break;
-
-            case REPLAY:
-                drivetrainConfig = SwerveDrivetrainConfigComp.getInstance();
-                robotStateConfig = RobotStateConfigComp.getInstance();
-
-                break;
-
-            default:
-                drivetrainConfig = SwerveDrivetrainConfigComp.getInstance();
-                robotStateConfig = RobotStateConfigComp.getInstance();
-
-                break;
-        }
+        SwerveConfig swerveConfig = ConfigLoader.load("swerve", SwerveConfig.class);
+        drivetrainConfig = swerveConfig.drivetrain;
+        robotStateConfig = ConfigLoader.load("robotState", RobotStateConfig.class);
 
         kinematics = new SwerveDriveKinematics(
             drivetrainConfig.getFrontLeftPositionMeters(),
@@ -129,15 +96,15 @@ public class RobotState {
             lastWheelPositions, 
             new Pose2d(),
             VecBuilder.fill(
-                robotStateConfig.getOdomTranslationDevBase(),
-                robotStateConfig.getOdomTranslationDevBase(),
-                robotStateConfig.getOdomRotationDevBase()
+                robotStateConfig.odomTranslationDevBase,
+                robotStateConfig.odomTranslationDevBase,
+                robotStateConfig.odomRotationDevBase
 
             ),
             VecBuilder.fill(
-                robotStateConfig.getVisionTranslationDevBase(),
-                robotStateConfig.getVisionTranslationDevBase(),
-                robotStateConfig.getVisionRotationDevBase()
+                robotStateConfig.visionTranslationDevBase,
+                robotStateConfig.visionTranslationDevBase,
+                robotStateConfig.visionRotationDevBase
             )
         );  
     }   

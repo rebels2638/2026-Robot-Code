@@ -7,7 +7,7 @@ import edu.wpi.first.math.system.plant.DCMotor;
 import edu.wpi.first.math.system.plant.LinearSystemId;
 import edu.wpi.first.wpilibj.Timer;
 import edu.wpi.first.wpilibj.simulation.DCMotorSim;
-import frc.robot.constants.kicker.KickerConfigBase;
+import frc.robot.configs.KickerConfig;
 import frc.robot.lib.util.DashboardMotorControlLoopConfigurator.MotorControlLoopConfig;
 
 public class KickerIOSim implements KickerIO {
@@ -27,16 +27,16 @@ public class KickerIOSim implements KickerIO {
 
     private double lastTimeInputs = Timer.getTimestamp();
 
-    private final KickerConfigBase config;
+    private final KickerConfig config;
 
-    public KickerIOSim(KickerConfigBase config) {
+    public KickerIOSim(KickerConfig config) {
         this.config = config;
 
         // Initialize PID controller with config values
-        kickerFeedback = new PIDController(config.getKickerKP(), config.getKickerKI(), config.getKickerKD());
+        kickerFeedback = new PIDController(config.kickerKP, config.kickerKI, config.kickerKD);
 
         // Initialize feedforward controller with config values
-        kickerFeedforward = new SimpleMotorFeedforward(config.getKickerKS(), config.getKickerKV(), config.getKickerKA());
+        kickerFeedforward = new SimpleMotorFeedforward(config.kickerKS, config.kickerKV, config.kickerKA);
     }
 
     @Override

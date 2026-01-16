@@ -29,7 +29,7 @@ public final class Constants {
         /** Running on a real robot. */
         COMP,
 
-        PROTO,
+        DEV,
 
         /** Running a physics simulator. */
         SIM,
@@ -46,7 +46,7 @@ public final class Constants {
 
                 break;
 
-            case PROTO:
+            case DEV:
                 kLOOP_CYCLE_MS = 0.02;
 
                 break;

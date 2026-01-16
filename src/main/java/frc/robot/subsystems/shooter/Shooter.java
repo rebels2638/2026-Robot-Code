@@ -12,11 +12,9 @@ import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.math.numbers.N1;
 import edu.wpi.first.math.numbers.N2;
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
-import frc.robot.constants.Constants;
-import frc.robot.constants.shooter.ShooterConfigBase;
-import frc.robot.constants.shooter.comp.ShooterConfigComp;
-import frc.robot.constants.shooter.proto.ShooterConfigProto;
-import frc.robot.constants.shooter.sim.ShooterConfigSim;
+import edu.wpi.first.wpilibj.RobotBase;
+import frc.robot.configs.ShooterConfig;
+import frc.robot.lib.util.ConfigLoader;
 import frc.robot.lib.util.DashboardMotorControlLoopConfigurator;
 
 public class Shooter extends SubsystemBase {
@@ -59,7 +57,7 @@ public class Shooter extends SubsystemBase {
     private final ShooterIO shooterIO;
     private final ShooterIOInputsAutoLogged shooterInputs = new ShooterIOInputsAutoLogged();
 
-    private final ShooterConfigBase config;
+    private final ShooterConfig config;
     
     private final DashboardMotorControlLoopConfigurator hoodControlLoopConfigurator;
     private final DashboardMotorControlLoopConfigurator turretControlLoopConfigurator;
@@ -70,61 +68,37 @@ public class Shooter extends SubsystemBase {
     private double flywheelSetpointRPS = 0.0;
 
     private Shooter() {
-        switch (Constants.currentMode) {
-            case COMP:
-                config = ShooterConfigComp.getInstance();
-                shooterIO = new ShooterIOTalonFX(config);
-                break;
-
-            case PROTO:
-                config = ShooterConfigProto.getInstance();
-                shooterIO = new ShooterIOTalonFX(config);
-                break;
-
-            case SIM:
-                config = ShooterConfigSim.getInstance();
-                shooterIO = new ShooterIOSim(config);
-                break;
-
-            case REPLAY:
-                config = ShooterConfigComp.getInstance();
-                shooterIO = new ShooterIOTalonFX(config);
-                break;
-
-            default:
-                config = ShooterConfigComp.getInstance();
-                shooterIO = new ShooterIOTalonFX(config);
-                break;
-        }
+        config = ConfigLoader.load("shooter", ShooterConfig.class);
+        shooterIO = RobotBase.isSimulation() ? new ShooterIOSim(config) : new ShooterIOTalonFX(config);
 
         hoodControlLoopConfigurator = new DashboardMotorControlLoopConfigurator("Shooter/hoodControlLoop", 
             new DashboardMotorControlLoopConfigurator.MotorControlLoopConfig(
-                config.getHoodKP(),
-                config.getHoodKI(),
-                config.getHoodKD(),
-                config.getHoodKS(),
-                config.getHoodKV(),
-                config.getHoodKA()
+                config.hoodKP,
+                config.hoodKI,
+                config.hoodKD,
+                config.hoodKS,
+                config.hoodKV,
+                config.hoodKA
             )
         );
         turretControlLoopConfigurator = new DashboardMotorControlLoopConfigurator("Shooter/turretControlLoop", 
             new DashboardMotorControlLoopConfigurator.MotorControlLoopConfig(
-                config.getTurretKP(),
-                config.getTurretKI(),
-                config.getTurretKD(),
-                config.getTurretKS(),
-                config.getTurretKV(),
-                config.getTurretKA()
+                config.turretKP,
+                config.turretKI,
+                config.turretKD,
+                config.turretKS,
+                config.turretKV,
+                config.turretKA
             )
         );
         flywheelControlLoopConfigurator = new DashboardMotorControlLoopConfigurator("Shooter/flywheelControlLoop", 
             new DashboardMotorControlLoopConfigurator.MotorControlLoopConfig(
-                config.getFlywheelKP(),
-                config.getFlywheelKI(),
-                config.getFlywheelKD(),
-                config.getFlywheelKS(),
-                config.getFlywheelKV(),
-                config.getFlywheelKA()
+                config.flywheelKP,
+                config.flywheelKI,
+                config.flywheelKD,
+                config.flywheelKS,
+                config.flywheelKV,
+                config.flywheelKA
             )
         );
     }
@@ -298,7 +272,7 @@ public class Shooter extends SubsystemBase {
 
     // Direct setters for mechanism control (now private, used internally by state handlers)
     private void setHoodAngle(Rotation2d angle) {
-        double clampedAngle = MathUtil.clamp(angle.getRotations(), config.getHoodMinAngleRotations(), config.getHoodMaxAngleRotations()); 
+        double clampedAngle = MathUtil.clamp(angle.getRotations(), config.hoodMinAngleRotations, config.hoodMaxAngleRotations); 
 
         hoodSetpointRotations = clampedAngle;
         Logger.recordOutput("Shooter/angleSetpointRotations", clampedAngle);
@@ -311,8 +285,8 @@ public class Shooter extends SubsystemBase {
         Logger.recordOutput("Shooter/unclampedTurretAngleRotations", angle.getRotations());
 
         double initAngle = angle.getDegrees();
-        double minDeg = config.getTurretMinAngleDeg();
-        double maxDeg = config.getTurretMaxAngleDeg();
+        double minDeg = config.turretMinAngleDeg;
+        double maxDeg = config.turretMaxAngleDeg;
         
         double targetAngleDeg;
         
@@ -355,7 +329,7 @@ public class Shooter extends SubsystemBase {
     }
 
     public double calculateShotExitVelocityMetersPerSec(double flywheelVelocityRotationsPerSec) {
-        return flywheelVelocityRotationsPerSec * 2 * Math.PI * config.getFlywheelRadiusMeters() / 2; 
+        return flywheelVelocityRotationsPerSec * 2 * Math.PI * config.flywheelRadiusMeters / 2; 
         // divide by 2 because the flywheel is a pulling the ball along the hood radius
     }
 
@@ -366,17 +340,17 @@ public class Shooter extends SubsystemBase {
     // Setpoint check methods
     @AutoLogOutput(key = "Shooter/isHoodAtSetpoint")
     public boolean isHoodAtSetpoint() {
-        return Math.abs(shooterInputs.hoodAngleRotations - hoodSetpointRotations) < config.getHoodAngleToleranceRotations();
+        return Math.abs(shooterInputs.hoodAngleRotations - hoodSetpointRotations) < config.hoodAngleToleranceRotations;
     }
 
     @AutoLogOutput(key = "Shooter/isTurretAtSetpoint")
     public boolean isTurretAtSetpoint() {
-        return Math.abs(shooterInputs.turretAngleRotations - turretSetpointRotations) < config.getTurretAngleToleranceRotations();
+        return Math.abs(shooterInputs.turretAngleRotations - turretSetpointRotations) < config.turretAngleToleranceRotations;
     }
 
     @AutoLogOutput(key = "Shooter/isFlywheelAtSetpoint")
     public boolean isFlywheelAtSetpoint() {
-        return Math.abs(shooterInputs.flywheelVelocityRotationsPerSec - flywheelSetpointRPS) < config.getFlywheelVelocityToleranceRPS();
+        return Math.abs(shooterInputs.flywheelVelocityRotationsPerSec - flywheelSetpointRPS) < config.flywheelVelocityToleranceRPS;
     }
 
     // Config getters
@@ -389,26 +363,26 @@ public class Shooter extends SubsystemBase {
     }
 
     public double getMinShotDistFromShooterMeters() {
-        return config.getMinShotDistFromShooterMeters();
+        return config.minShotDistFromShooterMeters;
     }
 
     public double getMaxShotDistFromShooterMeters() {
-        return config.getMaxShotDistFromShooterMeters();
+        return config.maxShotDistFromShooterMeters;
     }
 
     public double getLatencyCompensationSeconds() {
-        return config.getLatencyCompensationSeconds();
+        return config.latencyCompensationSeconds;
     }
 
     public double getTurretMinAngleDeg() {
-        return config.getTurretMinAngleDeg();
+        return config.turretMinAngleDeg;
     }
 
     public double getTurretMaxAngleDeg() {
-        return config.getTurretMaxAngleDeg();
+        return config.turretMaxAngleDeg;
     }
 
     public double getTurretAngleToleranceDeg() {
-        return config.getTurretAngleToleranceRotations() * 360.0;
+        return config.turretAngleToleranceRotations * 360.0;
     }
 }

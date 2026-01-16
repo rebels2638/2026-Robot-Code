@@ -9,7 +9,7 @@ import edu.wpi.first.math.system.plant.DCMotor;
 import edu.wpi.first.math.system.plant.LinearSystemId;
 import edu.wpi.first.wpilibj.Timer;
 import edu.wpi.first.wpilibj.simulation.DCMotorSim;
-import frc.robot.constants.swerve.moduleConfigs.SwerveModuleGeneralConfigBase;
+import frc.robot.configs.SwerveModuleGeneralConfig;
 
 public class ModuleIOSim implements ModuleIO {
     private final DCMotor driveMotorModel = DCMotor.getKrakenX60Foc(1);
@@ -40,7 +40,7 @@ public class ModuleIOSim implements ModuleIO {
     private double lastTimeInputs = Timer.getTimestamp();
     
     private final int moduleID;
-    public ModuleIOSim(SwerveModuleGeneralConfigBase config, int moduleID) {
+    public ModuleIOSim(SwerveModuleGeneralConfig config, int moduleID) {
         this.moduleID = moduleID;
         steerFeedback.enableContinuousInput(-Math.PI, Math.PI);
     }

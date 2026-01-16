@@ -9,7 +9,7 @@ import edu.wpi.first.math.system.plant.LinearSystemId;
 import edu.wpi.first.math.trajectory.TrapezoidProfile;
 import edu.wpi.first.wpilibj.Timer;
 import edu.wpi.first.wpilibj.simulation.DCMotorSim;
-import frc.robot.constants.shooter.ShooterConfigBase;
+import frc.robot.configs.ShooterConfig;
 import frc.robot.lib.util.DashboardMotorControlLoopConfigurator.MotorControlLoopConfig;
 
 public class ShooterIOSim implements ShooterIO {
@@ -48,35 +48,35 @@ public class ShooterIOSim implements ShooterIO {
 
     private double lastTimeInputs = Timer.getTimestamp();
 
-    private final ShooterConfigBase config;
+    private final ShooterConfig config;
 
-    public ShooterIOSim(ShooterConfigBase config) {
+    public ShooterIOSim(ShooterConfig config) {
         this.config = config;
 
         // Initialize PID controllers with config values
-        hoodFeedback = new PIDController(config.getHoodKP(), config.getHoodKI(), config.getHoodKD());
+        hoodFeedback = new PIDController(config.hoodKP, config.hoodKI, config.hoodKD);
 
         // Turret uses a profiled PID controller in radians with trapezoidal constraints
-        double turretMaxVelRadPerSec = Math.toRadians(config.getTurretMaxVelocityDegPerSec());
-        double turretMaxAccelRadPerSec2 = Math.toRadians(config.getTurretMaxAccelerationDegPerSec2());
+        double turretMaxVelRadPerSec = Math.toRadians(config.turretMaxVelocityDegPerSec);
+        double turretMaxAccelRadPerSec2 = Math.toRadians(config.turretMaxAccelerationDegPerSec2);
         turretFeedback =
             new ProfiledPIDController(
-                config.getTurretKP(),
-                config.getTurretKI(),
-                config.getTurretKD(),
+                config.turretKP,
+                config.turretKI,
+                config.turretKD,
                 new TrapezoidProfile.Constraints(turretMaxVelRadPerSec, turretMaxAccelRadPerSec2)
             );
 
-        flywheelFeedback = new PIDController(config.getFlywheelKP(), config.getFlywheelKI(), config.getFlywheelKD());
+        flywheelFeedback = new PIDController(config.flywheelKP, config.flywheelKI, config.flywheelKD);
 
         // Initialize feedforward controllers with config values
-        flywheelFeedforward = new SimpleMotorFeedforward(config.getFlywheelKS(), config.getFlywheelKV(), config.getFlywheelKA());
+        flywheelFeedforward = new SimpleMotorFeedforward(config.flywheelKS, config.flywheelKV, config.flywheelKA);
 
         // Initialize hood position to starting angle (config gives rotations)
-        hoodSim.setState(config.getHoodStartingAngleRotations() * 2 * Math.PI, 0);
+        hoodSim.setState(config.hoodStartingAngleRotations * 2 * Math.PI, 0);
 
         // Initialize turret position to starting angle (config gives degrees)
-        double turretStartRad = Math.toRadians(config.getTurretStartingAngleDeg());
+        double turretStartRad = Math.toRadians(config.turretStartingAngleDeg);
         turretSim.setState(turretStartRad, 0);
     }
 
@@ -146,8 +146,8 @@ public class ShooterIOSim implements ShooterIO {
     public void setAngle(double angleRotations) {
         // Clamp angle within software limits
         double clampedAngle = MathUtil.clamp(angleRotations,
-            config.getHoodMinAngleRotations(),
-            config.getHoodMaxAngleRotations());
+            config.hoodMinAngleRotations,
+            config.hoodMaxAngleRotations);
         hoodFeedback.setSetpoint(clampedAngle * (2 * Math.PI));
         isHoodClosedLoop = true;
     }
@@ -155,8 +155,8 @@ public class ShooterIOSim implements ShooterIO {
     @Override
     public void setTurretAngle(double angleRotations) {
         // Clamp angle within software limits
-        double minRot = config.getTurretMinAngleDeg() / 360.0;
-        double maxRot = config.getTurretMaxAngleDeg() / 360.0;
+        double minRot = config.turretMinAngleDeg / 360.0;
+        double maxRot = config.turretMaxAngleDeg / 360.0;
         double clampedAngle = MathUtil.clamp(angleRotations, minRot, maxRot);
         double goalRadians = clampedAngle * (2 * Math.PI);
         turretFeedback.setGoal(goalRadians);

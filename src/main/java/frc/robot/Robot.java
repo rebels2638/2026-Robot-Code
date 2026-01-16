@@ -74,7 +74,7 @@ public class Robot extends LoggedRobot {
 
                 break;
 
-            case PROTO:
+            case DEV:
                 Logger.addDataReceiver(new NT4Publisher());
                 break;
 

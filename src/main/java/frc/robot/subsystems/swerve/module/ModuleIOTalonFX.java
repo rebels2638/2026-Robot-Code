@@ -29,8 +29,8 @@ import edu.wpi.first.units.measure.AngularVelocity;
 import edu.wpi.first.units.measure.Current;
 import edu.wpi.first.units.measure.Temperature;
 import edu.wpi.first.wpilibj.Timer;
-import frc.robot.constants.swerve.moduleConfigs.SwerveModuleGeneralConfigBase;
-import frc.robot.constants.swerve.moduleConfigs.SwerveModuleSpecificConfigBase;
+import frc.robot.configs.SwerveModuleGeneralConfig;
+import frc.robot.configs.SwerveModuleSpecificConfig;
 import frc.robot.lib.util.RebelUtil;
 import frc.robot.subsystems.swerve.PhoenixOdometryThread;
 import frc.robot.lib.util.PhoenixUtil;
@@ -64,120 +64,120 @@ public class ModuleIOTalonFX implements ModuleIO {
     private final MotionMagicExpoTorqueCurrentFOC steerMotorRequest = new MotionMagicExpoTorqueCurrentFOC(0).withSlot(0);
     private final TorqueCurrentFOC torqueCurrentFOCRequest = new TorqueCurrentFOC(0);
 
-    private final SwerveModuleGeneralConfigBase generalConfig;
+    private final SwerveModuleGeneralConfig generalConfig;
 
     private Rotation2d lastSteerAngleRad = new Rotation2d();
     private SwerveModuleState lastRequestedState = new SwerveModuleState();
     private double lastRequestedStateTime = Timer.getFPGATimestamp();
 
-    public ModuleIOTalonFX(SwerveModuleGeneralConfigBase generalConfig, SwerveModuleSpecificConfigBase specificConfig) {
+    public ModuleIOTalonFX(SwerveModuleGeneralConfig generalConfig, SwerveModuleSpecificConfig specificConfig) {
         this.generalConfig = generalConfig;
 
         TalonFXConfiguration driveConfig = new TalonFXConfiguration();
 
-        driveConfig.Slot0.kP = generalConfig.getDriveKP();
-        driveConfig.Slot0.kI = generalConfig.getDriveKI();
-        driveConfig.Slot0.kD = generalConfig.getDriveKD();
-        driveConfig.Slot0.kS = generalConfig.getDriveKS();
-        driveConfig.Slot0.kV = generalConfig.getDriveKV();
-        driveConfig.Slot0.kA = generalConfig.getDriveKA();
+        driveConfig.Slot0.kP = generalConfig.driveKP;
+        driveConfig.Slot0.kI = generalConfig.driveKI;
+        driveConfig.Slot0.kD = generalConfig.driveKD;
+        driveConfig.Slot0.kS = generalConfig.driveKS;
+        driveConfig.Slot0.kV = generalConfig.driveKV;
+        driveConfig.Slot0.kA = generalConfig.driveKA;
         driveConfig.Slot0.StaticFeedforwardSign = StaticFeedforwardSignValue.UseVelocitySign;
 
-        driveConfig.MotionMagic.MotionMagicAcceleration = generalConfig.getDriveMotionMagicVelocityAccelerationMetersPerSecSec();
-        driveConfig.MotionMagic.MotionMagicJerk = generalConfig.getDriveMotionMagicVelocityJerkMetersPerSecSecSec();
+        driveConfig.MotionMagic.MotionMagicAcceleration = generalConfig.driveMotionMagicVelocityAccelerationMetersPerSecSec;
+        driveConfig.MotionMagic.MotionMagicJerk = generalConfig.driveMotionMagicVelocityJerkMetersPerSecSecSec;
 
         // Cancoder + encoder
         driveConfig.ClosedLoopGeneral.ContinuousWrap = false;
         driveConfig.Feedback.SensorToMechanismRatio = 
-            generalConfig.getDriveMotorToOutputShaftRatio() /
-            (generalConfig.getDriveWheelRadiusMeters() * 2 * Math.PI);
+            generalConfig.driveMotorToOutputShaftRatio /
+            (generalConfig.driveWheelRadiusMeters * 2 * Math.PI);
 
         driveConfig.MotorOutput.NeutralMode = 
-            generalConfig.getIsDriveNeutralModeBrake() ? 
+            generalConfig.isDriveNeutralModeBrake ? 
                 NeutralModeValue.Brake : 
                 NeutralModeValue.Coast;
 
         driveConfig.MotorOutput.Inverted = 
-            specificConfig.getIsDriveInverted() ?
+            specificConfig.isDriveInverted ?
                 InvertedValue.Clockwise_Positive :
                 InvertedValue.CounterClockwise_Positive;
 
         // Current and torque limiting
         driveConfig.CurrentLimits.SupplyCurrentLimitEnable = true;
-        driveConfig.CurrentLimits.SupplyCurrentLimit = generalConfig.getDriveSupplyCurrentLimit();
-        driveConfig.CurrentLimits.SupplyCurrentLowerLimit = generalConfig.getDriveSupplyCurrentLimit();
-        driveConfig.CurrentLimits.SupplyCurrentLowerTime = generalConfig.getDriveSupplyCurrentLimitLowerTime();
+        driveConfig.CurrentLimits.SupplyCurrentLimit = generalConfig.driveSupplyCurrentLimit;
+        driveConfig.CurrentLimits.SupplyCurrentLowerLimit = generalConfig.driveSupplyCurrentLimitLowerLimit;
+        driveConfig.CurrentLimits.SupplyCurrentLowerTime = generalConfig.driveSupplyCurrentLimitLowerTime;
 
         driveConfig.CurrentLimits.StatorCurrentLimitEnable = true;
-        driveConfig.CurrentLimits.StatorCurrentLimit = generalConfig.getDriveStatorCurrentLimit();
+        driveConfig.CurrentLimits.StatorCurrentLimit = generalConfig.driveStatorCurrentLimit;
 
-        driveConfig.TorqueCurrent.PeakForwardTorqueCurrent = generalConfig.getDrivePeakForwardTorqueCurrent();
-        driveConfig.TorqueCurrent.PeakReverseTorqueCurrent = generalConfig.getDrivePeakReverseTorqueCurrent();
+        driveConfig.TorqueCurrent.PeakForwardTorqueCurrent = generalConfig.drivePeakForwardTorqueCurrent;
+        driveConfig.TorqueCurrent.PeakReverseTorqueCurrent = generalConfig.drivePeakReverseTorqueCurrent;
 
         driveConfig.FutureProofConfigs = true;
         
-        driveMotor = new TalonFX(specificConfig.getDriveCanId(), generalConfig.getCanBusName());
+        driveMotor = new TalonFX(specificConfig.driveCanId, generalConfig.canBusName);
         PhoenixUtil.tryUntilOk(5, () -> driveMotor.getConfigurator().apply(driveConfig, 0.25));
 
         // ABS encoder
         CANcoderConfiguration encoderConfig = new CANcoderConfiguration();
-        encoderConfig.MagnetSensor.AbsoluteSensorDiscontinuityPoint = generalConfig.getCancoderAbsoluteSensorDiscontinuityPoint();
+        encoderConfig.MagnetSensor.AbsoluteSensorDiscontinuityPoint = generalConfig.cancoderAbsoluteSensorDiscontinuityPoint;
         encoderConfig.MagnetSensor.SensorDirection = generalConfig.getCancoderSensorDirection();
-        encoderConfig.MagnetSensor.withMagnetOffset(specificConfig.getCancoderOffsetRotations());
+        encoderConfig.MagnetSensor.withMagnetOffset(specificConfig.cancoderOffsetRotations);
 
         encoderConfig.FutureProofConfigs = true;
 
-        steerEncoder = new CANcoder(specificConfig.getCancoderCanId(), generalConfig.getCanBusName());
+        steerEncoder = new CANcoder(specificConfig.cancoderCanId, generalConfig.canBusName);
         PhoenixUtil.tryUntilOk(5, () -> steerEncoder.getConfigurator().apply(encoderConfig, 0.25));
 
         // Steer motor
         TalonFXConfiguration steerConfig = new TalonFXConfiguration();
 
         // Motion magic expo
-        steerConfig.Slot0.kP = generalConfig.getSteerKP();
-        steerConfig.Slot0.kI = generalConfig.getSteerKI();
-        steerConfig.Slot0.kD = generalConfig.getSteerKD();
-        steerConfig.Slot0.kS = generalConfig.getSteerKS();
-        steerConfig.Slot0.kV = generalConfig.getSteerKV();
-        steerConfig.Slot0.kA = generalConfig.getSteerKA();
+        steerConfig.Slot0.kP = generalConfig.steerKP;
+        steerConfig.Slot0.kI = generalConfig.steerKI;
+        steerConfig.Slot0.kD = generalConfig.steerKD;
+        steerConfig.Slot0.kS = generalConfig.steerKS;
+        steerConfig.Slot0.kV = generalConfig.steerKV;
+        steerConfig.Slot0.kA = generalConfig.steerKA;
         steerConfig.Slot0.StaticFeedforwardSign = StaticFeedforwardSignValue.UseVelocitySign;
 
-        steerConfig.MotionMagic.MotionMagicExpo_kA = generalConfig.getSteerMotionMagicExpoKA();
-        steerConfig.MotionMagic.MotionMagicExpo_kV = generalConfig.getSteerMotionMagicExpoKV();
-        steerConfig.MotionMagic.MotionMagicCruiseVelocity = generalConfig.getSteerMotionMagicCruiseVelocityRotationsPerSec();
+        steerConfig.MotionMagic.MotionMagicExpo_kA = generalConfig.steerMotionMagicExpoKA;
+        steerConfig.MotionMagic.MotionMagicExpo_kV = generalConfig.steerMotionMagicExpoKV;
+        steerConfig.MotionMagic.MotionMagicCruiseVelocity = generalConfig.steerMotionMagicCruiseVelocityRotationsPerSec;
 
         steerConfig.MotorOutput.NeutralMode = 
-            generalConfig.getIsSteerNeutralModeBrake() ? 
+            generalConfig.isSteerNeutralModeBrake ? 
                 NeutralModeValue.Brake : 
                 NeutralModeValue.Coast;
 
         steerConfig.MotorOutput.Inverted = 
-            specificConfig.getIsSteerInverted() ?
+            specificConfig.isSteerInverted ?
                 InvertedValue.Clockwise_Positive :
                 InvertedValue.CounterClockwise_Positive;
                 
         // Cancoder + encoder
         steerConfig.ClosedLoopGeneral.ContinuousWrap = true;
-        steerConfig.Feedback.FeedbackRemoteSensorID = specificConfig.getCancoderCanId();
+        steerConfig.Feedback.FeedbackRemoteSensorID = specificConfig.cancoderCanId;
         steerConfig.Feedback.FeedbackSensorSource = generalConfig.getSteerCancoderFeedbackSensorSource();
         steerConfig.Feedback.SensorToMechanismRatio = 1;
-        steerConfig.Feedback.RotorToSensorRatio = generalConfig.getSteerRotorToSensorRatio();
+        steerConfig.Feedback.RotorToSensorRatio = generalConfig.steerRotorToSensorRatio;
 
         // current and torque limiting
         steerConfig.CurrentLimits.SupplyCurrentLimitEnable = true;
-        steerConfig.CurrentLimits.SupplyCurrentLimit = generalConfig.getSteerSupplyCurrentLimit();
-        steerConfig.CurrentLimits.SupplyCurrentLowerLimit = generalConfig.getSteerSupplyCurrentLimitLowerLimit();
-        steerConfig.CurrentLimits.SupplyCurrentLowerTime = generalConfig.getSteerSupplyCurrentLimitLowerTime();
+        steerConfig.CurrentLimits.SupplyCurrentLimit = generalConfig.steerSupplyCurrentLimit;
+        steerConfig.CurrentLimits.SupplyCurrentLowerLimit = generalConfig.steerSupplyCurrentLimitLowerLimit;
+        steerConfig.CurrentLimits.SupplyCurrentLowerTime = generalConfig.steerSupplyCurrentLimitLowerTime;
 
         steerConfig.CurrentLimits.StatorCurrentLimitEnable = true;
-        steerConfig.CurrentLimits.StatorCurrentLimit = generalConfig.getSteerStatorCurrentLimit();
+        steerConfig.CurrentLimits.StatorCurrentLimit = generalConfig.steerStatorCurrentLimit;
 
-        steerConfig.TorqueCurrent.PeakForwardTorqueCurrent = generalConfig.getSteerPeakForwardTorqueCurrent();
-        steerConfig.TorqueCurrent.PeakReverseTorqueCurrent = generalConfig.getSteerPeakReverseTorqueCurrent();
+        steerConfig.TorqueCurrent.PeakForwardTorqueCurrent = generalConfig.steerPeakForwardTorqueCurrent;
+        steerConfig.TorqueCurrent.PeakReverseTorqueCurrent = generalConfig.steerPeakReverseTorqueCurrent;
 
         steerConfig.FutureProofConfigs = true;
 
-        steerMotor = new TalonFX(specificConfig.getSteerCanId(), generalConfig.getCanBusName());
+        steerMotor = new TalonFX(specificConfig.steerCanId, generalConfig.canBusName);
         PhoenixUtil.tryUntilOk(5, () -> steerMotor.getConfigurator().apply(steerConfig, 0.25));
 
         // status signals
@@ -276,8 +276,8 @@ public class ModuleIOTalonFX implements ModuleIO {
         driveMotor.setControl(driveMotorRequest.withVelocity(
                 RebelUtil.constrain(
                     state.speedMetersPerSecond,
-                    -generalConfig.getDriveMaxVelocityMetersPerSec(),
-                    generalConfig.getDriveMaxVelocityMetersPerSec()
+                    -generalConfig.driveMaxVelocityMetersPerSec,
+                    generalConfig.driveMaxVelocityMetersPerSec
                 ) * state.angle.minus(lastSteerAngleRad).getCos()
             ).withAcceleration((state.speedMetersPerSecond - lastRequestedState.speedMetersPerSecond) / (Timer.getFPGATimestamp() - lastRequestedStateTime))
         );
@@ -302,8 +302,8 @@ public class ModuleIOTalonFX implements ModuleIO {
         driveMotor.setControl(driveMotorRequest.withVelocity(
                 RebelUtil.constrain(
                     driveVelocityMetersPerSec,
-                    -generalConfig.getDriveMaxVelocityMetersPerSec(),
-                    generalConfig.getDriveMaxVelocityMetersPerSec()
+                    -generalConfig.driveMaxVelocityMetersPerSec,
+                    generalConfig.driveMaxVelocityMetersPerSec
                 )
             )
         );

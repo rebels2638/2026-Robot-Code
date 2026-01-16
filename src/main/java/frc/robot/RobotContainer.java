@@ -124,7 +124,7 @@ public class RobotContainer {
     }
     
     public Command getAutonomousCommand() {
-        currentPath = new Path("lknkn");
+        currentPath = new Path("corr_sweep");
         shouldResetPose = true; 
 
         return new InstantCommand(() -> swerveDrive.setDesiredSystemState(SwerveDrive.DesiredSystemState.PREPARE_FOR_AUTO)).andThen(

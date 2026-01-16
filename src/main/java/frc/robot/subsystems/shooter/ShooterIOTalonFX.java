@@ -26,7 +26,7 @@ import edu.wpi.first.units.measure.Angle;
 import edu.wpi.first.units.measure.AngularVelocity;
 import edu.wpi.first.units.measure.Current;
 import edu.wpi.first.units.measure.Temperature;
-import frc.robot.constants.shooter.ShooterConfigBase;
+import frc.robot.configs.ShooterConfig;
 import frc.robot.lib.util.DashboardMotorControlLoopConfigurator.MotorControlLoopConfig;
 import frc.robot.lib.util.PhoenixUtil;
 
@@ -61,136 +61,136 @@ public class ShooterIOTalonFX implements ShooterIO {
 
     private final VelocityVoltage flywheelMotorRequest = new VelocityVoltage(0).withSlot(0);
 
-    private final ShooterConfigBase config;
+    private final ShooterConfig config;
     private final TalonFXConfiguration hoodConfig;
     private final TalonFXConfiguration turretConfig;
     private final TalonFXConfiguration flywheelConfig;
     private final TalonFXConfiguration flywheelFollowerConfig;
 
-    public ShooterIOTalonFX(ShooterConfigBase config) {
+    public ShooterIOTalonFX(ShooterConfig config) {
         this.config = config;
 
         // Hood motor configuration (positional control)
         hoodConfig = new TalonFXConfiguration();
-        hoodConfig.Slot0.kP = config.getHoodKP();
-        hoodConfig.Slot0.kI = config.getHoodKI();
-        hoodConfig.Slot0.kD = config.getHoodKD();
-        hoodConfig.Slot0.kS = config.getHoodKS();
-        hoodConfig.Slot0.kV = config.getHoodKV();
-        hoodConfig.Slot0.kA = config.getHoodKA();
+        hoodConfig.Slot0.kP = config.hoodKP;
+        hoodConfig.Slot0.kI = config.hoodKI;
+        hoodConfig.Slot0.kD = config.hoodKD;
+        hoodConfig.Slot0.kS = config.hoodKS;
+        hoodConfig.Slot0.kV = config.hoodKV;
+        hoodConfig.Slot0.kA = config.hoodKA;
         hoodConfig.Slot0.StaticFeedforwardSign = StaticFeedforwardSignValue.UseVelocitySign;
 
         hoodConfig.ClosedLoopGeneral.ContinuousWrap = false;
-        hoodConfig.Feedback.SensorToMechanismRatio = config.getHoodMotorToOutputShaftRatio();
+        hoodConfig.Feedback.SensorToMechanismRatio = config.hoodMotorToOutputShaftRatio;
 
         hoodConfig.MotorOutput.NeutralMode = NeutralModeValue.Brake;
-        hoodConfig.MotorOutput.Inverted = config.getIsHoodInverted() ?
+        hoodConfig.MotorOutput.Inverted = config.isHoodInverted ?
             InvertedValue.Clockwise_Positive : InvertedValue.CounterClockwise_Positive;
 
         // Current and torque limiting
         hoodConfig.CurrentLimits.SupplyCurrentLimitEnable = true;
-        hoodConfig.CurrentLimits.SupplyCurrentLimit = config.getHoodSupplyCurrentLimit();
-        hoodConfig.CurrentLimits.SupplyCurrentLowerLimit = config.getHoodSupplyCurrentLimitLowerLimit();
-        hoodConfig.CurrentLimits.SupplyCurrentLowerTime = config.getHoodSupplyCurrentLimitLowerTime();
+        hoodConfig.CurrentLimits.SupplyCurrentLimit = config.hoodSupplyCurrentLimit;
+        hoodConfig.CurrentLimits.SupplyCurrentLowerLimit = config.hoodSupplyCurrentLimitLowerLimit;
+        hoodConfig.CurrentLimits.SupplyCurrentLowerTime = config.hoodSupplyCurrentLimitLowerTime;
 
         hoodConfig.CurrentLimits.StatorCurrentLimitEnable = true;
-        hoodConfig.CurrentLimits.StatorCurrentLimit = config.getHoodStatorCurrentLimit();
+        hoodConfig.CurrentLimits.StatorCurrentLimit = config.hoodStatorCurrentLimit;
 
-        hoodConfig.TorqueCurrent.PeakForwardTorqueCurrent = config.getHoodPeakForwardTorqueCurrent();
-        hoodConfig.TorqueCurrent.PeakReverseTorqueCurrent = config.getHoodPeakReverseTorqueCurrent();
+        hoodConfig.TorqueCurrent.PeakForwardTorqueCurrent = config.hoodPeakForwardTorqueCurrent;
+        hoodConfig.TorqueCurrent.PeakReverseTorqueCurrent = config.hoodPeakReverseTorqueCurrent;
 
         // Software limits for hood angle
         hoodConfig.SoftwareLimitSwitch.ForwardSoftLimitEnable = true;
-        hoodConfig.SoftwareLimitSwitch.ForwardSoftLimitThreshold = config.getHoodMaxAngleRotations();
+        hoodConfig.SoftwareLimitSwitch.ForwardSoftLimitThreshold = config.hoodMaxAngleRotations;
         hoodConfig.SoftwareLimitSwitch.ReverseSoftLimitEnable = true;
-        hoodConfig.SoftwareLimitSwitch.ReverseSoftLimitThreshold = config.getHoodMinAngleRotations();
+        hoodConfig.SoftwareLimitSwitch.ReverseSoftLimitThreshold = config.hoodMinAngleRotations;
 
         hoodConfig.FutureProofConfigs = false;
 
-        hoodMotor = new TalonFX(config.getHoodCanId(), config.getCanBusName());
+        hoodMotor = new TalonFX(config.hoodCanId, config.canBusName);
         PhoenixUtil.tryUntilOk(5, () -> hoodMotor.getConfigurator().apply(hoodConfig, 0.25));
-        PhoenixUtil.tryUntilOk(5, () -> hoodMotor.setPosition(config.getHoodStartingAngleRotations(), 0.25));
+        PhoenixUtil.tryUntilOk(5, () -> hoodMotor.setPosition(config.hoodStartingAngleRotations, 0.25));
 
         // Turret motor configuration (positional control, mirrors hood, Motion Magic)
         turretConfig = new TalonFXConfiguration();
-        turretConfig.Slot0.kP = config.getTurretKP();
-        turretConfig.Slot0.kI = config.getTurretKI();
-        turretConfig.Slot0.kD = config.getTurretKD();
-        turretConfig.Slot0.kS = config.getTurretKS();
-        turretConfig.Slot0.kV = config.getTurretKV();
-        turretConfig.Slot0.kA = config.getTurretKA();
+        turretConfig.Slot0.kP = config.turretKP;
+        turretConfig.Slot0.kI = config.turretKI;
+        turretConfig.Slot0.kD = config.turretKD;
+        turretConfig.Slot0.kS = config.turretKS;
+        turretConfig.Slot0.kV = config.turretKV;
+        turretConfig.Slot0.kA = config.turretKA;
         turretConfig.Slot0.StaticFeedforwardSign = StaticFeedforwardSignValue.UseVelocitySign;
 
         turretConfig.ClosedLoopGeneral.ContinuousWrap = false;
-        turretConfig.Feedback.SensorToMechanismRatio = config.getTurretMotorToOutputShaftRatio();
+        turretConfig.Feedback.SensorToMechanismRatio = config.turretMotorToOutputShaftRatio;
 
         turretConfig.MotorOutput.NeutralMode = NeutralModeValue.Brake;
-        turretConfig.MotorOutput.Inverted = config.getIsTurretInverted() ?
+        turretConfig.MotorOutput.Inverted = config.isTurretInverted ?
             InvertedValue.Clockwise_Positive : InvertedValue.CounterClockwise_Positive;
 
         // Current and torque limiting
         turretConfig.CurrentLimits.SupplyCurrentLimitEnable = true;
-        turretConfig.CurrentLimits.SupplyCurrentLimit = config.getTurretSupplyCurrentLimit();
-        turretConfig.CurrentLimits.SupplyCurrentLowerLimit = config.getTurretSupplyCurrentLimitLowerLimit();
-        turretConfig.CurrentLimits.SupplyCurrentLowerTime = config.getTurretSupplyCurrentLimitLowerTime();
+        turretConfig.CurrentLimits.SupplyCurrentLimit = config.turretSupplyCurrentLimit;
+        turretConfig.CurrentLimits.SupplyCurrentLowerLimit = config.turretSupplyCurrentLimitLowerLimit;
+        turretConfig.CurrentLimits.SupplyCurrentLowerTime = config.turretSupplyCurrentLimitLowerTime;
 
         turretConfig.CurrentLimits.StatorCurrentLimitEnable = true;
-        turretConfig.CurrentLimits.StatorCurrentLimit = config.getTurretStatorCurrentLimit();
+        turretConfig.CurrentLimits.StatorCurrentLimit = config.turretStatorCurrentLimit;
 
-        turretConfig.TorqueCurrent.PeakForwardTorqueCurrent = config.getTurretPeakForwardTorqueCurrent();
-        turretConfig.TorqueCurrent.PeakReverseTorqueCurrent = config.getTurretPeakReverseTorqueCurrent();
+        turretConfig.TorqueCurrent.PeakForwardTorqueCurrent = config.turretPeakForwardTorqueCurrent;
+        turretConfig.TorqueCurrent.PeakReverseTorqueCurrent = config.turretPeakReverseTorqueCurrent;
 
         // Software limits for turret angle (convert degrees to rotations)
         turretConfig.SoftwareLimitSwitch.ForwardSoftLimitEnable = true;
-        turretConfig.SoftwareLimitSwitch.ForwardSoftLimitThreshold = config.getTurretMaxAngleDeg() / 360.0;
+        turretConfig.SoftwareLimitSwitch.ForwardSoftLimitThreshold = config.turretMaxAngleDeg / 360.0;
         turretConfig.SoftwareLimitSwitch.ReverseSoftLimitEnable = true;
-        turretConfig.SoftwareLimitSwitch.ReverseSoftLimitThreshold = config.getTurretMinAngleDeg() / 360.0;
+        turretConfig.SoftwareLimitSwitch.ReverseSoftLimitThreshold = config.turretMinAngleDeg / 360.0;
 
         // Motion Magic constraints (degrees/sec -> rotations/sec)
-        double turretCruiseVelocityRotPerSec = config.getTurretMaxVelocityDegPerSec() / 360.0;
-        double turretAccelerationRotPerSec2 = config.getTurretMaxAccelerationDegPerSec2() / 360.0;
+        double turretCruiseVelocityRotPerSec = config.turretMaxVelocityDegPerSec / 360.0;
+        double turretAccelerationRotPerSec2 = config.turretMaxAccelerationDegPerSec2 / 360.0;
         turretConfig.MotionMagic.MotionMagicCruiseVelocity = turretCruiseVelocityRotPerSec;
         turretConfig.MotionMagic.MotionMagicAcceleration = turretAccelerationRotPerSec2;
 
         turretConfig.FutureProofConfigs = false;
 
-        turretMotor = new TalonFX(config.getTurretCanId(), config.getCanBusName());
+        turretMotor = new TalonFX(config.turretCanId, config.canBusName);
         PhoenixUtil.tryUntilOk(5, () -> turretMotor.getConfigurator().apply(turretConfig, 0.25));
-        PhoenixUtil.tryUntilOk(5, () -> turretMotor.setPosition(config.getTurretStartingAngleDeg() / 360.0, 0.25));
+        PhoenixUtil.tryUntilOk(5, () -> turretMotor.setPosition(config.turretStartingAngleDeg / 360.0, 0.25));
 
         // Flywheel motor configuration (velocity control) - Leader
         flywheelConfig = new TalonFXConfiguration();
 
-        flywheelConfig.Slot0.kP = config.getFlywheelKP();
-        flywheelConfig.Slot0.kI = config.getFlywheelKI();
-        flywheelConfig.Slot0.kD = config.getFlywheelKD();
-        flywheelConfig.Slot0.kS = config.getFlywheelKS();
-        flywheelConfig.Slot0.kV = config.getFlywheelKV();
-        flywheelConfig.Slot0.kA = config.getFlywheelKA();
+        flywheelConfig.Slot0.kP = config.flywheelKP;
+        flywheelConfig.Slot0.kI = config.flywheelKI;
+        flywheelConfig.Slot0.kD = config.flywheelKD;
+        flywheelConfig.Slot0.kS = config.flywheelKS;
+        flywheelConfig.Slot0.kV = config.flywheelKV;
+        flywheelConfig.Slot0.kA = config.flywheelKA;
         flywheelConfig.Slot0.StaticFeedforwardSign = StaticFeedforwardSignValue.UseVelocitySign;
 
         flywheelConfig.ClosedLoopGeneral.ContinuousWrap = false;
-        flywheelConfig.Feedback.SensorToMechanismRatio = config.getFlywheelMotorToOutputShaftRatio();
+        flywheelConfig.Feedback.SensorToMechanismRatio = config.flywheelMotorToOutputShaftRatio;
 
         flywheelConfig.MotorOutput.NeutralMode = NeutralModeValue.Coast;
-        flywheelConfig.MotorOutput.Inverted = config.getIsFlywheelInverted() ?
+        flywheelConfig.MotorOutput.Inverted = config.isFlywheelInverted ?
             InvertedValue.Clockwise_Positive : InvertedValue.CounterClockwise_Positive;
 
         // Current and torque limiting
         flywheelConfig.CurrentLimits.SupplyCurrentLimitEnable = true;
-        flywheelConfig.CurrentLimits.SupplyCurrentLimit = config.getFlywheelSupplyCurrentLimit();
-        flywheelConfig.CurrentLimits.SupplyCurrentLowerLimit = config.getFlywheelSupplyCurrentLimitLowerLimit();
-        flywheelConfig.CurrentLimits.SupplyCurrentLowerTime = config.getFlywheelSupplyCurrentLimitLowerTime();
+        flywheelConfig.CurrentLimits.SupplyCurrentLimit = config.flywheelSupplyCurrentLimit;
+        flywheelConfig.CurrentLimits.SupplyCurrentLowerLimit = config.flywheelSupplyCurrentLimitLowerLimit;
+        flywheelConfig.CurrentLimits.SupplyCurrentLowerTime = config.flywheelSupplyCurrentLimitLowerTime;
 
         flywheelConfig.CurrentLimits.StatorCurrentLimitEnable = true;
-        flywheelConfig.CurrentLimits.StatorCurrentLimit = config.getFlywheelStatorCurrentLimit();
+        flywheelConfig.CurrentLimits.StatorCurrentLimit = config.flywheelStatorCurrentLimit;
 
-        flywheelConfig.TorqueCurrent.PeakForwardTorqueCurrent = config.getFlywheelPeakForwardTorqueCurrent();
-        flywheelConfig.TorqueCurrent.PeakReverseTorqueCurrent = config.getFlywheelPeakReverseTorqueCurrent();
+        flywheelConfig.TorqueCurrent.PeakForwardTorqueCurrent = config.flywheelPeakForwardTorqueCurrent;
+        flywheelConfig.TorqueCurrent.PeakReverseTorqueCurrent = config.flywheelPeakReverseTorqueCurrent;
 
         flywheelConfig.FutureProofConfigs = false;
 
-        flywheelMotor = new TalonFX(config.getFlywheelCanId(), config.getCanBusName());
+        flywheelMotor = new TalonFX(config.flywheelCanId, config.canBusName);
         PhoenixUtil.tryUntilOk(5, () -> flywheelMotor.getConfigurator().apply(flywheelConfig, 0.25));
 
         // Flywheel follower motor configuration - uses same config as leader but set as follower
@@ -201,24 +201,24 @@ public class ShooterIOTalonFX implements ShooterIO {
 
         // Current and torque limiting (same as leader)
         flywheelFollowerConfig.CurrentLimits.SupplyCurrentLimitEnable = true;
-        flywheelFollowerConfig.CurrentLimits.SupplyCurrentLimit = config.getFlywheelSupplyCurrentLimit();
-        flywheelFollowerConfig.CurrentLimits.SupplyCurrentLowerLimit = config.getFlywheelSupplyCurrentLimitLowerLimit();
-        flywheelFollowerConfig.CurrentLimits.SupplyCurrentLowerTime = config.getFlywheelSupplyCurrentLimitLowerTime();
+        flywheelFollowerConfig.CurrentLimits.SupplyCurrentLimit = config.flywheelSupplyCurrentLimit;
+        flywheelFollowerConfig.CurrentLimits.SupplyCurrentLowerLimit = config.flywheelSupplyCurrentLimitLowerLimit;
+        flywheelFollowerConfig.CurrentLimits.SupplyCurrentLowerTime = config.flywheelSupplyCurrentLimitLowerTime;
 
         flywheelFollowerConfig.CurrentLimits.StatorCurrentLimitEnable = true;
-        flywheelFollowerConfig.CurrentLimits.StatorCurrentLimit = config.getFlywheelStatorCurrentLimit();
+        flywheelFollowerConfig.CurrentLimits.StatorCurrentLimit = config.flywheelStatorCurrentLimit;
 
-        flywheelFollowerConfig.TorqueCurrent.PeakForwardTorqueCurrent = config.getFlywheelPeakForwardTorqueCurrent();
-        flywheelFollowerConfig.TorqueCurrent.PeakReverseTorqueCurrent = config.getFlywheelPeakReverseTorqueCurrent();
+        flywheelFollowerConfig.TorqueCurrent.PeakForwardTorqueCurrent = config.flywheelPeakForwardTorqueCurrent;
+        flywheelFollowerConfig.TorqueCurrent.PeakReverseTorqueCurrent = config.flywheelPeakReverseTorqueCurrent;
 
         flywheelFollowerConfig.FutureProofConfigs = false;
 
-        flywheelFollowerMotor = new TalonFX(config.getFlywheelFollowerCanId(), config.getCanBusName());
+        flywheelFollowerMotor = new TalonFX(config.flywheelFollowerCanId, config.canBusName);
         PhoenixUtil.tryUntilOk(5, () -> flywheelFollowerMotor.getConfigurator().apply(flywheelFollowerConfig, 0.25));
 
         // Set follower to follow the leader motor
-        flywheelFollowerMotor.setControl(new Follower(config.getFlywheelCanId(), 
-            config.getIsFlywheelFollowerOppositeDirection() ? MotorAlignmentValue.Opposed : MotorAlignmentValue.Aligned));
+        flywheelFollowerMotor.setControl(new Follower(config.flywheelCanId, 
+            config.isFlywheelFollowerOppositeDirection ? MotorAlignmentValue.Opposed : MotorAlignmentValue.Aligned));
 
         // Status signals
         hoodTorqueCurrent = hoodMotor.getTorqueCurrent().clone();
@@ -294,16 +294,16 @@ public class ShooterIOTalonFX implements ShooterIO {
     @Override
     public void setAngle(double angleRotations) {
         // Clamp angle within software limits
-        double clampedAngle = Math.max(config.getHoodMinAngleRotations(),
-            Math.min(config.getHoodMaxAngleRotations(), angleRotations));
+        double clampedAngle = Math.max(config.hoodMinAngleRotations,
+            Math.min(config.hoodMaxAngleRotations, angleRotations));
         hoodMotor.setControl(hoodMotorRequest.withPosition(clampedAngle));
     }
 
     @Override
     public void setTurretAngle(double angleRotations) {
         // Clamp angle within software limits
-        double minRot = config.getTurretMinAngleDeg() / 360.0;
-        double maxRot = config.getTurretMaxAngleDeg() / 360.0;
+        double minRot = config.turretMinAngleDeg / 360.0;
+        double maxRot = config.turretMaxAngleDeg / 360.0;
         double clampedAngle = Math.max(minRot, Math.min(maxRot, angleRotations));
         turretMotor.setControl(turretMotorRequest.withPosition(clampedAngle));
     }

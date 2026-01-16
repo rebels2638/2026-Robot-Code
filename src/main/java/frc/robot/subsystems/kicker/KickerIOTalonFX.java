@@ -17,7 +17,7 @@ import com.ctre.phoenix6.signals.StaticFeedforwardSignValue;
 import edu.wpi.first.units.measure.AngularVelocity;
 import edu.wpi.first.units.measure.Current;
 import edu.wpi.first.units.measure.Temperature;
-import frc.robot.constants.kicker.KickerConfigBase;
+import frc.robot.configs.KickerConfig;
 import frc.robot.lib.util.DashboardMotorControlLoopConfigurator.MotorControlLoopConfig;
 import frc.robot.lib.util.PhoenixUtil;
 
@@ -30,45 +30,45 @@ public class KickerIOTalonFX implements KickerIO {
 
     private final VelocityVoltage kickerMotorRequest = new VelocityVoltage(0).withSlot(0);
 
-    private final KickerConfigBase config;
+    private final KickerConfig config;
     private final TalonFXConfiguration kickerConfig;
 
-    public KickerIOTalonFX(KickerConfigBase config) {
+    public KickerIOTalonFX(KickerConfig config) {
         this.config = config;
 
         // Kicker motor configuration (velocity control)
         kickerConfig = new TalonFXConfiguration();
 
-        kickerConfig.Slot0.kP = config.getKickerKP();
-        kickerConfig.Slot0.kI = config.getKickerKI();
-        kickerConfig.Slot0.kD = config.getKickerKD();
-        kickerConfig.Slot0.kS = config.getKickerKS();
-        kickerConfig.Slot0.kV = config.getKickerKV();
-        kickerConfig.Slot0.kA = config.getKickerKA();
+        kickerConfig.Slot0.kP = config.kickerKP;
+        kickerConfig.Slot0.kI = config.kickerKI;
+        kickerConfig.Slot0.kD = config.kickerKD;
+        kickerConfig.Slot0.kS = config.kickerKS;
+        kickerConfig.Slot0.kV = config.kickerKV;
+        kickerConfig.Slot0.kA = config.kickerKA;
         kickerConfig.Slot0.StaticFeedforwardSign = StaticFeedforwardSignValue.UseVelocitySign;
 
         kickerConfig.ClosedLoopGeneral.ContinuousWrap = false;
-        kickerConfig.Feedback.SensorToMechanismRatio = config.getKickerMotorToOutputShaftRatio();
+        kickerConfig.Feedback.SensorToMechanismRatio = config.kickerMotorToOutputShaftRatio;
 
         kickerConfig.MotorOutput.NeutralMode = NeutralModeValue.Coast;
-        kickerConfig.MotorOutput.Inverted = config.getIsKickerInverted() ?
+        kickerConfig.MotorOutput.Inverted = config.isKickerInverted ?
             InvertedValue.Clockwise_Positive : InvertedValue.CounterClockwise_Positive;
 
         // Current and torque limiting
         kickerConfig.CurrentLimits.SupplyCurrentLimitEnable = true;
-        kickerConfig.CurrentLimits.SupplyCurrentLimit = config.getKickerSupplyCurrentLimit();
-        kickerConfig.CurrentLimits.SupplyCurrentLowerLimit = config.getKickerSupplyCurrentLimitLowerLimit();
-        kickerConfig.CurrentLimits.SupplyCurrentLowerTime = config.getKickerSupplyCurrentLimitLowerTime();
+        kickerConfig.CurrentLimits.SupplyCurrentLimit = config.kickerSupplyCurrentLimit;
+        kickerConfig.CurrentLimits.SupplyCurrentLowerLimit = config.kickerSupplyCurrentLimitLowerLimit;
+        kickerConfig.CurrentLimits.SupplyCurrentLowerTime = config.kickerSupplyCurrentLimitLowerTime;
 
         kickerConfig.CurrentLimits.StatorCurrentLimitEnable = true;
-        kickerConfig.CurrentLimits.StatorCurrentLimit = config.getKickerStatorCurrentLimit();
+        kickerConfig.CurrentLimits.StatorCurrentLimit = config.kickerStatorCurrentLimit;
 
-        kickerConfig.TorqueCurrent.PeakForwardTorqueCurrent = config.getKickerPeakForwardTorqueCurrent();
-        kickerConfig.TorqueCurrent.PeakReverseTorqueCurrent = config.getKickerPeakReverseTorqueCurrent();
+        kickerConfig.TorqueCurrent.PeakForwardTorqueCurrent = config.kickerPeakForwardTorqueCurrent;
+        kickerConfig.TorqueCurrent.PeakReverseTorqueCurrent = config.kickerPeakReverseTorqueCurrent;
 
         kickerConfig.FutureProofConfigs = false;
 
-        kickerMotor = new TalonFX(config.getKickerCanId(), config.getCanBusName());
+        kickerMotor = new TalonFX(config.kickerCanId, config.canBusName);
         PhoenixUtil.tryUntilOk(5, () -> kickerMotor.getConfigurator().apply(kickerConfig, 0.25));
 
         // Status signals
