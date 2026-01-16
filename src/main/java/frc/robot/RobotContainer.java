@@ -89,10 +89,19 @@ public class RobotContainer {
         //     )
         // );
         
-        xboxDriver.getYButton().onTrue(
-            new InstantCommand(() -> robotState.resetPose(new Pose2d(new Translation2d(5, 5), new Rotation2d(0))))
-        );
+        // xboxDriver.getYButton().onTrue(
+        //     new InstantCommand(() -> robotState.resetPose(new Pose2d(new Translation2d(5, 5), new Rotation2d(0))))
+        // );
 
+        Path toClimb = new Path(new Waypoint(1,3, new Rotation2d(0)));
+        xboxDriver.getXButton().onTrue(
+            new InstantCommand(() -> currentPath = toClimb).andThen(
+                new InstantCommand(() -> swerveDrive.setDesiredSystemState(SwerveDrive.DesiredSystemState.FOLLOW_PATH)).andThen(
+                    new WaitUntilCommand(() -> swerveDrive.getCurrentSystemState() == SwerveDrive.CurrentSystemState.IDLE)).andThen(
+                        new InstantCommand(() -> swerveDrive.setDesiredSystemState(SwerveDrive.DesiredSystemState.TELEOP))
+                    )
+                )
+        );
     }
 
     public void teleopInit() {
