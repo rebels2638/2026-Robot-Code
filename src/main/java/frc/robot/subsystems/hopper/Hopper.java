@@ -20,21 +20,21 @@ public class Hopper extends SubsystemBase {
     }
 
     public enum HopperCurrentState {
-        STOPPED,
+        DISABLED,
         HOME,
         FEEDING,
         REVERSE
     }
 
     public enum HopperDesiredState {
-        STOPPED,
+        DISABLED,
         HOME,
         FEEDING,
         REVERSE
     }
 
-    private HopperCurrentState currentState = HopperCurrentState.STOPPED;
-    private HopperDesiredState desiredState = HopperDesiredState.STOPPED;
+    private HopperCurrentState currentState = HopperCurrentState.DISABLED;
+    private HopperDesiredState desiredState = HopperDesiredState.DISABLED;
 
     private final HopperIO hopperIO;
     private final HopperIOInputsAutoLogged hopperInputs = new HopperIOInputsAutoLogged();
@@ -76,8 +76,8 @@ public class Hopper extends SubsystemBase {
 
     private void handleStateTransitions() {
         switch (desiredState) {
-            case STOPPED:
-                currentState = HopperCurrentState.STOPPED;
+            case DISABLED:
+                currentState = HopperCurrentState.DISABLED;
                 break;
             case HOME:
                 currentState = HopperCurrentState.HOME;
@@ -93,8 +93,8 @@ public class Hopper extends SubsystemBase {
 
     private void handleCurrentState() {
         switch (currentState) {
-            case STOPPED:
-                handleStoppedState();
+            case DISABLED:
+                handleDISABLEDState();
                 break;
             case HOME:
                 handleHomeState();
@@ -108,7 +108,7 @@ public class Hopper extends SubsystemBase {
         }
     }
 
-    private void handleStoppedState() {
+    private void handleDISABLEDState() {
         setHopperVelocity(0);
     }
 

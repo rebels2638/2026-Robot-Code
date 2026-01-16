@@ -29,7 +29,7 @@ public class Shooter extends SubsystemBase {
 
     // FSM State Enums
     public enum ShooterCurrentState {
-        STOPPED,
+        DISABLED,
         HOME,
         TRACKING,
         PREPARING_FOR_SHOT,
@@ -38,7 +38,7 @@ public class Shooter extends SubsystemBase {
     }
 
     public enum ShooterDesiredState {
-        STOPPED,
+        DISABLED,
         HOME,
         TRACKING,
         READY_FOR_SHOT,
@@ -46,8 +46,8 @@ public class Shooter extends SubsystemBase {
     }
 
     // FSM State Variables
-    private ShooterCurrentState currentState = ShooterCurrentState.STOPPED;
-    private ShooterDesiredState desiredState = ShooterDesiredState.STOPPED;
+    private ShooterCurrentState currentState = ShooterCurrentState.DISABLED;
+    private ShooterDesiredState desiredState = ShooterDesiredState.DISABLED;
 
     // Setpoint Suppliers (set by Superstructure)
     private Supplier<Rotation2d> hoodAngleSupplier = () -> Rotation2d.fromDegrees(45.0);
@@ -130,8 +130,8 @@ public class Shooter extends SubsystemBase {
      */
     private void handleStateTransitions() {
         switch (desiredState) {
-            case STOPPED:
-                currentState = ShooterCurrentState.STOPPED;
+            case DISABLED:
+                currentState = ShooterCurrentState.DISABLED;
                 break;
 
             case HOME:
@@ -169,8 +169,8 @@ public class Shooter extends SubsystemBase {
      */
     private void handleCurrentState() {
         switch (currentState) {
-            case STOPPED:
-                handleStoppedState();
+            case DISABLED:
+                handleDISABLEDState();
                 break;
             case HOME:
                 handleHomeState();
@@ -190,8 +190,8 @@ public class Shooter extends SubsystemBase {
         }
     }
 
-    private void handleStoppedState() {
-        // All motors stopped/coast
+    private void handleDISABLEDState() {
+        // All motors DISABLED/coast
         setShotVelocity(0);
         // Keep current hood/turret position or go to default
         setHoodAngle(Rotation2d.fromDegrees(45.0));

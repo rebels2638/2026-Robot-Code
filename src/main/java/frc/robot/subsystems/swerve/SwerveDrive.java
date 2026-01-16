@@ -57,7 +57,7 @@ public class SwerveDrive extends SubsystemBase {
 
     // FSM State Enums
     public enum DesiredSystemState {
-        STOPPED,
+        DISABLED,
         IDLE,
         TELEOP,
         FOLLOW_PATH,
@@ -66,7 +66,7 @@ public class SwerveDrive extends SubsystemBase {
     }
 
     public enum CurrentSystemState {
-        STOPPED,
+        DISABLED,
         IDLE,
         TELEOP,
         FOLLOW_PATH,
@@ -100,9 +100,9 @@ public class SwerveDrive extends SubsystemBase {
 
 
     // FSM State Variables
-    private DesiredSystemState desiredSystemState = DesiredSystemState.STOPPED;
-    private CurrentSystemState currentSystemState = CurrentSystemState.STOPPED;
-    private CurrentSystemState previousSystemState = CurrentSystemState.STOPPED;
+    private DesiredSystemState desiredSystemState = DesiredSystemState.DISABLED;
+    private CurrentSystemState currentSystemState = CurrentSystemState.DISABLED;
+    private CurrentSystemState previousSystemState = CurrentSystemState.DISABLED;
 
     private DesiredOmegaOverrideState desiredOmegaOverrideState = DesiredOmegaOverrideState.NONE;
     private CurrentOmegaOverrideState currentOmegaOverrideState = CurrentOmegaOverrideState.NONE;
@@ -368,8 +368,8 @@ public class SwerveDrive extends SubsystemBase {
      */
     private void handleStateTransitions() {
         switch (desiredSystemState) {
-            case STOPPED:
-                currentSystemState = CurrentSystemState.STOPPED;
+            case DISABLED:
+                currentSystemState = CurrentSystemState.DISABLED;
                 break;
             case IDLE:
                 currentSystemState = CurrentSystemState.IDLE;
@@ -435,8 +435,8 @@ public class SwerveDrive extends SubsystemBase {
      */
     private void handleCurrentState() {
         switch (currentSystemState) {
-            case STOPPED:
-                handleStoppedSystemState();
+            case DISABLED:
+                handleDISABLEDSystemState();
                 break;
             case IDLE:
                 handleIdleSystemState();
@@ -491,19 +491,19 @@ public class SwerveDrive extends SubsystemBase {
         currentPathCommand = null;
     }
 
-    private void handleStoppedSystemState() {
-        if (previousSystemState != CurrentSystemState.STOPPED) {
+    private void handleDISABLEDSystemState() {
+        if (previousSystemState != CurrentSystemState.DISABLED) {
             setWheelCoast(true);
         }
         cancelPathCommand();
         
         driveFieldRelative(new ChassisSpeeds(0, 0, 0));
 
-        previousSystemState = CurrentSystemState.STOPPED;
+        previousSystemState = CurrentSystemState.DISABLED;
     }
 
     private void handleIdleSystemState() {
-        if (previousSystemState == CurrentSystemState.STOPPED) {
+        if (previousSystemState == CurrentSystemState.DISABLED) {
             setWheelCoast(false);
         }
         cancelPathCommand();
@@ -519,7 +519,7 @@ public class SwerveDrive extends SubsystemBase {
     }
 
     private void handleTeleopSystemState() {
-        if (previousSystemState == CurrentSystemState.STOPPED) {
+        if (previousSystemState == CurrentSystemState.DISABLED) {
             setWheelCoast(false);
         }
         cancelPathCommand();
@@ -537,7 +537,7 @@ public class SwerveDrive extends SubsystemBase {
     }
 
     private void handleFollowPathSystemState() {
-        if (previousSystemState == CurrentSystemState.STOPPED) {
+        if (previousSystemState == CurrentSystemState.DISABLED) {
             setWheelCoast(false);
         }
         
@@ -574,7 +574,7 @@ public class SwerveDrive extends SubsystemBase {
     }
 
     private void handleSysIdSystemState() {
-        if (previousSystemState == CurrentSystemState.STOPPED) {
+        if (previousSystemState == CurrentSystemState.DISABLED) {
             setWheelCoast(false);
         }
         cancelPathCommand();

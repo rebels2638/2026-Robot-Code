@@ -21,22 +21,22 @@ public class Kicker extends SubsystemBase {
 
     // FSM State Enums
     public enum KickerCurrentState {
-        STOPPED,
+        DISABLED,
         HOME,
         FEEDING,
         KICKING
     }
 
     public enum KickerDesiredState {
-        STOPPED,
+        DISABLED,
         HOME,
         FEEDING,
         KICKING
     }
 
     // FSM State Variables
-    private KickerCurrentState currentState = KickerCurrentState.STOPPED;
-    private KickerDesiredState desiredState = KickerDesiredState.STOPPED;
+    private KickerCurrentState currentState = KickerCurrentState.DISABLED;
+    private KickerDesiredState desiredState = KickerDesiredState.DISABLED;
 
     private final KickerIO kickerIO;
     private final KickerIOInputsAutoLogged kickerInputs = new KickerIOInputsAutoLogged();
@@ -84,8 +84,8 @@ public class Kicker extends SubsystemBase {
      */
     private void handleStateTransitions() {
         switch (desiredState) {
-            case STOPPED:
-                currentState = KickerCurrentState.STOPPED;
+            case DISABLED:
+                currentState = KickerCurrentState.DISABLED;
                 break;
 
             case HOME:
@@ -107,8 +107,8 @@ public class Kicker extends SubsystemBase {
      */
     private void handleCurrentState() {
         switch (currentState) {
-            case STOPPED:
-                handleStoppedState();
+            case DISABLED:
+                handleDISABLEDState();
                 break;
             case HOME:
                 handleHomeState();
@@ -122,7 +122,7 @@ public class Kicker extends SubsystemBase {
         }
     }
 
-    private void handleStoppedState() {
+    private void handleDISABLEDState() {
         setKickerVelocity(0);
     }
 

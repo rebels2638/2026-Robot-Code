@@ -20,21 +20,21 @@ public class Intake extends SubsystemBase {
     }
 
     public enum IntakeCurrentState {
-        STOPPED,
+        DISABLED,
         HOME,
         INTAKING,
         OUTTAKING
     }
 
     public enum IntakeDesiredState {
-        STOPPED,
+        DISABLED,
         HOME,
         INTAKING,
         OUTTAKING
     }
 
-    private IntakeCurrentState currentState = IntakeCurrentState.STOPPED;
-    private IntakeDesiredState desiredState = IntakeDesiredState.STOPPED;
+    private IntakeCurrentState currentState = IntakeCurrentState.DISABLED;
+    private IntakeDesiredState desiredState = IntakeDesiredState.DISABLED;
 
     private final IntakeIO intakeIO;
     private final IntakeIOInputsAutoLogged intakeInputs = new IntakeIOInputsAutoLogged();
@@ -76,8 +76,8 @@ public class Intake extends SubsystemBase {
 
     private void handleStateTransitions() {
         switch (desiredState) {
-            case STOPPED:
-                currentState = IntakeCurrentState.STOPPED;
+            case DISABLED:
+                currentState = IntakeCurrentState.DISABLED;
                 break;
             case HOME:
                 currentState = IntakeCurrentState.HOME;
@@ -93,8 +93,8 @@ public class Intake extends SubsystemBase {
 
     private void handleCurrentState() {
         switch (currentState) {
-            case STOPPED:
-                handleStoppedState();
+            case DISABLED:
+                handleDISABLEDState();
                 break;
             case HOME:
                 handleHomeState();
@@ -108,7 +108,7 @@ public class Intake extends SubsystemBase {
         }
     }
 
-    private void handleStoppedState() {
+    private void handleDISABLEDState() {
         setIntakeVelocity(0);
     }
 

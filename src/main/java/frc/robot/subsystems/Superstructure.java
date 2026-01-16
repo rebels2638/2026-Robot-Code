@@ -41,7 +41,7 @@ public class Superstructure extends SubsystemBase {
     }
 
     public enum CurrentState {
-        STOPPED,
+        DISABLED,
         HOME,
         TRACKING,
         PREPARING_FOR_SHOT,
@@ -50,16 +50,16 @@ public class Superstructure extends SubsystemBase {
     }
 
     public enum DesiredState {
-        STOPPED,
+        DISABLED,
         HOME,
         TRACKING,
         READY_FOR_SHOT,
         SHOOTING
     }
 
-    private CurrentState currentState = CurrentState.STOPPED;
-    private DesiredState desiredState = DesiredState.STOPPED;
-    private CurrentState previousState = CurrentState.STOPPED;
+    private CurrentState currentState = CurrentState.DISABLED;
+    private DesiredState desiredState = DesiredState.DISABLED;
+    private CurrentState previousState = CurrentState.DISABLED;
 
     private final Shooter shooter = Shooter.getInstance();
     private final Kicker kicker = Kicker.getInstance();
@@ -93,8 +93,8 @@ public class Superstructure extends SubsystemBase {
      */
     private void handleStateTransitions() {
         switch (desiredState) {
-            case STOPPED:
-                currentState = CurrentState.STOPPED;
+            case DISABLED:
+                currentState = CurrentState.DISABLED;
                 break;
 
             case HOME:
@@ -160,8 +160,8 @@ public class Superstructure extends SubsystemBase {
      */
     private void handleCurrentState() {
         switch (currentState) {
-            case STOPPED:
-                handleStoppedState();
+            case DISABLED:
+                handleDISABLEDState();
                 break;
             case HOME:
                 handleHomeState();
@@ -181,10 +181,10 @@ public class Superstructure extends SubsystemBase {
         }
     }
 
-    private void handleStoppedState() {
-        shooter.setDesiredState(ShooterDesiredState.STOPPED);
-        kicker.setDesiredState(KickerDesiredState.STOPPED);
-        swerveDrive.setDesiredSystemState(SwerveDrive.DesiredSystemState.STOPPED);
+    private void handleDISABLEDState() {
+        shooter.setDesiredState(ShooterDesiredState.DISABLED);
+        kicker.setDesiredState(KickerDesiredState.DISABLED);
+        swerveDrive.setDesiredSystemState(SwerveDrive.DesiredSystemState.DISABLED);
         swerveDrive.setDesiredOmegaOverrideState(SwerveDrive.DesiredOmegaOverrideState.NONE);
         swerveDrive.setDesiredTranslationOverrideState(SwerveDrive.DesiredTranslationOverrideState.NONE);
     }

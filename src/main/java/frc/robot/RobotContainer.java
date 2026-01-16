@@ -119,8 +119,8 @@ public class RobotContainer {
     }
 
     public void disabledInit() {
-        superstructure.setDesiredState(Superstructure.DesiredState.STOPPED);
-        swerveDrive.setDesiredSystemState(SwerveDrive.DesiredSystemState.STOPPED);
+        superstructure.setDesiredState(Superstructure.DesiredState.DISABLED);
+        swerveDrive.setDesiredSystemState(SwerveDrive.DesiredSystemState.DISABLED);
     }
     
     public Command getAutonomousCommand() {

@@ -20,7 +20,7 @@ public class Climber extends SubsystemBase {
     }
 
     public enum ClimberCurrentState {
-        STOPPED,
+        DISABLED,
         HOME,
         TRANSITIONING_TO_HOME,
         READY,
@@ -30,14 +30,14 @@ public class Climber extends SubsystemBase {
     }
 
     public enum ClimberDesiredState {
-        STOPPED,
+        DISABLED,
         HOME,
         READY,
         LIFTED
     }
 
-    private ClimberCurrentState currentState = ClimberCurrentState.STOPPED;
-    private ClimberDesiredState desiredState = ClimberDesiredState.STOPPED;
+    private ClimberCurrentState currentState = ClimberCurrentState.DISABLED;
+    private ClimberDesiredState desiredState = ClimberDesiredState.DISABLED;
 
     private final ClimberIO climberIO;
     private final ClimberIOInputsAutoLogged climberInputs = new ClimberIOInputsAutoLogged();
@@ -79,8 +79,8 @@ public class Climber extends SubsystemBase {
 
     private void handleStateTransitions() {
         switch (desiredState) {
-            case STOPPED:
-                currentState = ClimberCurrentState.STOPPED;
+            case DISABLED:
+                currentState = ClimberCurrentState.DISABLED;
                 break;
             case HOME:
                 currentState = isAtPosition(config.climberHomePositionRotations)
@@ -102,8 +102,8 @@ public class Climber extends SubsystemBase {
 
     private void handleCurrentState() {
         switch (currentState) {
-            case STOPPED:
-                handleStoppedState();
+            case DISABLED:
+                handleDISABLEDState();
                 break;
             case HOME:
             case TRANSITIONING_TO_HOME:
@@ -120,7 +120,7 @@ public class Climber extends SubsystemBase {
         }
     }
 
-    private void handleStoppedState() {
+    private void handleDISABLEDState() {
         climberIO.setVoltage(0);
     }
 
