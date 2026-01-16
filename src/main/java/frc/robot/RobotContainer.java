@@ -15,7 +15,6 @@ import frc.robot.subsystems.Superstructure;
 import frc.robot.subsystems.Superstructure.DesiredState;
 import frc.robot.subsystems.shooter.Shooter;
 import frc.robot.subsystems.swerve.SwerveDrive;
-import frc.robot.commands.autos.tower.ScoreL1;
 // import frc.robot.subsystems.vision.Vision;
 
 public class RobotContainer {
@@ -46,20 +45,21 @@ public class RobotContainer {
         this.xboxTester = new XboxController(1);
         this.xboxOperator = new XboxController(2);
         this.xboxDriver = new XboxController(3);
-
+        
         // Configure teleop input suppliers for SwerveDrive FSM
         // Using normalized inputs (-1 to 1) with deadband applied
         swerveDrive.setTeleopInputSuppliers(
-                () -> -MathUtil.applyDeadband(xboxDriver.getLeftY(), Constants.OperatorConstants.LEFT_Y_DEADBAND),
-                () -> -MathUtil.applyDeadband(xboxDriver.getLeftX(), Constants.OperatorConstants.LEFT_X_DEADBAND),
-                () -> -MathUtil.applyDeadband(xboxDriver.getRightX(), Constants.OperatorConstants.RIGHT_X_DEADBAND));
+            () -> -MathUtil.applyDeadband(xboxDriver.getLeftY(), Constants.OperatorConstants.LEFT_Y_DEADBAND),
+            () -> -MathUtil.applyDeadband(xboxDriver.getLeftX(), Constants.OperatorConstants.LEFT_X_DEADBAND),
+            () -> -MathUtil.applyDeadband(xboxDriver.getRightX(), Constants.OperatorConstants.RIGHT_X_DEADBAND)
+        );
 
         // Set up path supplier for SwerveDrive
         swerveDrive.setPathSupplier(() -> currentPath, () -> shouldResetPose);
 
         // Set default state to TELEOP
         swerveDrive.setDesiredSystemState(SwerveDrive.DesiredSystemState.TELEOP);
-
+        
         // Set default superstructure state to HOME
         superstructure.setDesiredState(Superstructure.DesiredState.HOME);
 
@@ -67,62 +67,22 @@ public class RobotContainer {
     }
 
     private void configureBindings() {
-        // xboxDriver.getAButton().onTrue(
-        // new InstantCommand(() ->
-        // superstructure.setDesiredState(Superstructure.DesiredState.SHOOTING))
-        // ).onFalse(
-        // new InstantCommand(() ->
-        // superstructure.setDesiredState(Superstructure.DesiredState.READY_FOR_SHOT))
-        // );
-
-        // xboxDriver.getXButton().onTrue(
-        // new InstantCommand(() ->
-        // superstructure.setDesiredState(Superstructure.DesiredState.TRACKING))
-        // );
-
-        // xboxDriver.getYButton().onTrue(
-        // new InstantCommand(() ->
-        // superstructure.setDesiredState(Superstructure.DesiredState.HOME))
-        // );
-
-        // xboxDriver.getAButton().onTrue(
-        // new InstantCommand(() -> currentPath = new Path(new Waypoint(5,5,new
-        // Rotation2d(0)))).andThen(
-        // new InstantCommand(() ->
-        // swerveDrive.setDesiredSystemState(SwerveDrive.DesiredSystemState.FOLLOW_PATH))
-        // ).andThen(new WaitUntilCommand(() -> swerveDrive.getCurrentSystemState() ==
-        // SwerveDrive.CurrentSystemState.IDLE)).andThen(
-        // new InstantCommand(() ->
-        // swerveDrive.setDesiredSystemState(SwerveDrive.DesiredSystemState.TELEOP))
-        // )
-        // );
-
-        xboxDriver.getYButton().onTrue(
-                new InstantCommand(() -> robotState.resetPose(new Pose2d(new Translation2d(5, 5), new Rotation2d(0)))));
-
-        xboxDriver.getBButton().whileTrue(
-                new ScoreL1());
-
-        Path toClimb = new Path(new Waypoint(1, 3, new Rotation2d(0)));
+        Path toClimb = new Path(new Waypoint(1,3, new Rotation2d(0)));
         xboxDriver.getXButton().onTrue(
-                new InstantCommand(() -> currentPath = toClimb).andThen(
-                        new InstantCommand(
-                                () -> swerveDrive.setDesiredSystemState(SwerveDrive.DesiredSystemState.FOLLOW_PATH))
-                                .andThen(
-                                        new WaitUntilCommand(() -> swerveDrive
-                                                .getCurrentSystemState() == SwerveDrive.CurrentSystemState.IDLE))
-                                .andThen(
-                                        new InstantCommand(() -> swerveDrive
-                                                .setDesiredSystemState(SwerveDrive.DesiredSystemState.TELEOP)))));
+            new InstantCommand(() -> currentPath = toClimb).andThen(
+                new InstantCommand(() -> swerveDrive.setDesiredSystemState(SwerveDrive.DesiredSystemState.FOLLOW_PATH)).andThen(
+                    new WaitUntilCommand(() -> swerveDrive.getCurrentSystemState() == SwerveDrive.CurrentSystemState.IDLE)).andThen(
+                        new InstantCommand(() -> swerveDrive.setDesiredSystemState(SwerveDrive.DesiredSystemState.TELEOP))
+                    )
+                )
+        );
     }
 
     public void teleopInit() {
-        shouldResetPose = false;
+        shouldResetPose = false; 
 
-        if (swerveDrive.getCurrentCommand() == null) {
-            swerveDrive.setDesiredSystemState(SwerveDrive.DesiredSystemState.TELEOP);
-        }
-
+        // Ensure we're in teleop state
+        swerveDrive.setDesiredSystemState(SwerveDrive.DesiredSystemState.TELEOP);
         superstructure.setDesiredState(Superstructure.DesiredState.HOME);
     }
 
@@ -136,19 +96,15 @@ public class RobotContainer {
         superstructure.setDesiredState(Superstructure.DesiredState.DISABLED);
         swerveDrive.setDesiredSystemState(SwerveDrive.DesiredSystemState.DISABLED);
     }
-
+    
     public Command getAutonomousCommand() {
-        currentPath = new Path("lknkn");
-        shouldResetPose = true;
+        currentPath = new Path("corr_sweep");
+        shouldResetPose = true; 
 
-        return new InstantCommand(
-                () -> swerveDrive.setDesiredSystemState(SwerveDrive.DesiredSystemState.PREPARE_FOR_AUTO)).andThen(
-                        new WaitUntilCommand(
-                                () -> swerveDrive
-                                        .getCurrentSystemState() == SwerveDrive.CurrentSystemState.READY_FOR_AUTO))
-                .andThen(
-                        new InstantCommand(
-                                () -> swerveDrive.setDesiredSystemState(SwerveDrive.DesiredSystemState.FOLLOW_PATH)));
+        return new InstantCommand(() -> swerveDrive.setDesiredSystemState(SwerveDrive.DesiredSystemState.PREPARE_FOR_AUTO)).andThen(
+            new WaitUntilCommand(() -> swerveDrive.getCurrentSystemState() == SwerveDrive.CurrentSystemState.READY_FOR_AUTO)).andThen(
+            new InstantCommand(() -> swerveDrive.setDesiredSystemState(SwerveDrive.DesiredSystemState.FOLLOW_PATH))
+        );
 
     }
 }

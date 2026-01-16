@@ -59,25 +59,10 @@ public class VisionConstants {
       };
 
   // Multipliers to apply for MegaTag 2 observations. less than 1 means more stable than full 3D solve (more weight)
-  public static double linearStdDevMegatag2Factor = 0.6;
+  public static double linearStdDevMegatag2Factor = 0.6; 
   public static double angularStdDevMegatag2Factor = Double.POSITIVE_INFINITY; // No rotation data available
 
   // Rotation rate rejection thresholds
   public static double maxRotationRateMegatag1DegreesPerSecond = 180.0; // Reject MegaTag1 observations if rotating faster than this
   public static double maxRotationRateMegatag2DegreesPerSecond = 120.0; // Reject MegaTag2 observations if rotating faster than this
-
-  public static enum TagIDs {
-    RED_TOWER_APRIL_TAG_ID(13),
-    BLUE_TOWER_APRIL_TAG_ID(29);
-
-    private final int id;
-
-    TagIDs(int id) {
-      this.id = id;
-    }
-
-    public int getId() {
-      return id;
-    }
-  }
 }
