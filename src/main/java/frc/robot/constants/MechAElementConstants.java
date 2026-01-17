@@ -19,10 +19,10 @@ import java.util.Map;
  * have a blue alliance origin.
  */
 public class MechAElementConstants {
-  public static final double fieldLength = Units.inchesToMeters(690.876);
-  public static final double fieldWidth = Units.inchesToMeters(317);
+  public static final double fieldLength = Units.inchesToMeters(651.22);
+  public static final double fieldWidth = Units.inchesToMeters(317.69);
   public static final double startingLineX =
-      Units.inchesToMeters(299.438); // Measured from the inside of starting line
+      Units.inchesToMeters(156.61);
   public static final double algaeDiameter = Units.inchesToMeters(16);
 
   public static class Processor {
@@ -36,13 +36,13 @@ public class MechAElementConstants {
     static {
         cages = new Translation2d[3];
         //farCage
-        cages[0] = 
+        cages[0] =
         new Translation2d(Units.inchesToMeters(345.428), Units.inchesToMeters(286.779));
         //middleCage
-        cages[1] = 
+        cages[1] =
         new Translation2d(Units.inchesToMeters(345.428), Units.inchesToMeters(242.855));
         //closeCage
-        cages[2] = 
+        cages[2] =
         new Translation2d(Units.inchesToMeters(345.428), Units.inchesToMeters(199.947));
     }
 
@@ -64,6 +64,29 @@ public class MechAElementConstants {
             Rotation2d.fromDegrees(144.011 - 90));
   }
 
+  public static class Tower {
+    public static final Pose2d leftTower =
+        new Pose2d(
+            Units.inchesToMeters(59.76),
+            Units.inchesToMeters(159.2),
+            Rotation2d.fromDegrees(180.0));
+    public static final Pose2d middleTower =
+        new Pose2d(
+            Units.inchesToMeters(59.76),
+            Units.inchesToMeters(168.094),
+            Rotation2d.fromDegrees(180.0));
+    public static final Pose2d rightTower =
+        new Pose2d(
+            Units.inchesToMeters(59.76),
+            Units.inchesToMeters(182.0),
+            Rotation2d.fromDegrees(180.0));
+  }
+
+  public static class AllianceBounds {
+    public static final double redZoneLineX = Units.inchesToMeters(182.11);
+    public static final double blueZoneLineX = fieldLength - redZoneLineX;
+  }
+
   public static class Reef {
     public static final Translation2d center =
       new Translation2d(Units.inchesToMeters(176.746), Units.inchesToMeters(158.501));
@@ -80,13 +103,13 @@ public class MechAElementConstants {
       reefCenterFaces[0] =
         //bottom
           new Pose2d(
-            Units.inchesToMeters(122.44), 
+            Units.inchesToMeters(122.44),
             Units.inchesToMeters(159.1),
             Rotation2d.fromDegrees(0));
         //top right
       reefCenterFaces[1] =
           new Pose2d(
-            Units.inchesToMeters(203.54), 
+            Units.inchesToMeters(203.54),
             Units.inchesToMeters(113.39),
             Rotation2d.fromDegrees(120));
         //bottom right
@@ -98,19 +121,19 @@ public class MechAElementConstants {
         //top
       reefCenterFaces[3] =
           new Pose2d(
-            Units.inchesToMeters(230.32), 
+            Units.inchesToMeters(230.32),
             Units.inchesToMeters(159.1),
             Rotation2d.fromDegrees(180));
         //bottom left
       reefCenterFaces[4] =
           new Pose2d(
-            Units.inchesToMeters(150.79), 
+            Units.inchesToMeters(150.79),
             Units.inchesToMeters(204.72),
             Rotation2d.fromDegrees(-60));
         //top left
       reefCenterFaces[5] =
           new Pose2d(
-            Units.inchesToMeters(203.94), 
+            Units.inchesToMeters(203.94),
             Units.inchesToMeters(208.66),
             Rotation2d.fromDegrees(-120));
 
