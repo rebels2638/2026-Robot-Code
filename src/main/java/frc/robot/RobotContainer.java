@@ -31,10 +31,10 @@ public class RobotContainer {
     private final XboxController xboxDriver;
     private final XboxController xboxOperator;
 
-    private final Shooter shooter = Shooter.getInstance();
+    // private final Shooter shooter = Shooter.getInstance();
     private final RobotState robotState = RobotState.getInstance();
     private final SwerveDrive swerveDrive = SwerveDrive.getInstance();
-    private final Superstructure superstructure = Superstructure.getInstance();
+    // private final Superstructure superstructure = Superstructure.getInstance();
     // private final Vision vision = Vision.getInstance();
 
     // Path for follow path state
@@ -61,21 +61,23 @@ public class RobotContainer {
         swerveDrive.setDesiredSystemState(SwerveDrive.DesiredSystemState.TELEOP);
         
         // Set default superstructure state to HOME
-        superstructure.setDesiredState(Superstructure.DesiredState.HOME);
+        // superstructure.setDesiredState(Superstructure.DesiredState.HOME);
 
         configureBindings();
     }
 
     private void configureBindings() {
-        Path toClimb = new Path(new Waypoint(1,3, new Rotation2d(0)));
-        xboxDriver.getXButton().onTrue(
-            new InstantCommand(() -> currentPath = toClimb).andThen(
-                new InstantCommand(() -> swerveDrive.setDesiredSystemState(SwerveDrive.DesiredSystemState.FOLLOW_PATH)).andThen(
-                    new WaitUntilCommand(() -> swerveDrive.getCurrentSystemState() == SwerveDrive.CurrentSystemState.IDLE)).andThen(
-                        new InstantCommand(() -> swerveDrive.setDesiredSystemState(SwerveDrive.DesiredSystemState.TELEOP))
-                    )
-                )
-        );
+        // Path toClimb = new Path(new Waypoint(1,3, new Rotation2d(0)));
+        // xboxDriver.getXButton().onTrue(
+        //     new InstantCommand(() -> currentPath = toClimb).andThen(
+        //         new InstantCommand(() -> swerveDrive.setDesiredSystemState(SwerveDrive.DesiredSystemState.FOLLOW_PATH)).andThen(
+        //             new WaitUntilCommand(() -> swerveDrive.getCurrentSystemState() == SwerveDrive.CurrentSystemState.IDLE)).andThen(
+        //                 new InstantCommand(() -> swerveDrive.setDesiredSystemState(SwerveDrive.DesiredSystemState.TELEOP))
+        //             )
+        //         )
+        // );
+
+        xboxDriver.getXButton().onFalse(new InstantCommand(() -> robotState.resetPose(new Pose2d(0,0, new Rotation2d(0)))));
     }
 
     public void teleopInit() {
@@ -83,17 +85,17 @@ public class RobotContainer {
 
         // Ensure we're in teleop state
         swerveDrive.setDesiredSystemState(SwerveDrive.DesiredSystemState.TELEOP);
-        superstructure.setDesiredState(Superstructure.DesiredState.HOME);
+        // superstructure.setDesiredState(Superstructure.DesiredState.HOME);
     }
 
     public void autonomousInit() {
         // Set up for autonomous
-        superstructure.setDesiredState(DesiredState.HOME);
+        // superstructure.setDesiredState(DesiredState.HOME);
         swerveDrive.setDesiredSystemState(SwerveDrive.DesiredSystemState.IDLE);
     }
 
     public void disabledInit() {
-        superstructure.setDesiredState(Superstructure.DesiredState.DISABLED);
+        // superstructure.setDesiredState(Superstructure.DesiredState.DISABLED);
         swerveDrive.setDesiredSystemState(SwerveDrive.DesiredSystemState.DISABLED);
     }
     
