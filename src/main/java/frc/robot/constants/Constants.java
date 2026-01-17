@@ -83,7 +83,7 @@ public final class Constants {
     }
 
     public static final class VisionConstants {
-       
+
         private VisionConstants() {}
     }
 
@@ -96,7 +96,6 @@ public final class Constants {
         public static final Translation3d kSHOOTER_TARGET = new Translation3d(49.85, 50.0, 0.46);
         private FieldConstants() {}
     }
-
 
     public static boolean shouldFlipPath() {
         var alliance = DriverStation.getAlliance();
