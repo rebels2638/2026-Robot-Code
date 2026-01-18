@@ -1,3 +1,4 @@
+package frc.robot.commands.shooter;
 // package frc.robot.commands;
 
 // import java.util.function.Supplier;
@@ -13,10 +14,10 @@
 // import frc.robot.subsystems.swerve.SwerveDrive;
 
 // public class WindupAndShoot extends SequentialCommandGroup {
-    
+
 //     private final Shooter shooter = Shooter.getInstance();
 //     private final SwerveDrive swerve = SwerveDrive.getInstance();
-    
+
 //     public WindupAndShoot(Supplier<ChassisSpeeds> desiredFieldRelativeSwerveSpeedsSupplier) {
 //         super(
 //             new MovingShotWindup(
@@ -38,7 +39,7 @@
 //             new WaitCommand(1),
 //             new RunShooterFlywheel(0),
 //             new RunShooterFeeder(0)
-            
+
 //         );
 //     }
 

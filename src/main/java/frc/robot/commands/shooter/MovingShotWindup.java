@@ -1,3 +1,4 @@
+package frc.robot.commands.shooter;
 // package frc.robot.commands;
 
 // import java.util.function.Supplier;
@@ -25,9 +26,9 @@
 // import frc.robot.constants.Constants;
 
 // public class MovingShotWindup extends Command {
-    
+
 //     private static final double GRAVITY = 9.81; // m/s^2
-//     private static final LoggedNetworkNumber LATENCY_COMPENSATION_SECONDS = new LoggedNetworkNumber("MovingShotWindup/latencyCompensationSeconds", 
+//     private static final LoggedNetworkNumber LATENCY_COMPENSATION_SECONDS = new LoggedNetworkNumber("MovingShotWindup/latencyCompensationSeconds",
 //         switch (Constants.currentMode) {
 //             case COMP -> 0.0;
 //             case SIM -> 0.0;
@@ -36,7 +37,7 @@
 //             default -> 0.0;
 //         }
 //     );
-        
+
 //     private final Shooter shooter = Shooter.getInstance();
 //     private final RobotState robotState = RobotState.getInstance();
 //     private final SwerveDrive swerveDrive = SwerveDrive.getInstance();
@@ -47,7 +48,7 @@
 //     private final Translation2d targetTranslation;
 //     private final double targetHeight;
 //     private final Supplier<ChassisSpeeds> desiredSwerveSpeedsSupplier;
-    
+
 //     private boolean isShotValid = false;
 //     private double maxRobotTranslationalVeloDuringShot;
 
@@ -69,10 +70,10 @@
 
 //     @Override
 //     public void execute() {
-        
+
 //         Pose2d currentPose = robotState.getEstimatedPose();
 //         ChassisSpeeds currentSpeeds = robotState.getFieldRelativeSpeeds();
-        
+
 //         Logger.recordOutput("MovingShotWindup/currentPose", currentPose);
 //         Logger.recordOutput("MovingShotWindup/currentSpeeds", currentSpeeds);
 
@@ -83,44 +84,44 @@
 //         Pose3d shooterPose = robotPose3d.plus(
 //             new Transform3d(new Pose3d(), shooter.getShooterRelativePose())
 //         );
-        
+
 //         // Iteratively solve for correct distance and flight time (robot reference frame approach)
 //         // Use HORIZONTAL distance (2D) as that's what the lerp table expects
 //         double shooterDistanceToTarget = shooterPose.getTranslation().toTranslation2d().getDistance(targetTranslation);
-        
+
 //         Logger.recordOutput("MovingShotWindup/initialShooterToTargetDistance2D", shooterDistanceToTarget);
-//         Logger.recordOutput("MovingShotWindup/initialShooterToTargetDistance3D", 
+//         Logger.recordOutput("MovingShotWindup/initialShooterToTargetDistance3D",
 //             shooterPose.getTranslation().getDistance(new Translation3d(targetTranslation.getX(), targetTranslation.getY(), this.targetHeight)));
-        
+
 //         double shotFlightTime = 0.0;
 //         double targetX = targetTranslation.getX();
 //         double targetY = targetTranslation.getY();
-        
+
 //         // Iterate to converge (robot frame: shot velocity is relative to robot, target appears to move)
 //         for (int i = 0; i < 30; i++) {
 //             Logger.recordOutput("MovingShotWindup/iteration", i);
 //             Logger.recordOutput("MovingShotWindup/iterationDistance", shooterDistanceToTarget);
-            
+
 //             // Get shooter settings for current distance estimate
 //             double hoodAngleRotations = lerpTable.get(shooterDistanceToTarget).get(0, 0);
 //             double flywheelRPS = lerpTable.get(shooterDistanceToTarget).get(1, 0);
 //             double exitVelocity = shooter.calculateShotExitVelocityMetersPerSec(flywheelRPS);
 //             double launchAngle = hoodAngleRotations * 2 * Math.PI; // Convert to radians
-            
+
 //             Logger.recordOutput("MovingShotWindup/iterationHoodAngleDeg", hoodAngleRotations * 360);
 //             Logger.recordOutput("MovingShotWindup/iterationExitVelocity", exitVelocity);
-            
+
 //             // Calculate velocity components (relative to robot)
 //             double exitVelocityHorizontal = exitVelocity * Math.cos(launchAngle);
 //             double exitVelocityVertical = exitVelocity * Math.sin(launchAngle);
-            
+
 //             // Calculate flight time using projectile motion physics
 //             // Solve: targetHeight = shooterHeight + vz0*t - 0.5*g*t^2
 //             // Rearranged: 0.5*g*t^2 - vz0*t + (shooterHeight - targetHeight) = 0
 //             // Using quadratic formula: t = (vz0 + sqrt(vz0^2 - 2*g*(shooterHeight - targetHeight))) / g
 //             double shooterHeight = shooterPose.getZ();
 //             double deltaHeight = this.targetHeight - shooterHeight;
-            
+
 //             // Flight time from vertical motion (projectile hits target height)
 //             double discriminant = exitVelocityVertical * exitVelocityVertical - 2 * GRAVITY * deltaHeight;
 //             if (discriminant < 0) {
@@ -131,37 +132,37 @@
 //                 shotFlightTime = (exitVelocityVertical + Math.sqrt(discriminant)) / GRAVITY;
 //                 Logger.recordOutput("MovingShotWindup/discriminantZero", false);
 //             }
-            
+
 //             Logger.recordOutput("MovingShotWindup/iterationFlightTime", shotFlightTime);
-            
-            
+
+
 //             // In robot frame, target appears to move. Predict where it will appear to be
 //             double vxDisplacement = shotFlightTime * currentSpeeds.vxMetersPerSecond + LATENCY_COMPENSATION_SECONDS.get() * currentSpeeds.vxMetersPerSecond;
 //             double vyDisplacement = shotFlightTime * currentSpeeds.vyMetersPerSecond + LATENCY_COMPENSATION_SECONDS.get() * currentSpeeds.vyMetersPerSecond;
-            
+
 //             targetX = targetTranslation.getX() - vxDisplacement;
 //             targetY = targetTranslation.getY() - vyDisplacement;
-            
+
 //             // Recalculate distance to compensated target
 //             double oldDistance = shooterDistanceToTarget;
 //             shooterDistanceToTarget = shooterPose.getTranslation().toTranslation2d().getDistance(new Translation2d(targetX, targetY));
-            
+
 //             double distanceChange = Math.abs(shooterDistanceToTarget - oldDistance);
 //             Logger.recordOutput("MovingShotWindup/iterationDistanceChange", distanceChange);
-            
+
 //             // Stop iterating if converged (distance change < 1cm)
 //             if (distanceChange < 0.01) {
 //                 Logger.recordOutput("MovingShotWindup/iterationsUsed", i + 1);
 //                 break;
 //             }
 //         }
-        
+
 //         double shooterAngleToTarget = Math.atan2(targetY - shooterPose.getTranslation().getY(), targetX - shooterPose.getTranslation().getX());
-        
+
 //         // Set shooter to optimal settings for this distance
 //         double hoodAngleRotations = lerpTable.get(shooterDistanceToTarget).get(0, 0);
 //         double flywheelVelocityRPS = lerpTable.get(shooterDistanceToTarget).get(1, 0);
-        
+
 //         shooter.setHoodAngle(new Rotation2d((Math.PI*2)*hoodAngleRotations));
 //         shooter.setShotVelocity(flywheelVelocityRPS);
 //         shooter.setFeedVelocity(35);
@@ -170,9 +171,9 @@
 //         ChassisSpeeds speeds = desiredSwerveSpeedsSupplier.get();
 //         speeds.omegaRadiansPerSecond = rotationController.calculate(shooterPose.getRotation().getZ(), shooterAngleToTarget);
 
-//         swerveDrive.driveFieldRelative(speeds);        
+//         swerveDrive.driveFieldRelative(speeds);
 
-//         isShotValid = speedsMagnitude <= maxRobotTranslationalVeloDuringShot && 
+//         isShotValid = speedsMagnitude <= maxRobotTranslationalVeloDuringShot &&
 //             shooterDistanceToTarget >= shooter.getMinShotDistFromShooterMeters() &&
 //             shooterDistanceToTarget <= shooter.getMaxShotDistFromShooterMeters();
 
@@ -199,23 +200,23 @@
 
 //     @Override
 //     public boolean isFinished() {
-//         boolean finished = 
+//         boolean finished =
 //             isShotValid &&
 //             rotationController.atSetpoint() &&
 //             shooter.isHoodAtSetpoint() &&
 //             shooter.isFlywheelAtSetpoint() &&
 //             shooter.isFeederAtSetpoint();
-        
+
 //         Logger.recordOutput("MovingShotWindup/isRotationControllerAtSetpoint", rotationController.atSetpoint());
-        
+
 //         return finished;
 //     }
-    
+
 //     @Override
 //     public void end(boolean interrupted) {
 
 
-//         isShotValid = false; 
+//         isShotValid = false;
 //         Logger.recordOutput("MovingShotWindup/endTime", Timer.getFPGATimestamp());
 
 //         Logger.recordOutput("MovingShotWindup/isActive", false);

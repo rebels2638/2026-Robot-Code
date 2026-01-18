@@ -1,3 +1,4 @@
+package frc.robot.commands.shooter;
 // package frc.robot.commands;
 
 // import java.util.function.Supplier;
@@ -10,7 +11,7 @@
 //     private final Shooter shooter = Shooter.getInstance();
 //     private final Supplier<Rotation2d> angle;
 
-//     // no requirements because it is expect that a requirement is added in the parent command 
+//     // no requirements because it is expect that a requirement is added in the parent command
 //     // this allows for multiple parallel shooter calls to different shooter motors
 //     public RunShooterHood(Rotation2d angle) {
 //         this.angle = () -> angle;

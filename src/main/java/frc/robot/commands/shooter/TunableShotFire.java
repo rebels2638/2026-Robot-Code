@@ -1,3 +1,4 @@
+package frc.robot.commands.shooter;
 // package frc.robot.commands;
 
 // import org.littletonrobotics.junction.networktables.LoggedNetworkNumber;
@@ -10,7 +11,7 @@
 // import frc.robot.subsystems.shooter.Shooter;
 
 // public class TunableShotFire extends SequentialCommandGroup {
-    
+
 //     private static final Shooter shooter = Shooter.getInstance();
 //     private static final LoggedNetworkNumber indexerVelocityDashboardNumber = new LoggedNetworkNumber("TunableShot/indexerVelocityRotationsPerSec", 35);
 //     private static final LoggedNetworkNumber indexerRunTimeDashboardNumber = new LoggedNetworkNumber("TunableShot/indexerRunTimeSecDashboardNumber", 0.12);

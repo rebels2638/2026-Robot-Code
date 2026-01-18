@@ -1,3 +1,4 @@
+package frc.robot.commands.shooter;
 // package frc.robot.commands;
 
 // import org.littletonrobotics.junction.networktables.LoggedNetworkNumber;
@@ -7,7 +8,7 @@
 // import frc.robot.subsystems.shooter.Shooter;
 
 // public class TunableShotWindup extends ParallelCommandGroup {
-    
+
 //     private static final Shooter shooter = Shooter.getInstance();
 
 //     private static final LoggedNetworkNumber angleDashboardNumber = new LoggedNetworkNumber("TunableShot/angleDegrees", 55);

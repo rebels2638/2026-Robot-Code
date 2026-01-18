@@ -1,3 +1,4 @@
+package frc.robot.commands.shooter;
 // package frc.robot.commands;
 
 // import java.util.function.Supplier;
@@ -5,39 +6,39 @@
 // import edu.wpi.first.wpilibj2.command.Command;
 // import frc.robot.subsystems.shooter.Shooter;
 
-// public class RunShooterFlywheel extends Command {
+// public class RunShooterFeeder extends Command {
 //     private final Shooter shooter = Shooter.getInstance();
 //     private final Supplier<Double> velocityRotationsPerSec;
 
-//     // no requirements because it is expect that a requirement is added in the parent command 
+//     // no requirements because it is expect that a requirement is added in the parent command
 //     // this allows for multiple parallel shooter calls to different shooter motors
-//     public RunShooterFlywheel(double velocityRotationsPerSec) {
+//     public RunShooterFeeder(double velocityRotationsPerSec) {
 //         this.velocityRotationsPerSec = () -> velocityRotationsPerSec;
 //     }
 
-//     public RunShooterFlywheel(Supplier<Double> velocityRotationsPerSec) {
+//     public RunShooterFeeder(Supplier<Double> velocityRotationsPerSec) {
 //         this.velocityRotationsPerSec = velocityRotationsPerSec;
 //     }
 
 //     @Override
 //     public void initialize() {
-//         shooter.setShotVelocity(velocityRotationsPerSec.get());
+//         shooter.setFeedVelocity(velocityRotationsPerSec.get());
 //     }
 
 //     @Override
 //     public void execute() {
-//         shooter.setShotVelocity(velocityRotationsPerSec.get());
+//         shooter.setFeedVelocity(velocityRotationsPerSec.get());
 //     }
 
 //     @Override
 //     public boolean isFinished() {
-//         return shooter.isFlywheelAtSetpoint();
-//     }   
+//         return shooter.isFeederAtSetpoint();
+//     }
 
 //     @Override
 //     public void end(boolean interrupted) {
 //         if (interrupted) {
-//             shooter.setShotVelocity(0);
+//             shooter.setFeedVelocity(0);
 //         }
 //     }
 // }
