@@ -1,5 +1,5 @@
-// Copyright (c) 2025 FRC 6328
-// http://github.com/Mechanical-Advantage
+// Copyright (c) 2026 FRC 2638
+// http://github.com/rebels2638
 //
 // Use of this source code is governed by an MIT-style
 // license that can be found in the LICENSE file at
@@ -9,205 +9,94 @@ package frc.robot.constants;
 
 import edu.wpi.first.math.geometry.*;
 import edu.wpi.first.math.util.Units;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
 
 /**
- * Contains various field dimensions and useful reference points. All units are in meters and poses
- * have a blue alliance origin.
+ * Contains various field dimensions and useful reference points for the 2026
+ * REBUILT game.
+ * All units are in meters and poses have a blue alliance origin.
+ * Currently using 2026 REBUILT official specifications.
  */
 public class MechAElementConstants {
-  public static final double fieldLength = Units.inchesToMeters(651.22);
-  public static final double fieldWidth = Units.inchesToMeters(317.69);
-  public static final double startingLineX =
-      Units.inchesToMeters(156.61);
-  public static final double algaeDiameter = Units.inchesToMeters(16);
+    public static final double fieldLength = Units.inchesToMeters(651.22);
+    public static final double fieldWidth = Units.inchesToMeters(317.69);
+    public static final double startingLineX = Units.inchesToMeters(156.61);
+    public static final double fuelDiameter = Units.inchesToMeters(5.91);
 
-  public static class Processor {
-    public static final Pose2d centerFace =
-        new Pose2d(Units.inchesToMeters(235.726), 0, Rotation2d.fromDegrees(90));
-  }
-
-  public static class Barge {
-    public static final Translation2d[] cages;
-
-    static {
-        cages = new Translation2d[3];
-        //farCage
-        cages[0] =
-        new Translation2d(Units.inchesToMeters(345.428), Units.inchesToMeters(286.779));
-        //middleCage
-        cages[1] =
-        new Translation2d(Units.inchesToMeters(345.428), Units.inchesToMeters(242.855));
-        //closeCage
-        cages[2] =
-        new Translation2d(Units.inchesToMeters(345.428), Units.inchesToMeters(199.947));
+    public static class Outpost {
+        public static final Pose2d outpost = new Pose2d(
+                Units.inchesToMeters(0.0),
+                Units.inchesToMeters(34.72),
+                Rotation2d.fromDegrees(0.0));
     }
 
-    // Measured from floor to bottom of cage
-    public static final double deepHeight = Units.inchesToMeters(3.125);
-    public static final double shallowHeight = Units.inchesToMeters(30.125);
-  }
+    public static class Tower {
+        // left to right
+        public static final Pose2d[] towerPoses = {
+                new Pose2d(
+                    Units.inchesToMeters(59.76),
+                    Units.inchesToMeters(141.2),
+                    Rotation2d.fromDegrees(180.0)),
+                new Pose2d(
+                    Units.inchesToMeters(59.76),
+                    Units.inchesToMeters(149.094),
+                    Rotation2d.fromDegrees(180.0)),
+                new Pose2d(
+                    Units.inchesToMeters(59.76),
+                    Units.inchesToMeters(163.0),
+                    Rotation2d.fromDegrees(180.0))
+        };
 
-  public static class CoralStation {
-    public static final Pose2d leftCenterFace =
-        new Pose2d(
-            Units.inchesToMeters(33.526),
-            Units.inchesToMeters(291.176),
-            Rotation2d.fromDegrees(90 - 144.011));
-    public static final Pose2d rightCenterFace =
-        new Pose2d(
-            Units.inchesToMeters(33.526),
-            Units.inchesToMeters(25.824),
-            Rotation2d.fromDegrees(144.011 - 90));
-  }
+        public enum TowerLevel {
+            LOW(Units.inchesToMeters(27.0)),
+            MID(Units.inchesToMeters(45.0)),
+            HIGH(Units.inchesToMeters(63.0));
 
-  public static class Tower {
-    public static final Pose2d leftTower =
-        new Pose2d(
-            Units.inchesToMeters(59.76),
-            Units.inchesToMeters(159.2),
-            Rotation2d.fromDegrees(180.0));
-    public static final Pose2d middleTower =
-        new Pose2d(
-            Units.inchesToMeters(59.76),
-            Units.inchesToMeters(168.094),
-            Rotation2d.fromDegrees(180.0));
-    public static final Pose2d rightTower =
-        new Pose2d(
-            Units.inchesToMeters(59.76),
-            Units.inchesToMeters(182.0),
-            Rotation2d.fromDegrees(180.0));
-  }
+            TowerLevel(double height) {
+                this.height = height;
+            }
 
-  public static class AllianceBounds {
-    public static final double redZoneLineX = Units.inchesToMeters(182.11);
-    public static final double blueZoneLineX = fieldLength - redZoneLineX;
-  }
-
-  public static class Reef {
-    public static final Translation2d center =
-      new Translation2d(Units.inchesToMeters(176.746), Units.inchesToMeters(158.501));
-    public static final double faceToZoneLine =
-        Units.inchesToMeters(12); // Side of the reef to the inside of the reef zone line
-
-    public static final Pose2d[] reefCenterFaces =
-        new Pose2d[6]; // Starting facing the driver station in clockwise order
-    public static final List<Map<ReefHeight, Pose3d>> branchPositions =
-        new ArrayList<>(); // Starting at the right branch facing the driver station in clockwise
-
-    static {
-      // Initialize faces
-      reefCenterFaces[0] =
-        //bottom
-          new Pose2d(
-            Units.inchesToMeters(122.44),
-            Units.inchesToMeters(159.1),
-            Rotation2d.fromDegrees(0));
-        //top right
-      reefCenterFaces[1] =
-          new Pose2d(
-            Units.inchesToMeters(203.54),
-            Units.inchesToMeters(113.39),
-            Rotation2d.fromDegrees(120));
-        //bottom right
-      reefCenterFaces[2] =
-          new Pose2d(
-            Units.inchesToMeters(150.79),
-            Units.inchesToMeters(113.39),
-            Rotation2d.fromDegrees(60));
-        //top
-      reefCenterFaces[3] =
-          new Pose2d(
-            Units.inchesToMeters(230.32),
-            Units.inchesToMeters(159.1),
-            Rotation2d.fromDegrees(180));
-        //bottom left
-      reefCenterFaces[4] =
-          new Pose2d(
-            Units.inchesToMeters(150.79),
-            Units.inchesToMeters(204.72),
-            Rotation2d.fromDegrees(-60));
-        //top left
-      reefCenterFaces[5] =
-          new Pose2d(
-            Units.inchesToMeters(203.94),
-            Units.inchesToMeters(208.66),
-            Rotation2d.fromDegrees(-120));
-
-      // Initialize branch positions
-      for (int face = 0; face < 6; face++) {
-        Map<ReefHeight, Pose3d> fillRight = new HashMap<>();
-        Map<ReefHeight, Pose3d> fillLeft = new HashMap<>();
-        for (var level : ReefHeight.values()) {
-          Pose2d poseDirection = new Pose2d(center, Rotation2d.fromDegrees(180 - (60 * face)));
-          double adjustX = Units.inchesToMeters(30.738);
-          double adjustY = Units.inchesToMeters(6.469);
-
-          fillRight.put(
-              level,
-              new Pose3d(
-                  new Translation3d(
-                      poseDirection
-                          .transformBy(new Transform2d(adjustX, adjustY, new Rotation2d()))
-                          .getX(),
-                      poseDirection
-                          .transformBy(new Transform2d(adjustX, adjustY, new Rotation2d()))
-                          .getY(),
-                      level.height),
-                  new Rotation3d(
-                      0,
-                      Units.degreesToRadians(level.pitch),
-                      poseDirection.getRotation().getRadians())));
-          fillLeft.put(
-              level,
-              new Pose3d(
-                  new Translation3d(
-                      poseDirection
-                          .transformBy(new Transform2d(adjustX, -adjustY, new Rotation2d()))
-                          .getX(),
-                      poseDirection
-                          .transformBy(new Transform2d(adjustX, -adjustY, new Rotation2d()))
-                          .getY(),
-                      level.height),
-                  new Rotation3d(
-                      0,
-                      Units.degreesToRadians(level.pitch),
-                      poseDirection.getRotation().getRadians())));
+            public final double height;
         }
-        branchPositions.add(fillRight);
-        branchPositions.add(fillLeft);
-      }
-    }
-  }
-
-  public static class StagingPositions {
-    // Measured from the center of the ice cream
-    public static final Pose2d leftIceCream =
-        new Pose2d(Units.inchesToMeters(48), Units.inchesToMeters(230.5), new Rotation2d());
-    public static final Pose2d middleIceCream =
-        new Pose2d(Units.inchesToMeters(48), Units.inchesToMeters(158.5), new Rotation2d());
-    public static final Pose2d rightIceCream =
-        new Pose2d(Units.inchesToMeters(48), Units.inchesToMeters(86.5), new Rotation2d());
-  }
-
-  public enum ReefHeight {
-    L4(Units.inchesToMeters(72), -90),
-    L3(Units.inchesToMeters(47.625), -35),
-    L2(Units.inchesToMeters(31.875), -35),
-    L1(Units.inchesToMeters(18), 0);
-
-    ReefHeight(double height, double pitch) {
-      this.height = height;
-      this.pitch = pitch; // in degrees
     }
 
-    public final double height;
-    public final double pitch;
-  }
+    public static class Depot {
+        public static final Translation2d[] depots = {
+                new Translation2d(Units.inchesToMeters(0.0), Units.inchesToMeters(290.0)),
+                new Translation2d(Units.inchesToMeters(0.0), Units.inchesToMeters(25.0))
+        };
+    }
 
-  public static final double aprilTagWidth = Units.inchesToMeters(6.50);
-  public static final int aprilTagCount = 22;
+    public static class Hub {
+        public static final Translation2d hubCenter = new Translation2d(
+                Units.inchesToMeters(182.105),
+                Units.inchesToMeters(158.845));
+
+        public static final double sideLength = Units.inchesToMeters(47.5);
+        public static final double topHeight = Units.inchesToMeters(44.25);
+    }
+
+    public static class AllianceBounds {
+        public static final double blueZoneLineX = Units.inchesToMeters(182.11);
+        public static final double redZoneLineX = fieldLength - blueZoneLineX;
+    }
+
+    public static class Bump {
+        public static final double width = Units.inchesToMeters(73.0);
+        public static final double depth = Units.inchesToMeters(44.4);
+        public static final double height = Units.inchesToMeters(6.513);
+    }
+
+    public static class Trench {
+        public static final double armWidth = Units.inchesToMeters(73.0);
+        public static final double armHeight = Units.inchesToMeters(35.0);
+    }
+
+    public static class NeutralZone {
+        public static final double boxWidth = Units.inchesToMeters(206.0);
+        public static final double boxDepth = Units.inchesToMeters(72.0);
+        public static final Translation2d boxCenter = new Translation2d(fieldLength / 2.0, fieldWidth / 2.0);
+    }
+
+    public static final double aprilTagWidth = Units.inchesToMeters(8.125);
+    public static final int aprilTagCount = 32;
 }
