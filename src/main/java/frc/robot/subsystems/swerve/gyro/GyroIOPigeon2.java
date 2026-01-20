@@ -4,6 +4,7 @@ import static edu.wpi.first.units.Units.Radians;
 import static edu.wpi.first.units.Units.RadiansPerSecond;
 
 import com.ctre.phoenix6.BaseStatusSignal;
+import com.ctre.phoenix6.CANBus;
 import com.ctre.phoenix6.StatusSignal;
 import com.ctre.phoenix6.configs.Pigeon2Configuration;
 import com.ctre.phoenix6.hardware.Pigeon2;
@@ -27,7 +28,7 @@ public class GyroIOPigeon2 implements GyroIO {
     private final Queue<Double> yawPositionQueue;
 
     public GyroIOPigeon2() {
-        gyro = new Pigeon2(2, "drivetrain");
+        gyro = new Pigeon2(2, new CANBus("drivetrain"));
         Pigeon2Configuration config = new Pigeon2Configuration();
         config.MountPose.MountPoseYaw = 88.42582702636719;
         config.MountPose.MountPosePitch = 0.6793335676193237;

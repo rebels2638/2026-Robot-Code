@@ -117,7 +117,8 @@ public class ModuleIOTalonFX implements ModuleIO {
 
         driveConfig.FutureProofConfigs = true;
         
-        driveMotor = new TalonFX(specificConfig.driveCanId, new CANBus(generalConfig.canBusName));
+        CANBus canBus = new CANBus(generalConfig.canBusName);
+        driveMotor = new TalonFX(specificConfig.driveCanId, canBus);
         PhoenixUtil.tryUntilOk(5, () -> driveMotor.getConfigurator().apply(driveConfig, 0.25));
 
         // ABS encoder
@@ -128,7 +129,7 @@ public class ModuleIOTalonFX implements ModuleIO {
 
         encoderConfig.FutureProofConfigs = true;
 
-        steerEncoder = new CANcoder(specificConfig.cancoderCanId, generalConfig.canBusName);
+        steerEncoder = new CANcoder(specificConfig.cancoderCanId, canBus);
         PhoenixUtil.tryUntilOk(5, () -> steerEncoder.getConfigurator().apply(encoderConfig, 0.25));
 
         // Steer motor
@@ -178,7 +179,7 @@ public class ModuleIOTalonFX implements ModuleIO {
 
         steerConfig.FutureProofConfigs = true;
 
-        steerMotor = new TalonFX(specificConfig.steerCanId, new CANBus(generalConfig.canBusName));
+        steerMotor = new TalonFX(specificConfig.steerCanId, canBus);
         PhoenixUtil.tryUntilOk(5, () -> steerMotor.getConfigurator().apply(steerConfig, 0.25));
 
         // status signals

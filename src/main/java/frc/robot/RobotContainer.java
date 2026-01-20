@@ -1,5 +1,7 @@
 package frc.robot;
 
+import org.littletonrobotics.junction.Logger;
+
 import edu.wpi.first.math.MathUtil;
 import edu.wpi.first.math.geometry.Pose2d;
 import edu.wpi.first.math.geometry.Rotation2d;
@@ -8,7 +10,9 @@ import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.InstantCommand;
 import edu.wpi.first.wpilibj2.command.WaitUntilCommand;
 import frc.robot.constants.Constants;
+import frc.robot.lib.BLine.FollowPath;
 import frc.robot.lib.BLine.Path;
+import frc.robot.lib.BLine.Path.EventTrigger;
 import frc.robot.lib.BLine.Path.Waypoint;
 import frc.robot.lib.input.XboxController;
 import frc.robot.subsystems.Superstructure;
@@ -42,6 +46,8 @@ public class RobotContainer {
     private boolean shouldResetPose = false;
 
     private RobotContainer() {
+        registerEventTriggers();
+
         this.xboxTester = new XboxController(1);
         this.xboxOperator = new XboxController(2);
         this.xboxDriver = new XboxController(3);
@@ -64,6 +70,15 @@ public class RobotContainer {
         // superstructure.setDesiredState(Superstructure.DesiredState.HOME);
 
         configureBindings();
+    }
+
+    private void registerEventTriggers() {
+        FollowPath.registerEventTrigger("test1", new InstantCommand(() -> {
+            Logger.recordOutput("TRIGGER1", true);
+        }));
+        FollowPath.registerEventTrigger("test2", new InstantCommand(() -> {
+            Logger.recordOutput("TRIGGER2", true);
+        }));
     }
 
     private void configureBindings() {
@@ -100,7 +115,10 @@ public class RobotContainer {
     }
     
     public Command getAutonomousCommand() {
-        currentPath = new Path("corr_sweep");
+        Logger.recordOutput("TRIGGER1", false);
+        Logger.recordOutput("TRIGGER2", false);
+
+        currentPath = new Path("event_test");
         shouldResetPose = true; 
 
         return new InstantCommand(() -> swerveDrive.setDesiredSystemState(SwerveDrive.DesiredSystemState.PREPARE_FOR_AUTO)).andThen(

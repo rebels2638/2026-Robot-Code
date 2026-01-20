@@ -24,6 +24,7 @@ import edu.wpi.first.math.kinematics.SwerveDriveKinematics;
 import edu.wpi.first.wpilibj.Timer;
 import edu.wpi.first.wpilibj.RobotBase;
 import edu.wpi.first.wpilibj2.command.Command;
+import edu.wpi.first.wpilibj2.command.CommandScheduler;
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
 import edu.wpi.first.wpilibj2.command.sysid.SysIdRoutine;
 import edu.wpi.first.wpilibj2.command.sysid.SysIdRoutine.Direction;
@@ -545,7 +546,7 @@ public class SwerveDrive extends SubsystemBase {
         Path path = pathSupplier.get();
         if (path != null && (currentPathCommand == null || (!currentPathCommand.isScheduled() && !currentPathCommand.isFinished()))) {
             currentPathCommand = buildPathCommand(path);
-            currentPathCommand.schedule();
+            CommandScheduler.getInstance().schedule(currentPathCommand);
         }
         // The path command handles driving via the callback
 
