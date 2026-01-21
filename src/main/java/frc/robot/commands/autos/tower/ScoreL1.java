@@ -1,19 +1,24 @@
 package frc.robot.commands.autos.tower;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Optional;
 
 import org.littletonrobotics.junction.Logger;
 
 import edu.wpi.first.math.geometry.Pose2d;
+import edu.wpi.first.math.geometry.Translation2d;
 import edu.wpi.first.wpilibj.DriverStation;
 import edu.wpi.first.wpilibj.DriverStation.Alliance;
 import edu.wpi.first.wpilibj2.command.Command;
 import frc.robot.RobotState;
-import frc.robot.constants.MechAElementConstants;
+import frc.robot.constants.Constants;
+import frc.robot.constants.AlignmentConstants;
 import frc.robot.lib.BLine.Path.PathConstraints;
 import frc.robot.lib.BLine.Path;
+import frc.robot.lib.BLine.Path.TranslationTarget;
 import frc.robot.lib.BLine.Path.Waypoint;
-import frc.robot.lib.util.AllianceFlippingUtil;
+import frc.robot.lib.util.RebelUtil;
 import frc.robot.subsystems.swerve.SwerveDrive;
 import frc.robot.subsystems.swerve.SwerveDrive.CurrentSystemState;
 import frc.robot.subsystems.swerve.SwerveDrive.DesiredSystemState;
@@ -36,40 +41,67 @@ public class ScoreL1 extends Command {
         boolean isRed = alliance.isPresent() && alliance.get() == Alliance.Red;
         Pose2d currentPose = robotState.getEstimatedPose();
 
-        double blueZoneX = MechAElementConstants.AllianceBounds.blueZoneLineX;
-        double redZoneX = MechAElementConstants.AllianceBounds.redZoneLineX;
-        double hubY = MechAElementConstants.Hub.hubCenter.getY();
+        double blueZoneX = AlignmentConstants.AllianceBounds.blueZoneLineX;
+        double redZoneX = AlignmentConstants.AllianceBounds.redZoneLineX;
 
         boolean behindBoundLine = isRed ? (currentPose.getX() > redZoneX) : (currentPose.getX() < blueZoneX);
-        boolean yInBounds = Math.abs(currentPose.getY() - hubY) <= 1.5;
-        boolean xInBounds = Math.abs(
-                currentPose.getX() - AllianceFlippingUtil.applyFlip(MechAElementConstants.Hub.hubCenter, isRed).getX()
-            ) <= 2.0;
 
-        if (!behindBoundLine || !yInBounds || !xInBounds) {
+        if (!behindBoundLine) {
             isFinished = true;
             return;
         }
 
         Logger.recordOutput("ScoreL1/Status", "Running");
 
-        Pose2d towerPoseBlue = MechAElementConstants.Tower.towerPoses[0];
-        Pose2d currentPoseBlue = AllianceFlippingUtil.applyFlip(currentPose, true);
+        // note: i cant see this working without a pose flip
+        Pose2d currentPoseBlue = RebelUtil.applyFlip(currentPose);
+        Pose2d towerPoseBlue = Constants.ScoreTowerConstants.TOWER_WAYPOINTS[0];
         double minDistanceToTower = towerPoseBlue.getTranslation().getDistance(currentPoseBlue.getTranslation());
+        int towerPoseIndex = 0;
 
-        for (Pose2d pose : MechAElementConstants.Tower.towerPoses) {
+        for (int i = 0; i < Constants.ScoreTowerConstants.TOWER_WAYPOINTS.length; i++) {
+            Pose2d pose = Constants.ScoreTowerConstants.TOWER_WAYPOINTS[i];
             double distance = pose.getTranslation().getDistance(currentPoseBlue.getTranslation());
 
             if (distance < minDistanceToTower) {
                 minDistanceToTower = distance;
+
                 towerPoseBlue = pose;
+                towerPoseIndex = i;
             }
         }
 
-        Path toClimb = new Path(
-                new PathConstraints().setMaxVelocityMetersPerSec(2.65).setMaxAccelerationMetersPerSec2(8.0),
-                new Waypoint(currentPoseBlue),
-                new Waypoint(towerPoseBlue));
+        List<Path.PathElement> pathElements = new ArrayList<>();
+        pathElements.add(new Waypoint(currentPoseBlue));
+
+        boolean needsIntermediate = Constants.ScoreTowerConstants.shouldUseIntermediate(currentPoseBlue, towerPoseBlue);
+        Translation2d[] intermediateTranslation = Constants.ScoreTowerConstants.intermediateTranslation(
+            currentPoseBlue,
+            towerPoseIndex
+        );
+
+        if (needsIntermediate) {
+            for (int i = intermediateTranslation.length - 1; i >= 0; i--) {
+                pathElements.add(new TranslationTarget(intermediateTranslation[i]));
+            }
+        }
+
+        pathElements.add(new Waypoint(towerPoseBlue, 0.08));
+
+        int finalTranslationOrdinal = pathElements.size() - 2;
+        PathConstraints constraints = new PathConstraints()
+                .setMaxVelocityMetersPerSec(
+                    new Path.RangedConstraint(
+                        Constants.ScoreTowerConstants.APPROACH_MAX_VELOCITY_METERS_PER_SEC,
+                        0,
+                        finalTranslationOrdinal),
+                    new Path.RangedConstraint(
+                        Constants.ScoreTowerConstants.MAX_VELOCITY_METERS_PER_SEC,
+                        finalTranslationOrdinal,
+                        pathElements.size() - 1))
+                .setMaxAccelerationMetersPerSec2(Constants.ScoreTowerConstants.MAX_ACCELERATION_METERS_PER_SEC2);
+
+        Path toClimb = new Path(pathElements, constraints);
 
         swerveDrive.setPathSupplier(() -> toClimb, () -> false);
         swerveDrive.setDesiredSystemState(DesiredSystemState.FOLLOW_PATH);

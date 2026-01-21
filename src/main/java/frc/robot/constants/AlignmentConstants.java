@@ -16,9 +16,7 @@ import edu.wpi.first.math.util.Units;
  * All units are in meters and poses have a blue alliance origin.
  * Currently using 2026 REBUILT official specifications.
  */
-public class MechAElementConstants {
-    public static final double fieldLength = Units.inchesToMeters(651.22);
-    public static final double fieldWidth = Units.inchesToMeters(317.69);
+public class AlignmentConstants {
     public static final double startingLineX = Units.inchesToMeters(156.61);
     public static final double fuelDiameter = Units.inchesToMeters(5.91);
 
@@ -30,21 +28,23 @@ public class MechAElementConstants {
     }
 
     public static class Tower {
-        // left to right
+        // left to right (facing the tower)
         public static final Pose2d[] towerPoses = {
-                new Pose2d(
-                    Units.inchesToMeters(59.76),
-                    Units.inchesToMeters(141.2),
-                    Rotation2d.fromDegrees(180.0)),
-                new Pose2d(
-                    Units.inchesToMeters(59.76),
-                    Units.inchesToMeters(149.094),
-                    Rotation2d.fromDegrees(180.0)),
-                new Pose2d(
-                    Units.inchesToMeters(59.76),
-                    Units.inchesToMeters(163.0),
-                    Rotation2d.fromDegrees(180.0))
+            new Pose2d(
+                Units.inchesToMeters(59.76),
+                Units.inchesToMeters(133.2),
+                Rotation2d.fromDegrees(180.0)),
+            new Pose2d(
+                Units.inchesToMeters(59.76),
+                Units.inchesToMeters(148.094),
+                Rotation2d.fromDegrees(180.0)),
+            new Pose2d(
+                Units.inchesToMeters(59.76),
+                Units.inchesToMeters(163.0),
+                Rotation2d.fromDegrees(180.0))
         };
+
+        public static final double towerWidth = Units.inchesToMeters(47.0);
 
         public enum TowerLevel {
             LOW(Units.inchesToMeters(27.0)),
@@ -77,7 +77,7 @@ public class MechAElementConstants {
 
     public static class AllianceBounds {
         public static final double blueZoneLineX = Units.inchesToMeters(182.11);
-        public static final double redZoneLineX = fieldLength - blueZoneLineX;
+        public static final double redZoneLineX = Constants.FieldConstants.fieldLength - blueZoneLineX;
     }
 
     public static class Bump {
@@ -94,7 +94,11 @@ public class MechAElementConstants {
     public static class NeutralZone {
         public static final double boxWidth = Units.inchesToMeters(206.0);
         public static final double boxDepth = Units.inchesToMeters(72.0);
-        public static final Translation2d boxCenter = new Translation2d(fieldLength / 2.0, fieldWidth / 2.0);
+        public static final Translation2d boxCenter =
+            new Translation2d(
+                Constants.FieldConstants.fieldLength / 2.0,
+                Constants.FieldConstants.fieldWidth / 2.0
+            );
     }
 
     public static final double aprilTagWidth = Units.inchesToMeters(8.125);
