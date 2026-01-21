@@ -62,7 +62,6 @@ public class RobotState {
     private double gyroTimeoutSeconds = 1.0;
 
     private Rotation3d lastGyroAngle = new Rotation3d();
-    private boolean useTiltedOdometryStdDevs = false;
 
     // Odometry
     private final SwerveDriveKinematics kinematics;
@@ -142,30 +141,13 @@ public class RobotState {
             );
         lastGyroAngle = gyroOrientation;
 
-        boolean shouldUseTiltedStdDevs =
-            Math.toDegrees(getAngleToFloorRadians()) > robotStateConfig.maxTiltAngleDegrees;
-        if (shouldUseTiltedStdDevs != useTiltedOdometryStdDevs) {
-            useTiltedOdometryStdDevs = shouldUseTiltedStdDevs;
-            double translationStdDev = useTiltedOdometryStdDevs ?
-                robotStateConfig.tiltedOdomTranslationDev :
-                robotStateConfig.odomTranslationDevBase;
-            Pose2d currentPose = swerveDrivePoseEstimator.getEstimatedPosition();
-            swerveDrivePoseEstimator = new SwerveDrivePoseEstimator(
-                kinematics,
-                gyroOrientation.toRotation2d(),
-                observation.modulePositions(),
-                currentPose,
-                VecBuilder.fill(
-                    translationStdDev,
-                    translationStdDev,
-                    robotStateConfig.odomRotationDevBase
-                ),
-                VecBuilder.fill(
-                    robotStateConfig.visionTranslationDevBase,
-                    robotStateConfig.visionTranslationDevBase,
-                    robotStateConfig.visionRotationDevBase
-                )
-            );
+        // Reject odometry if robot is tilted too much
+        boolean isTilted = getAngleToFloor().getDegrees() > robotStateConfig.maxTiltAngleDegrees;
+        Logger.recordOutput("RobotState/odometry/isTilted", isTilted);
+        if (isTilted) {
+            // Still update wheel positions for twist calculation but skip pose estimator update
+            lastWheelPositions = observation.modulePositions();
+            return;
         }
 
         swerveDrivePoseEstimator.updateWithTime(
@@ -261,11 +243,12 @@ public class RobotState {
         return lastGyroAngle;
     }
 
-    public double getAngleToFloorRadians() {
+    @AutoLogOutput(key = "RobotState/angleToFloor")
+    public Rotation2d getAngleToFloor() {
         double roll = lastGyroAngle.getX();
         double pitch = lastGyroAngle.getY();
         double cosine = Math.cos(roll) * Math.cos(pitch);
-        return Math.acos(MathUtil.clamp(cosine, -1.0, 1.0));
+        return new Rotation2d(Math.acos(MathUtil.clamp(cosine, -1.0, 1.0)));
     }
 
     @AutoLogOutput(key = "RobotState/fieldRelativeSpeeds")
