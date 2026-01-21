@@ -6,16 +6,19 @@ import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.math.interpolation.TimeInterpolatableBuffer;
 import edu.wpi.first.wpilibj.Alert;
 import edu.wpi.first.wpilibj.Alert.AlertType;
+import edu.wpi.first.wpilibj.DriverStation;
 import edu.wpi.first.wpilibj.Timer;
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
 import frc.robot.RobotState;
 import frc.robot.RobotState.VisionObservation;
+import frc.robot.configs.VisionConfig;
 import frc.robot.constants.Constants;
 import frc.robot.constants.vision.VisionConstants;
+import frc.robot.lib.util.ConfigLoader;
+import frc.robot.lib.util.LimelightHelpers;
 import frc.robot.subsystems.vision.VisionIO.PoseObservationType;
 
-import static frc.robot.constants.vision.VisionConstants.*;
-
+import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.function.Consumer;
@@ -25,55 +28,33 @@ import org.littletonrobotics.junction.Logger;
 
 public class Vision extends SubsystemBase {
     private static Vision instance = null;
+    private static final VisionConfig config = ConfigLoader.load("vision", VisionConfig.class);
     public static Vision getInstance() {
         if (instance == null) {
             RobotState robotState = RobotState.getInstance();
-            switch (Constants.currentMode) {
-                case COMP:
-                    instance = new Vision(
-                        robotState::addVisionObservation,
-                        () -> Rotation2d.fromRadians(robotState.getFieldRelativeSpeeds().omegaRadiansPerSecond),
-                        new VisionIOLimelight(camera0Name, () -> robotState.getEstimatedPose().getRotation())
-                    );
-                    break;
-
-                case DEV:
-                    instance = new Vision(
-                        robotState::addVisionObservation,
-                        () -> Rotation2d.fromRadians(robotState.getFieldRelativeSpeeds().omegaRadiansPerSecond),
-                        new VisionIOLimelight(camera0Name, () -> robotState.getEstimatedPose().getRotation())
-                    );
-                    break;
-                
-                case SIM:
-                    instance = new Vision(
-                        robotState::addVisionObservation,
-                        () -> Rotation2d.fromRadians(robotState.getFieldRelativeSpeeds().omegaRadiansPerSecond),
+            List<VisionIO> ioList = new ArrayList<>();
+            List<VisionConfig.CameraConfig> cameraConfigs =
+                config.cameras != null ? config.cameras : List.of();
+            if (Constants.currentMode == Constants.Mode.SIM) {
+                for (VisionConfig.CameraConfig camera : cameraConfigs) {
+                    ioList.add(
                         new VisionIOPhotonVisionSim(
-                            camera0Name,
-                            VisionConstants.robotToCamera0,
+                            camera.name,
+                            camera.getRobotToCamera(),
                             () -> robotState.getEstimatedPose()
                         )
                     );
-                    break;
-
-                case REPLAY:
-                    instance = new Vision(
-                        robotState::addVisionObservation,
-                        () -> Rotation2d.fromRadians(robotState.getFieldRelativeSpeeds().omegaRadiansPerSecond),
-                        new VisionIOLimelight(camera0Name, () -> robotState.getEstimatedPose().getRotation())
-                    );
-                    break;
-
-                default:
-                    instance = new Vision(
-                        robotState::addVisionObservation,
-                        () -> Rotation2d.fromRadians(robotState.getFieldRelativeSpeeds().omegaRadiansPerSecond),
-                        new VisionIOLimelight(camera0Name, () -> robotState.getEstimatedPose().getRotation())
-                    );
-                    break;
-
+                }
+            } else {
+                for (VisionConfig.CameraConfig camera : cameraConfigs) {
+                    ioList.add(new VisionIOLimelight(camera.name, robotState::getLastGyroAngle));
+                }
             }
+            instance = new Vision(
+                robotState::addVisionObservation,
+                () -> Rotation2d.fromRadians(robotState.getFieldRelativeSpeeds().omegaRadiansPerSecond),
+                ioList.toArray(new VisionIO[0])
+            );
 
         }
         return instance;
@@ -85,6 +66,7 @@ public class Vision extends SubsystemBase {
     private final VisionIOInputsAutoLogged[] inputs;
     private final Alert[] disconnectedAlerts;
     private final TimeInterpolatableBuffer<Rotation2d> rotationRateBuffer;
+    private final String[] limelightNames;
 
     private Vision(Consumer<VisionObservation> consumer, Supplier<Rotation2d> rotationRateSupplier, VisionIO... io) {
         this.consumer = consumer;
@@ -107,6 +89,18 @@ public class Vision extends SubsystemBase {
 
         // Initialize rotation rate buffer (keep 2 seconds of data)
         this.rotationRateBuffer = TimeInterpolatableBuffer.createBuffer(2.0);
+
+        List<String> limelightNameList = new ArrayList<>();
+        if (config.cameras != null) {
+            for (VisionConfig.CameraConfig camera : config.cameras) {
+                if (camera.name != null
+                    && !camera.name.isBlank()
+                    && !limelightNameList.contains(camera.name)) {
+                    limelightNameList.add(camera.name);
+                }
+            }
+        }
+        this.limelightNames = limelightNameList.toArray(new String[0]);
     }
 
     /**
@@ -120,6 +114,11 @@ public class Vision extends SubsystemBase {
 
     @Override
     public void periodic() {
+        int imuMode = DriverStation.isDisabled() ? config.disabledImuMode : config.enabledImuMode;
+        for (String cameraName : limelightNames) {
+            LimelightHelpers.SetIMUMode(cameraName, imuMode);
+        }
+
         for (int i = 0; i < io.length; i++) {
             io[i].updateInputs(inputs[i]);
             Logger.processInputs("Vision/Camera" + Integer.toString(i), inputs[i]);
@@ -150,7 +149,7 @@ public class Vision extends SubsystemBase {
 
             // Add tag poses
             for (int tagId : inputs[cameraIndex].tagIds) {
-                var tagPose = aprilTagLayout.getTagPose(tagId);
+                var tagPose = VisionConstants.aprilTagLayout.getTagPose(tagId);
                 if (tagPose.isPresent()) {
                     tagPoses.add(tagPose.get());
                 }
@@ -167,12 +166,12 @@ public class Vision extends SubsystemBase {
                     // Use different thresholds based on observation type
                     double maxRotationRateThreshold;
                     if (observation.type() == PoseObservationType.MEGATAG_1) {
-                        maxRotationRateThreshold = maxRotationRateMegatag1DegreesPerSecond;
+                        maxRotationRateThreshold = config.maxRotationRateMegatag1DegreesPerSecond;
                     } else if (observation.type() == PoseObservationType.MEGATAG_2) {
-                        maxRotationRateThreshold = maxRotationRateMegatag2DegreesPerSecond;
+                        maxRotationRateThreshold = config.maxRotationRateMegatag2DegreesPerSecond;
                     } else {
                         // Default to MegaTag1 threshold for other types (like PhotonVision)
-                        maxRotationRateThreshold = maxRotationRateMegatag1DegreesPerSecond;
+                        maxRotationRateThreshold = config.maxRotationRateMegatag1DegreesPerSecond;
                     }
                     
                     rotationRateTooHigh = observationRotationRateDegreesPerSecond > maxRotationRateThreshold;
@@ -182,16 +181,16 @@ public class Vision extends SubsystemBase {
                 boolean rejectPose =
                     observation.tagCount() == 0 // Must have at least one tag
                         || (observation.tagCount() == 1
-                            && observation.ambiguity() > maxAmbiguity) // Cannot be high ambiguity
+                            && observation.ambiguity() > config.maxAmbiguity) // Cannot be high ambiguity
                         || Math.abs(observation.pose().getZ())
-                            > maxZError // Must have realistic Z coordinate
+                            > config.maxZError // Must have realistic Z coordinate
                         || rotationRateTooHigh // Must not be rotating too fast
 
                         // Must be within the field boundaries
                         || observation.pose().getX() < 0.0
-                        || observation.pose().getX() > aprilTagLayout.getFieldLength()
+                        || observation.pose().getX() > VisionConstants.aprilTagLayout.getFieldLength()
                         || observation.pose().getY() < 0.0
-                        || observation.pose().getY() > aprilTagLayout.getFieldWidth();
+                        || observation.pose().getY() > VisionConstants.aprilTagLayout.getFieldWidth();
 
                 // Add pose to log
                 robotPoses.add(observation.pose());
@@ -209,18 +208,18 @@ public class Vision extends SubsystemBase {
                 // Calculate standard deviations
                 double stdDevFactor =
                     Math.pow(observation.averageTagDistance(), 2.0) / observation.tagCount();
-                double linearStdDev = linearStdDevBaseline.get() * stdDevFactor;
-                double angularStdDev = angularStdDevBaseline.get() * stdDevFactor;
+                double linearStdDev = config.linearStdDevBaseline * stdDevFactor;
+                double angularStdDev = config.angularStdDevBaseline * stdDevFactor;
                 if (observation.type() == PoseObservationType.MEGATAG_1) {
-                    linearStdDev *= linearStdDevMegatag1Factor;
-                    angularStdDev *= angularStdDevMegatag1Factor;
+                    linearStdDev *= config.linearStdDevMegatag1Factor;
+                    angularStdDev *= config.angularStdDevMegatag1Factor;
                 } else if (observation.type() == PoseObservationType.MEGATAG_2) {
-                    linearStdDev *= linearStdDevMegatag2Factor;
-                    angularStdDev *= angularStdDevMegatag2Factor;
+                    linearStdDev *= config.linearStdDevMegatag2Factor;
+                    angularStdDev *= config.angularStdDevMegatag2Factor;
                 }
-                if (cameraIndex < cameraStdDevFactors.length) {
-                    linearStdDev *= cameraStdDevFactors[cameraIndex];
-                    angularStdDev *= cameraStdDevFactors[cameraIndex];
+                if (config.cameraStdDevFactors != null && cameraIndex < config.cameraStdDevFactors.length) {
+                    linearStdDev *= config.cameraStdDevFactors[cameraIndex];
+                    angularStdDev *= config.cameraStdDevFactors[cameraIndex];
                 }
 
                 if (!Double.isFinite(linearStdDev) || !Double.isFinite(angularStdDev)) {

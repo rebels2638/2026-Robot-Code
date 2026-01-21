@@ -22,7 +22,7 @@ import static frc.robot.constants.vision.VisionConstants.aprilTagLayout;
 
 /** IO implementation for real Limelight hardware. */
 public class VisionIOLimelight implements VisionIO {
-    private final Supplier<Rotation2d> rotationSupplier;
+    private final Supplier<Rotation3d> rotationSupplier;
     private final DoubleArrayPublisher orientationPublisher;
 
     private final DoubleSubscriber latencySubscriber;
@@ -37,7 +37,7 @@ public class VisionIOLimelight implements VisionIO {
      * @param name The configured name of the Limelight.
      * @param rotationSupplier Supplier for the current estimated rotation, used for MegaTag 2.
      */
-    public VisionIOLimelight(String name, Supplier<Rotation2d> rotationSupplier) {
+    public VisionIOLimelight(String name, Supplier<Rotation3d> rotationSupplier) {
         var table = NetworkTableInstance.getDefault().getTable(name);
         this.rotationSupplier = rotationSupplier;
         orientationPublisher = table.getDoubleArrayTopic("robot_orientation_set").publish();
@@ -61,8 +61,16 @@ public class VisionIOLimelight implements VisionIO {
                 Rotation2d.fromDegrees(txSubscriber.get()), Rotation2d.fromDegrees(tySubscriber.get()));
 
         // Update orientation for MegaTag 2
+        Rotation3d orientation = rotationSupplier.get();
         orientationPublisher.accept(
-            new double[] {rotationSupplier.get().getDegrees(), 0.0, 0.0, 0.0, 0.0, 0.0});
+            new double[] {
+                Math.toDegrees(orientation.getZ()),
+                0.0,
+                Math.toDegrees(orientation.getY()),
+                0.0,
+                Math.toDegrees(orientation.getX()),
+                0.0
+            });
         NetworkTableInstance.getDefault()
             .flush(); // Increases network traffic but recommended by Limelight
 
