@@ -11,6 +11,7 @@ import com.ctre.phoenix6.hardware.Pigeon2;
 
 import edu.wpi.first.math.MathUtil;
 import edu.wpi.first.math.geometry.Rotation2d;
+import edu.wpi.first.math.geometry.Rotation3d;
 import edu.wpi.first.units.measure.Angle;
 import edu.wpi.first.units.measure.AngularVelocity;
 import java.util.Queue;
@@ -22,6 +23,8 @@ public class GyroIOPigeon2 implements GyroIO {
     private final Pigeon2 gyro;
 
     private final StatusSignal<Angle> yawSignal;
+    private final StatusSignal<Angle> rollSignal;
+    private final StatusSignal<Angle> pitchSignal;
     private final StatusSignal<AngularVelocity> yawVelocitySignal;
 
     private final Queue<Double> odometryTimestampQueue;
@@ -38,11 +41,15 @@ public class GyroIOPigeon2 implements GyroIO {
         PhoenixUtil.tryUntilOk(5, () -> gyro.getConfigurator().apply(config, 0.25));
 
         yawSignal = gyro.getYaw().clone();
+        rollSignal = gyro.getRoll().clone();
+        pitchSignal = gyro.getPitch().clone();
         yawVelocitySignal = gyro.getAngularVelocityZWorld().clone();
 
         BaseStatusSignal.setUpdateFrequencyForAll(
             SwerveDrive.ODOMETRY_FREQUENCY,
             yawSignal,
+            rollSignal,
+            pitchSignal,
             yawVelocitySignal
         );
 
@@ -54,11 +61,18 @@ public class GyroIOPigeon2 implements GyroIO {
 
     @Override
     public synchronized void updateInputs(GyroIOInputs inputs) {
-        BaseStatusSignal.refreshAll(yawVelocitySignal);
+        BaseStatusSignal.refreshAll(yawSignal, rollSignal, pitchSignal, yawVelocitySignal);
 
         inputs.isConnected = true;
 
-        inputs.yawPosition = new Rotation2d(MathUtil.angleModulus(BaseStatusSignal.getLatencyCompensatedValue(yawSignal, yawVelocitySignal).in(Radians)));
+        double yawRadians = MathUtil.angleModulus(
+            BaseStatusSignal.getLatencyCompensatedValue(yawSignal, yawVelocitySignal).in(Radians)
+        );
+        inputs.gyroOrientation = new Rotation3d(
+            rollSignal.getValue().in(Radians),
+            pitchSignal.getValue().in(Radians),
+            yawRadians
+        );
         inputs.yawVelocityRadPerSec = yawVelocitySignal.getValue().in(RadiansPerSecond);
 
         inputs.odometryTimestampsSeconds = odometryTimestampQueue.stream().mapToDouble(Double::doubleValue).toArray();

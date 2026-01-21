@@ -17,6 +17,7 @@ import edu.wpi.first.math.MathUtil;
 import edu.wpi.first.math.controller.PIDController;
 import edu.wpi.first.math.geometry.Pose2d;
 import edu.wpi.first.math.geometry.Rotation2d;
+import edu.wpi.first.math.geometry.Rotation3d;
 import edu.wpi.first.math.kinematics.ChassisSpeeds;
 import edu.wpi.first.math.kinematics.SwerveModulePosition;
 import edu.wpi.first.math.kinematics.SwerveModuleState;
@@ -345,7 +346,13 @@ public class SwerveDrive extends SubsystemBase {
                     gyroInputs.isConnected,
                     modulePositions,
                     moduleStates,
-                    gyroInputs.isConnected ? gyroInputs.odometryYawPositions[i] : new Rotation2d(),
+                    gyroInputs.isConnected ?
+                        new Rotation3d(
+                            gyroInputs.gyroOrientation.getX(),
+                            gyroInputs.gyroOrientation.getY(),
+                            gyroInputs.odometryYawPositions[i].getRadians()
+                        ) :
+                        new Rotation3d(),
                     gyroInputs.isConnected ? gyroInputs.yawVelocityRadPerSec : 0
                 )
             );
@@ -983,7 +990,7 @@ public class SwerveDrive extends SubsystemBase {
     }
 
     public Rotation2d getGyroAngle() {
-        return gyroInputs.yawPosition;
+        return gyroInputs.gyroOrientation.toRotation2d();
     }
 
     public void setWheelCoast(boolean isCoast) {

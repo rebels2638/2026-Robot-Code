@@ -37,7 +37,7 @@ public class RobotState {
         boolean isGyroConnected,
         SwerveModulePosition[] modulePositions, 
         SwerveModuleState[] moduleStates,
-        Rotation2d yawPosition,
+        Rotation3d gyroOrientation,
         double yawVelocityRadPerSec
     ) {}
 
@@ -52,7 +52,7 @@ public class RobotState {
     private static final double poseBufferSizeSeconds = 2.0;
     private final TimeInterpolatableBuffer<Pose2d> poseBuffer = TimeInterpolatableBuffer.createBuffer(poseBufferSizeSeconds);
 
-    private final SwerveDrivePoseEstimator swerveDrivePoseEstimator;
+    private SwerveDrivePoseEstimator swerveDrivePoseEstimator;
 
     private double lastEstimatedPoseUpdateTime = 0;
     private int visionObservationsAccepted = 0;
@@ -61,7 +61,8 @@ public class RobotState {
     private double lastGyroResetTime = Timer.getTimestamp();
     private double gyroTimeoutSeconds = 1.0;
 
-    private Rotation2d lastGyroAngle = new Rotation2d();
+    private Rotation3d lastGyroAngle = new Rotation3d();
+    private boolean useTiltedOdometryStdDevs = false;
 
     // Odometry
     private final SwerveDriveKinematics kinematics;
@@ -116,7 +117,7 @@ public class RobotState {
             observation.isGyroConnected(),
             observation.modulePositions().clone(),
             observation.moduleStates().clone(),
-            observation.yawPosition(),
+            observation.gyroOrientation(),
             observation.yawVelocityRadPerSec()
         );
         
@@ -124,7 +125,7 @@ public class RobotState {
         Logger.recordOutput("RobotState/odometry/isGyroConnected", observation.isGyroConnected());
         Logger.recordOutput("RobotState/odometry/modulePositions", observation.modulePositions());
         Logger.recordOutput("RobotState/odometry/moduleStates", observation.moduleStates());
-        Logger.recordOutput("RobotState/odometry/yawPosition", observation.yawPosition());
+        Logger.recordOutput("RobotState/odometry/gyroOrientation", observation.gyroOrientation());
         Logger.recordOutput("RobotState/odometry/yawVelocityRadPerSec", observation.yawVelocityRadPerSec());
 
         // update robotState member variables
@@ -132,18 +133,51 @@ public class RobotState {
         lastRobotRelativeSpeeds.omegaRadiansPerSecond = observation.isGyroConnected ? observation.yawVelocityRadPerSec() : lastRobotRelativeSpeeds.omegaRadiansPerSecond;
         lastYawVelocityRadPerSec = observation.isGyroConnected ? observation.yawVelocityRadPerSec() : lastRobotRelativeSpeeds.omegaRadiansPerSecond;
 
+        Rotation3d gyroOrientation = observation.isGyroConnected() ?
+            observation.gyroOrientation() :
+            new Rotation3d(
+                0.0,
+                0.0,
+                swerveDrivePoseEstimator.getEstimatedPosition().getRotation().getRadians()
+            );
+        lastGyroAngle = gyroOrientation;
+
+        boolean shouldUseTiltedStdDevs =
+            Math.toDegrees(getAngleToFloorRadians()) > robotStateConfig.maxTiltAngleDegrees;
+        if (shouldUseTiltedStdDevs != useTiltedOdometryStdDevs) {
+            useTiltedOdometryStdDevs = shouldUseTiltedStdDevs;
+            double translationStdDev = useTiltedOdometryStdDevs ?
+                robotStateConfig.tiltedOdomTranslationDev :
+                robotStateConfig.odomTranslationDevBase;
+            Pose2d currentPose = swerveDrivePoseEstimator.getEstimatedPosition();
+            swerveDrivePoseEstimator = new SwerveDrivePoseEstimator(
+                kinematics,
+                gyroOrientation.toRotation2d(),
+                observation.modulePositions(),
+                currentPose,
+                VecBuilder.fill(
+                    translationStdDev,
+                    translationStdDev,
+                    robotStateConfig.odomRotationDevBase
+                ),
+                VecBuilder.fill(
+                    robotStateConfig.visionTranslationDevBase,
+                    robotStateConfig.visionTranslationDevBase,
+                    robotStateConfig.visionRotationDevBase
+                )
+            );
+        }
+
         swerveDrivePoseEstimator.updateWithTime(
             observation.timestampsSeconds(), 
             observation.isGyroConnected() ? 
-                observation.yawPosition() : 
+                observation.gyroOrientation().toRotation2d() : 
                 new Rotation2d(
                     swerveDrivePoseEstimator.getEstimatedPosition().getRotation().getRadians() + 
                     kinematics.toTwist2d(lastWheelPositions, observation.modulePositions()).dtheta
                 ),
             observation.modulePositions()
         );
-
-        lastGyroAngle = observation.isGyroConnected() ? observation.yawPosition() : swerveDrivePoseEstimator.getEstimatedPosition().getRotation();
 
         lastWheelPositions = observation.modulePositions();
 
@@ -221,6 +255,17 @@ public class RobotState {
 
     public ChassisSpeeds getRobotRelativeSpeeds() {
         return lastRobotRelativeSpeeds;
+    }
+
+    public Rotation3d getLastGyroAngle() {
+        return lastGyroAngle;
+    }
+
+    public double getAngleToFloorRadians() {
+        double roll = lastGyroAngle.getX();
+        double pitch = lastGyroAngle.getY();
+        double cosine = Math.cos(roll) * Math.cos(pitch);
+        return Math.acos(MathUtil.clamp(cosine, -1.0, 1.0));
     }
 
     @AutoLogOutput(key = "RobotState/fieldRelativeSpeeds")
