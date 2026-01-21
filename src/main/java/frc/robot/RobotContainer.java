@@ -20,6 +20,7 @@ import frc.robot.subsystems.Superstructure.DesiredState;
 import frc.robot.subsystems.shooter.Shooter;
 import frc.robot.subsystems.swerve.SwerveDrive;
 // import frc.robot.subsystems.vision.Vision;
+import frc.robot.subsystems.vision.Vision;
 
 public class RobotContainer {
     public static RobotContainer instance = null;
@@ -39,7 +40,7 @@ public class RobotContainer {
     private final RobotState robotState = RobotState.getInstance();
     private final SwerveDrive swerveDrive = SwerveDrive.getInstance();
     // private final Superstructure superstructure = Superstructure.getInstance();
-    // private final Vision vision = Vision.getInstance();
+    private final Vision vision = Vision.getInstance();
 
     // Path for follow path state
     private Path currentPath = null;
@@ -74,11 +75,11 @@ public class RobotContainer {
 
     private void registerEventTriggers() {
         FollowPath.registerEventTrigger("test1", new InstantCommand(() -> {
-            Logger.recordOutput("TRIGGER1", true);
+            Logger.recordOutput("In a command", true);
         }));
-        FollowPath.registerEventTrigger("test2", new InstantCommand(() -> {
-            Logger.recordOutput("TRIGGER2", true);
-        }));
+        FollowPath.registerEventTrigger("test2", () -> {
+            System.out.println("As a runnable");
+        });
     }
 
     private void configureBindings() {
@@ -120,6 +121,12 @@ public class RobotContainer {
 
         currentPath = new Path("event_test");
         shouldResetPose = true; 
+
+        new Path(
+            new Waypoint(0, 0, new Rotation2d(0)),
+            new EventTrigger(0.5, "test"),
+            new Waypoint(1, 1, new Rotation2d(0))
+        );
 
         return new InstantCommand(() -> swerveDrive.setDesiredSystemState(SwerveDrive.DesiredSystemState.PREPARE_FOR_AUTO)).andThen(
             new WaitUntilCommand(() -> swerveDrive.getCurrentSystemState() == SwerveDrive.CurrentSystemState.READY_FOR_AUTO)).andThen(

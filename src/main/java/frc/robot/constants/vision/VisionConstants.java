@@ -58,11 +58,15 @@ public class VisionConstants {
         1.0 // Camera 1
       };
 
+  // Multipliers to apply for MegaTag 1 observations
+  public static double linearStdDevMegatag1Factor = 999999;
+  public static double angularStdDevMegatag1Factor = 1.0;
+
   // Multipliers to apply for MegaTag 2 observations. less than 1 means more stable than full 3D solve (more weight)
-  public static double linearStdDevMegatag2Factor = 0.6; 
-  public static double angularStdDevMegatag2Factor = Double.POSITIVE_INFINITY; // No rotation data available
+  public static double linearStdDevMegatag2Factor = 1.0; 
+  public static double angularStdDevMegatag2Factor = 999999; // No rotation data available
 
   // Rotation rate rejection thresholds
-  public static double maxRotationRateMegatag1DegreesPerSecond = 180.0; // Reject MegaTag1 observations if rotating faster than this
-  public static double maxRotationRateMegatag2DegreesPerSecond = 120.0; // Reject MegaTag2 observations if rotating faster than this
+  public static double maxRotationRateMegatag1DegreesPerSecond = 360.0; // Reject MegaTag1 observations if rotating faster than this
+  public static double maxRotationRateMegatag2DegreesPerSecond = 360.0; // Reject MegaTag2 observations if rotating faster than this
 }

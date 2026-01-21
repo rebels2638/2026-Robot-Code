@@ -31,7 +31,8 @@ public final class Constants {
 
         DEV,
 
-        /** Running a physics simulator. */
+        /** Running a physics simulaton
+         * r. */
         SIM,
 
         /** Replaying from a log file. */

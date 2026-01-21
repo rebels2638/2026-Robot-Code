@@ -2,24 +2,19 @@
   "path_elements": [
     {
       "type": "translation",
-      "x_meters": 8.77,
-      "y_meters": 4.535,
+      "x_meters": 10.127602211778514,
+      "y_meters": 4.759861696256541,
       "intermediate_handoff_radius_meters": 0.25
     },
     {
       "type": "event_trigger",
-      "t_ratio": 0.6024083085267936,
+      "t_ratio": 0.5000000000000009,
       "lib_key": "test1"
     },
     {
-      "type": "event_trigger",
-      "t_ratio": 0.8420968682686275,
-      "lib_key": "test2"
-    },
-    {
       "type": "translation",
-      "x_meters": 11.371671117357701,
-      "y_meters": 4.756869290231906,
+      "x_meters": 11.138374221808974,
+      "y_meters": 4.753224026238958,
       "intermediate_handoff_radius_meters": 0.25
     },
     {

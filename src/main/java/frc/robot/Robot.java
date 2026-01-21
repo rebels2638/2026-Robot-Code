@@ -22,6 +22,7 @@ import edu.wpi.first.wpilibj2.command.CommandScheduler;
 import edu.wpi.first.wpilibj2.command.InstantCommand;
 import frc.robot.constants.Constants;
 import frc.robot.lib.BLine.FollowPath;
+import frc.robot.lib.util.LimelightHelpers;
 import frc.robot.subsystems.shooter.Shooter;
 
 /**
@@ -139,8 +140,18 @@ public class Robot extends LoggedRobot {
         m_robotContainer.disabledInit();
     }
 
+    // Set the imumode. 
+    // 0 - use external imu, 
+    // 1 - use external imu, seed internal imu, 
+    // 2 - use internal, 
+    // 3 - use internal with MT1 assisted convergence, 
+    // 4 - use internal IMU with external IMU assisted convergence
+
     @Override
     public void disabledPeriodic() {
+        
+// TODO try using mode 4. also add into limelight vision subsystem
+        LimelightHelpers.SetIMUMode("limelight", 1);
     }
 
     private void linkFollowPathLogging() {
@@ -188,10 +199,13 @@ public class Robot extends LoggedRobot {
     /** This function is called periodically during autonomous. */
     @Override
     public void autonomousPeriodic() {
+        LimelightHelpers.SetIMUMode("limelight", 4);
+
     }
 
     @Override
     public void teleopInit() {
+
 
         // This makes sure that the autonomous stops running when
         // teleop starts running. If you want the autonomous to
@@ -209,6 +223,8 @@ public class Robot extends LoggedRobot {
     /** This function is called periodically during operator control. */
     @Override
     public void teleopPeriodic() {
+        LimelightHelpers.SetIMUMode("limelight", 4);
+
     }
 
     @Override
