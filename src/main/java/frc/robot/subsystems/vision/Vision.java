@@ -47,7 +47,7 @@ public class Vision extends SubsystemBase {
                 }
             } else {
                 for (VisionConfig.CameraConfig camera : cameraConfigs) {
-                    ioList.add(new VisionIOLimelight(camera.name, robotState::getLastGyroAngle));
+                    ioList.add(new VisionIOLimelight(camera.name, robotState::getLastOrientation));
                 }
             }
             instance = new Vision(

@@ -239,8 +239,12 @@ public class RobotState {
         return lastRobotRelativeSpeeds;
     }
 
-    public Rotation3d getLastGyroAngle() {
-        return lastGyroAngle;
+    public Rotation3d getLastOrientation() {
+        return new Rotation3d(
+            lastGyroAngle.getX(), 
+            lastGyroAngle.getY(), 
+            getEstimatedPose().getRotation().getRadians() // pose estim offsets for yaw taken into account
+        );
     }
 
     @AutoLogOutput(key = "RobotState/angleToFloor")
