@@ -17,6 +17,7 @@ import edu.wpi.first.math.MathUtil;
 import edu.wpi.first.math.controller.PIDController;
 import edu.wpi.first.math.geometry.Pose2d;
 import edu.wpi.first.math.geometry.Rotation2d;
+import edu.wpi.first.math.geometry.Rotation3d;
 import edu.wpi.first.math.kinematics.ChassisSpeeds;
 import edu.wpi.first.math.kinematics.SwerveModulePosition;
 import edu.wpi.first.math.kinematics.SwerveModuleState;
@@ -24,6 +25,7 @@ import edu.wpi.first.math.kinematics.SwerveDriveKinematics;
 import edu.wpi.first.wpilibj.Timer;
 import edu.wpi.first.wpilibj.RobotBase;
 import edu.wpi.first.wpilibj2.command.Command;
+import edu.wpi.first.wpilibj2.command.CommandScheduler;
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
 import edu.wpi.first.wpilibj2.command.sysid.SysIdRoutine;
 import edu.wpi.first.wpilibj2.command.sysid.SysIdRoutine.Direction;
@@ -344,7 +346,13 @@ public class SwerveDrive extends SubsystemBase {
                     gyroInputs.isConnected,
                     modulePositions,
                     moduleStates,
-                    gyroInputs.isConnected ? gyroInputs.odometryYawPositions[i] : new Rotation2d(),
+                    gyroInputs.isConnected ?
+                        new Rotation3d(
+                            gyroInputs.gyroOrientation.getX(),
+                            gyroInputs.gyroOrientation.getY(),
+                            gyroInputs.odometryYawPositions[i].getRadians()
+                        ) :
+                        new Rotation3d(),
                     gyroInputs.isConnected ? gyroInputs.yawVelocityRadPerSec : 0
                 )
             );
@@ -545,7 +553,7 @@ public class SwerveDrive extends SubsystemBase {
         Path path = pathSupplier.get();
         if (path != null && (currentPathCommand == null || (!currentPathCommand.isScheduled() && !currentPathCommand.isFinished()))) {
             currentPathCommand = buildPathCommand(path);
-            currentPathCommand.schedule();
+            CommandScheduler.getInstance().schedule(currentPathCommand);
         }
         // The path command handles driving via the callback
 
@@ -982,7 +990,7 @@ public class SwerveDrive extends SubsystemBase {
     }
 
     public Rotation2d getGyroAngle() {
-        return gyroInputs.yawPosition;
+        return gyroInputs.gyroOrientation.toRotation2d();
     }
 
     public void setWheelCoast(boolean isCoast) {

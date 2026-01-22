@@ -2,5 +2,6 @@
   "odomTranslationDevBase": 0.005,
   "odomRotationDevBase": 0.005,
   "visionTranslationDevBase": 0.02,
-  "visionRotationDevBase": 0.02
+  "visionRotationDevBase": 0.02,
+  "maxTiltAngleDegrees": 5.0
 }

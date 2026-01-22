@@ -9,6 +9,7 @@ import edu.wpi.first.math.geometry.Transform3d;
 import edu.wpi.first.math.geometry.Translation2d;
 import edu.wpi.first.math.kinematics.ChassisSpeeds;
 import edu.wpi.first.wpilibj.Timer;
+import edu.wpi.first.wpilibj2.command.CommandScheduler;
 import frc.robot.lib.util.ProjectileVisualizer;
 import frc.robot.subsystems.shooter.Shooter;
 
@@ -77,11 +78,11 @@ public class VisualizeShot {
         Logger.recordOutput("VisualizeShot/shooterVxField", shooterVxField);
         Logger.recordOutput("VisualizeShot/shooterVyField", shooterVyField);
 
-        new ProjectileVisualizer(
+        CommandScheduler.getInstance().schedule(new ProjectileVisualizer(
             fieldRelativeSpeeds.vxMetersPerSecond,
             fieldRelativeSpeeds.vyMetersPerSecond,
             exitVelocity,
             shooterPose
-        ).schedule();
+        ));
     }
 }
