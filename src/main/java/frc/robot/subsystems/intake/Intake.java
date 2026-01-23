@@ -124,6 +124,11 @@ public class Intake extends SubsystemBase {
         setIntakeVelocity(config.outtakingVelocityRPS);
     }
 
+    private void setIntakeVoltage(double voltage) {
+        Logger.recordOutput("Intake/voltageSetpoint", voltage);
+        intakeIO.setVoltage(voltage);
+    }
+    
     private void setIntakeVelocity(double velocityRotationsPerSec) {
         intakeSetpointRPS = velocityRotationsPerSec;
         Logger.recordOutput("Intake/velocitySetpointRPS", velocityRotationsPerSec);
