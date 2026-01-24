@@ -1,5 +1,6 @@
 package frc.robot.lib.util.ballistics;
 
+import edu.wpi.first.math.geometry.Translation3d;
 import frc.robot.lib.util.ballistics.ProjectileState.Derivatives;
 
 public final class BallisticsPhysics {
@@ -173,6 +174,45 @@ public final class BallisticsPhysics {
         }
 
         return new TrajectoryResult(elapsed, state.z(), state.x(), false);
+    }
+
+    public static Translation3d simulateToHeight3D(
+        Translation3d startPosition,
+        double vx,
+        double vy,
+        double vz,
+        double spinRateRadPerSec,
+        double targetHeight,
+        double dt
+    ) {
+        ProjectileState state = new ProjectileState(
+            startPosition.getX(),
+            startPosition.getY(),
+            startPosition.getZ(),
+            vx,
+            vy,
+            vz
+        );
+        ProjectileState prev = state;
+        double elapsed = 0.0;
+        double step = Math.max(1e-6, dt);
+
+        while (state.z() >= 0.0 && elapsed < MAX_SIM_TIME) {
+            prev = state;
+            state = integrateStep3D(state, spinRateRadPerSec, step);
+            elapsed += step;
+
+            boolean crossedTarget =
+                prev.z() >= targetHeight && state.z() <= targetHeight && state.vz() <= 0.0;
+            if (crossedTarget) {
+                double t = (targetHeight - prev.z()) / (state.z() - prev.z());
+                double xAtTarget = prev.x() + t * (state.x() - prev.x());
+                double yAtTarget = prev.y() + t * (state.y() - prev.y());
+                return new Translation3d(xAtTarget, yAtTarget, targetHeight);
+            }
+        }
+
+        return new Translation3d(state.x(), state.y(), state.z());
     }
 
     private static Derivatives weighted(Derivatives k1, Derivatives k2, Derivatives k3, Derivatives k4) {

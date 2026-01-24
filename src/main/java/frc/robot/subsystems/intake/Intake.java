@@ -19,22 +19,20 @@ public class Intake extends SubsystemBase {
         return instance;
     }
 
-    public enum IntakeCurrentState {
-        DISABLED,
-        HOME,
-        INTAKING,
-        OUTTAKING
-    }
+    public enum IntakeSetpoint {
+        OFF(0.0),
+        INTAKING(Double.NaN),
+        OUTTAKING(Double.NaN);
 
-    public enum IntakeDesiredState {
-        DISABLED,
-        HOME,
-        INTAKING,
-        OUTTAKING
-    }
+        private final double rps;
+        IntakeSetpoint(double rps) {
+            this.rps = rps;
+        }
 
-    private IntakeCurrentState currentState = IntakeCurrentState.DISABLED;
-    private IntakeDesiredState desiredState = IntakeDesiredState.DISABLED;
+        public double getRps() {
+            return rps;
+        }
+    }
 
     private final IntakeIO intakeIO;
     private final IntakeIOInputsAutoLogged intakeInputs = new IntakeIOInputsAutoLogged();
@@ -70,83 +68,19 @@ public class Intake extends SubsystemBase {
             intakeIO.configureControlLoop(intakeControlLoopConfigurator.getConfig());
         }
 
-        handleStateTransitions();
-        handleCurrentState();
     }
 
-    private void handleStateTransitions() {
-        switch (desiredState) {
-            case DISABLED:
-                currentState = IntakeCurrentState.DISABLED;
-                break;
-            case HOME:
-                currentState = IntakeCurrentState.HOME;
-                break;
-            case INTAKING:
-                currentState = IntakeCurrentState.INTAKING;
-                break;
-            case OUTTAKING:
-                currentState = IntakeCurrentState.OUTTAKING;
-                break;
-        }
-    }
-
-    private void handleCurrentState() {
-        switch (currentState) {
-            case DISABLED:
-                handleDISABLEDState();
-                break;
-            case HOME:
-                handleHomeState();
-                break;
-            case INTAKING:
-                handleIntakingState();
-                break;
-            case OUTTAKING:
-                handleOuttakingState();
-                break;
-        }
-    }
-
-    private void handleDISABLEDState() {
-        setIntakeVelocity(0);
-    }
-
-    private void handleHomeState() {
-        setIntakeVelocity(0);
-    }
-
-    private void handleIntakingState() {
-        setIntakeVelocity(config.intakingVelocityRPS);
-    }
-
-    private void handleOuttakingState() {
-        setIntakeVelocity(config.outtakingVelocityRPS);
-    }
-
-    private void setIntakeVoltage(double voltage) {
-        Logger.recordOutput("Intake/voltageSetpoint", voltage);
-        intakeIO.setVoltage(voltage);
-    }
-    
     private void setIntakeVelocity(double velocityRotationsPerSec) {
         intakeSetpointRPS = velocityRotationsPerSec;
         Logger.recordOutput("Intake/velocitySetpointRPS", velocityRotationsPerSec);
         intakeIO.setVelocity(velocityRotationsPerSec);
     }
 
-    @AutoLogOutput(key = "Intake/currentState")
-    public IntakeCurrentState getCurrentState() {
-        return currentState;
-    }
-
-    @AutoLogOutput(key = "Intake/desiredState")
-    public IntakeDesiredState getDesiredState() {
-        return desiredState;
-    }
-
-    public void setDesiredState(IntakeDesiredState desiredState) {
-        this.desiredState = desiredState;
+    public void setSetpoint(IntakeSetpoint setpoint) {
+        double targetRps = setpoint == IntakeSetpoint.INTAKING
+            ? config.intakingVelocityRPS
+            : setpoint == IntakeSetpoint.OUTTAKING ? config.outtakingVelocityRPS : setpoint.getRps();
+        setIntakeVelocity(targetRps);
     }
 
     public double getIntakeVelocityRotationsPerSec() {

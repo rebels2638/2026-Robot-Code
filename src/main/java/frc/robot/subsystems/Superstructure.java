@@ -20,16 +20,16 @@ import edu.wpi.first.wpilibj.Timer;
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
 import frc.robot.RobotState;
 import frc.robot.VisualizeShot;
-import frc.robot.constants.Constants;
 import frc.robot.constants.FieldConstants;
+import frc.robot.lib.util.ballistics.BallisticsPhysics;
 import frc.robot.lib.util.ShotCalculator;
 import frc.robot.lib.util.ShotCalculator.ShotData;
 import frc.robot.subsystems.kicker.Kicker;
-import frc.robot.subsystems.kicker.Kicker.KickerCurrentState;
-import frc.robot.subsystems.kicker.Kicker.KickerDesiredState;
+import frc.robot.subsystems.kicker.Kicker.KickerSetpoint;
 import frc.robot.subsystems.shooter.Shooter;
-import frc.robot.subsystems.shooter.Shooter.ShooterCurrentState;
-import frc.robot.subsystems.shooter.Shooter.ShooterDesiredState;
+import frc.robot.subsystems.shooter.Shooter.FlywheelSetpoint;
+import frc.robot.subsystems.shooter.Shooter.HoodSetpoint;
+import frc.robot.subsystems.shooter.Shooter.TurretSetpoint;
 import frc.robot.subsystems.swerve.SwerveDrive;
 
 public class Superstructure extends SubsystemBase {
@@ -60,7 +60,6 @@ public class Superstructure extends SubsystemBase {
 
     private CurrentState currentState = CurrentState.DISABLED;
     private DesiredState desiredState = DesiredState.DISABLED;
-    private CurrentState previousState = CurrentState.DISABLED;
 
     private final Shooter shooter = Shooter.getInstance();
     private final Kicker kicker = Kicker.getInstance();
@@ -73,6 +72,7 @@ public class Superstructure extends SubsystemBase {
     // Margin for swerve rotation range (degrees)
     private static final double SWERVE_ROTATION_MARGIN_DEG = 20.0;
     private static final double MAX_TRANSLATIONAL_VELOCITY_DURING_SHOT_METERS_PER_SEC = 1.0;
+    private static final double SHOT_IMPACT_TOLERANCE_METERS = 0.15;
     private LoggedNetworkNumber latencyCompensationSeconds = new LoggedNetworkNumber("Shooter/latencyCompSec");
 
     private Superstructure() {
@@ -183,23 +183,29 @@ public class Superstructure extends SubsystemBase {
     }
 
     private void handleDISABLEDState() {
-        shooter.setDesiredState(ShooterDesiredState.DISABLED);
-        kicker.setDesiredState(KickerDesiredState.DISABLED);
+        shooter.setHoodSetpoint(HoodSetpoint.HOME);
+        shooter.setTurretSetpoint(TurretSetpoint.HOME);
+        shooter.setFlywheelSetpoint(FlywheelSetpoint.OFF);
+        kicker.setSetpoint(KickerSetpoint.OFF);
         swerveDrive.setDesiredSystemState(SwerveDrive.DesiredSystemState.DISABLED);
         swerveDrive.setDesiredOmegaOverrideState(SwerveDrive.DesiredOmegaOverrideState.NONE);
         swerveDrive.setDesiredTranslationOverrideState(SwerveDrive.DesiredTranslationOverrideState.NONE);
     }
 
     private void handleHomeState() {
-        shooter.setDesiredState(ShooterDesiredState.HOME);
-        kicker.setDesiredState(KickerDesiredState.HOME);
+        shooter.setHoodSetpoint(HoodSetpoint.HOME);
+        shooter.setTurretSetpoint(TurretSetpoint.HOME);
+        shooter.setFlywheelSetpoint(FlywheelSetpoint.OFF);
+        kicker.setSetpoint(KickerSetpoint.OFF);
         swerveDrive.setDesiredOmegaOverrideState(SwerveDrive.DesiredOmegaOverrideState.NONE);
         swerveDrive.setDesiredTranslationOverrideState(SwerveDrive.DesiredTranslationOverrideState.NONE);
     }
 
     private void handleTrackingState() {
-        shooter.setDesiredState(ShooterDesiredState.TRACKING);
-        kicker.setDesiredState(KickerDesiredState.HOME);
+        shooter.setHoodSetpoint(HoodSetpoint.DYNAMIC);
+        shooter.setTurretSetpoint(TurretSetpoint.DYNAMIC);
+        shooter.setFlywheelSetpoint(FlywheelSetpoint.OFF);
+        kicker.setSetpoint(KickerSetpoint.OFF);
         swerveDrive.setDesiredOmegaOverrideState(SwerveDrive.DesiredOmegaOverrideState.NONE);
         swerveDrive.setDesiredTranslationOverrideState(SwerveDrive.DesiredTranslationOverrideState.NONE);
     }
@@ -209,8 +215,10 @@ public class Superstructure extends SubsystemBase {
         swerveDrive.setVelocityCapMaxVelocityMetersPerSec(MAX_TRANSLATIONAL_VELOCITY_DURING_SHOT_METERS_PER_SEC);
 
 
-        shooter.setDesiredState(ShooterDesiredState.READY_FOR_SHOT);
-        kicker.setDesiredState(KickerDesiredState.FEEDING);
+        shooter.setHoodSetpoint(HoodSetpoint.DYNAMIC);
+        shooter.setTurretSetpoint(TurretSetpoint.DYNAMIC);
+        shooter.setFlywheelSetpoint(FlywheelSetpoint.DYNAMIC);
+        kicker.setSetpoint(KickerSetpoint.FEEDING);
         swerveDrive.setDesiredOmegaOverrideState(SwerveDrive.DesiredOmegaOverrideState.RANGED_ROTATION);
         swerveDrive.setDesiredTranslationOverrideState(SwerveDrive.DesiredTranslationOverrideState.CAPPED);
     }
@@ -219,8 +227,10 @@ public class Superstructure extends SubsystemBase {
         updateSwerveRotationRange();
         swerveDrive.setVelocityCapMaxVelocityMetersPerSec(MAX_TRANSLATIONAL_VELOCITY_DURING_SHOT_METERS_PER_SEC);
 
-        shooter.setDesiredState(ShooterDesiredState.READY_FOR_SHOT);
-        kicker.setDesiredState(KickerDesiredState.FEEDING);
+        shooter.setHoodSetpoint(HoodSetpoint.DYNAMIC);
+        shooter.setTurretSetpoint(TurretSetpoint.DYNAMIC);
+        shooter.setFlywheelSetpoint(FlywheelSetpoint.DYNAMIC);
+        kicker.setSetpoint(KickerSetpoint.FEEDING);
         swerveDrive.setDesiredOmegaOverrideState(SwerveDrive.DesiredOmegaOverrideState.RANGED_ROTATION);
         swerveDrive.setDesiredTranslationOverrideState(SwerveDrive.DesiredTranslationOverrideState.CAPPED);
     }
@@ -229,8 +239,10 @@ public class Superstructure extends SubsystemBase {
         updateSwerveRotationRange();
         swerveDrive.setVelocityCapMaxVelocityMetersPerSec(MAX_TRANSLATIONAL_VELOCITY_DURING_SHOT_METERS_PER_SEC);
 
-        shooter.setDesiredState(ShooterDesiredState.SHOOTING);
-        kicker.setDesiredState(KickerDesiredState.KICKING);
+        shooter.setHoodSetpoint(HoodSetpoint.DYNAMIC);
+        shooter.setTurretSetpoint(TurretSetpoint.DYNAMIC);
+        shooter.setFlywheelSetpoint(FlywheelSetpoint.DYNAMIC);
+        kicker.setSetpoint(KickerSetpoint.KICKING);
         swerveDrive.setDesiredOmegaOverrideState(SwerveDrive.DesiredOmegaOverrideState.RANGED_ROTATION);
 
         if (Timer.getTimestamp() - lastShotTime < SHOT_DURATION_SECONDS) {
@@ -255,12 +267,26 @@ public class Superstructure extends SubsystemBase {
             ) < MAX_TRANSLATIONAL_VELOCITY_DURING_SHOT_METERS_PER_SEC;
         Logger.recordOutput("Superstructure/swerveReady", swerveReady);
         
-        // Check if shooter is ready
-        boolean shooterReady = shooter.getCurrentState() == ShooterCurrentState.READY_FOR_SHOT;
+        double actualHood = shooter.getHoodAngleRotations();
+        double actualTurret = shooter.getTurretAngleRotations();
+        double actualFlywheel = shooter.getFlywheelVelocityRotationsPerSec();
+
+        double setpointHood = getTargetHoodAngle().getRotations();
+        double setpointTurret = getTargetTurretAngle().getRotations();
+        double setpointFlywheel = getTargetFlywheelRPS();
+
+        Translation3d actualLanding = simulateShotLanding(actualHood, actualTurret, actualFlywheel);
+        Translation3d setpointLanding = simulateShotLanding(setpointHood, setpointTurret, setpointFlywheel);
+        double impactErrorMeters = actualLanding.toTranslation2d()
+            .getDistance(setpointLanding.toTranslation2d());
+        boolean shooterReady = impactErrorMeters <= SHOT_IMPACT_TOLERANCE_METERS;
         Logger.recordOutput("Superstructure/shooterReady", shooterReady);
+        Logger.recordOutput("Superstructure/actualLanding", actualLanding);
+        Logger.recordOutput("Superstructure/setpointLanding", setpointLanding);
+        Logger.recordOutput("Superstructure/impactErrorMeters", impactErrorMeters);
         
         // Check if kicker is ready (feeding and at setpoint)
-        boolean kickerReady = kicker.getCurrentState() == KickerCurrentState.FEEDING && kicker.isKickerAtSetpoint();
+        boolean kickerReady = kicker.isKickerAtSetpoint();
         Logger.recordOutput("Superstructure/kickerReady", kickerReady);
         
         // Check if within valid shooting distance
@@ -355,6 +381,47 @@ public class Superstructure extends SubsystemBase {
             rpsToSpinRateRadPerSec,
             shooterOffsetFromRobotCenter,
             robotHeading
+        );
+    }
+
+    private Translation3d simulateShotLanding(
+        double hoodAngleRotations,
+        double turretAngleRotations,
+        double flywheelRPS
+    ) {
+        Pose3d robotPose = new Pose3d(
+            new Translation3d(
+                robotState.getEstimatedPose().getX(),
+                robotState.getEstimatedPose().getY(),
+                0
+            ),
+            new Rotation3d(0, 0, robotState.getEstimatedPose().getRotation().getRadians())
+        );
+        Translation3d shooterPosition =
+            robotPose.plus(new Transform3d(new Pose3d(), shooter.getShooterRelativePose())).getTranslation();
+
+        double exitVelocity = shooter.calculateShotExitVelocityMetersPerSec(flywheelRPS);
+        double spinRateRadPerSec = shooter.calculateBackSpinRPM(flywheelRPS) * 2.0 * Math.PI / 60.0;
+
+        double pitch = hoodAngleRotations * 2.0 * Math.PI;
+        double turretYaw = turretAngleRotations * 2.0 * Math.PI;
+        double fieldYaw = turretYaw + robotState.getEstimatedPose().getRotation().getRadians();
+
+        double vHorizontal = exitVelocity * Math.cos(pitch);
+        ChassisSpeeds fieldSpeeds = robotState.getFieldRelativeSpeeds();
+        double vx = vHorizontal * Math.cos(fieldYaw) + fieldSpeeds.vxMetersPerSecond;
+        double vy = vHorizontal * Math.sin(fieldYaw) + fieldSpeeds.vyMetersPerSecond;
+        double vz = exitVelocity * Math.sin(pitch);
+
+        double hubZ = FieldConstants.Hub.hubCenter.getZ();
+        return BallisticsPhysics.simulateToHeight3D(
+            shooterPosition,
+            vx,
+            vy,
+            vz,
+            spinRateRadPerSec,
+            hubZ,
+            0.002
         );
     }
 

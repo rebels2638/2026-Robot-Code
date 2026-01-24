@@ -19,22 +19,20 @@ public class Hopper extends SubsystemBase {
         return instance;
     }
 
-    public enum HopperCurrentState {
-        DISABLED,
-        HOME,
-        FEEDING,
-        REVERSE
-    }
+    public enum HopperSetpoint {
+        OFF(0.0),
+        FEEDING(Double.NaN),
+        REVERSE(Double.NaN);
 
-    public enum HopperDesiredState {
-        DISABLED,
-        HOME,
-        FEEDING,
-        REVERSE
-    }
+        private final double rps;
+        HopperSetpoint(double rps) {
+            this.rps = rps;
+        }
 
-    private HopperCurrentState currentState = HopperCurrentState.DISABLED;
-    private HopperDesiredState desiredState = HopperDesiredState.DISABLED;
+        public double getRps() {
+            return rps;
+        }
+    }
 
     private final HopperIO hopperIO;
     private final HopperIOInputsAutoLogged hopperInputs = new HopperIOInputsAutoLogged();
@@ -70,58 +68,6 @@ public class Hopper extends SubsystemBase {
             hopperIO.configureControlLoop(hopperControlLoopConfigurator.getConfig());
         }
 
-        handleStateTransitions();
-        handleCurrentState();
-    }
-
-    private void handleStateTransitions() {
-        switch (desiredState) {
-            case DISABLED:
-                currentState = HopperCurrentState.DISABLED;
-                break;
-            case HOME:
-                currentState = HopperCurrentState.HOME;
-                break;
-            case FEEDING:
-                currentState = HopperCurrentState.FEEDING;
-                break;
-            case REVERSE:
-                currentState = HopperCurrentState.REVERSE;
-                break;
-        }
-    }
-
-    private void handleCurrentState() {
-        switch (currentState) {
-            case DISABLED:
-                handleDISABLEDState();
-                break;
-            case HOME:
-                handleHomeState();
-                break;
-            case FEEDING:
-                handleFeedingState();
-                break;
-            case REVERSE:
-                handleReverseState();
-                break;
-        }
-    }
-
-    private void handleDISABLEDState() {
-        setHopperVelocity(0);
-    }
-
-    private void handleHomeState() {
-        setHopperVelocity(0);
-    }
-
-    private void handleFeedingState() {
-        setHopperVelocity(config.feedingVelocityRPS);
-    }
-
-    private void handleReverseState() {
-        setHopperVelocity(config.reverseVelocityRPS);
     }
 
     private void setHopperVelocity(double velocityRotationsPerSec) {
@@ -130,18 +76,11 @@ public class Hopper extends SubsystemBase {
         hopperIO.setVelocity(velocityRotationsPerSec);
     }
 
-    @AutoLogOutput(key = "Hopper/currentState")
-    public HopperCurrentState getCurrentState() {
-        return currentState;
-    }
-
-    @AutoLogOutput(key = "Hopper/desiredState")
-    public HopperDesiredState getDesiredState() {
-        return desiredState;
-    }
-
-    public void setDesiredState(HopperDesiredState desiredState) {
-        this.desiredState = desiredState;
+    public void setSetpoint(HopperSetpoint setpoint) {
+        double targetRps = setpoint == HopperSetpoint.FEEDING
+            ? config.feedingVelocityRPS
+            : setpoint == HopperSetpoint.REVERSE ? config.reverseVelocityRPS : setpoint.getRps();
+        setHopperVelocity(targetRps);
     }
 
     public double getHopperVelocityRotationsPerSec() {
