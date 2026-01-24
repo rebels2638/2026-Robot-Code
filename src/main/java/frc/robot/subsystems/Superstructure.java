@@ -67,13 +67,17 @@ public class Superstructure extends SubsystemBase {
     private final RobotState robotState = RobotState.getInstance();
 
     private double lastShotTime = 0;
-    private static final double SHOT_DURATION_SECONDS = 1; // Time to complete one shot
+    private static final double SHOT_DURATION_SECONDS = .3; // Time to complete one shot
+    private static final double BALLS_PER_SECOND = 12.0;
 
     // Margin for swerve rotation range (degrees)
     private static final double SWERVE_ROTATION_MARGIN_DEG = 20.0;
-    private static final double MAX_TRANSLATIONAL_VELOCITY_DURING_SHOT_METERS_PER_SEC = 1.0;
-    private static final double SHOT_IMPACT_TOLERANCE_METERS = 0.15;
+    private static final double MAX_TRANSLATIONAL_VELOCITY_DURING_SHOT_METERS_PER_SEC = 2.5;
+    private static final double SHOT_IMPACT_TOLERANCE_METERS = 0.3;
     private LoggedNetworkNumber latencyCompensationSeconds = new LoggedNetworkNumber("Shooter/latencyCompSec");
+    private double kickerEngagedTime = 0;
+    private double lastBallVisualizedTime = 0;
+    private boolean hasStartedShooting = false;
 
     private Superstructure() {
         // Set up suppliers for the shooter - these provide dynamic setpoints based on shot calculation
@@ -130,17 +134,16 @@ public class Superstructure extends SubsystemBase {
                 break;
 
             case SHOOTING:
+                // Stay in SHOOTING if already shooting
+                if (currentState == CurrentState.SHOOTING) {
+                    break;
+                }
                 // SHOOTING only allowed when we're in READY_FOR_SHOT
                 if (currentState == CurrentState.READY_FOR_SHOT) {
                     currentState = CurrentState.SHOOTING;
-                    new VisualizeShot();
-                } else if (currentState == CurrentState.SHOOTING) {
-                    // Stay in shooting, check if shot is complete
-                    if (Timer.getTimestamp() - lastShotTime >= SHOT_DURATION_SECONDS) {
-                        currentState = CurrentState.READY_FOR_SHOT;
-                        desiredState = DesiredState.READY_FOR_SHOT;
-                        lastShotTime = Timer.getTimestamp();
-                    }
+                    kickerEngagedTime = Timer.getTimestamp();
+                    lastShotTime = kickerEngagedTime;
+                    hasStartedShooting = false;
                 } else {
                     // Not ready yet, go to preparing
                     if (isReadyForShot()) {
@@ -162,7 +165,7 @@ public class Superstructure extends SubsystemBase {
     private void handleCurrentState() {
         switch (currentState) {
             case DISABLED:
-                handleDISABLEDState();
+                handleDisabledState();
                 break;
             case HOME:
                 handleHomeState();
@@ -182,7 +185,7 @@ public class Superstructure extends SubsystemBase {
         }
     }
 
-    private void handleDISABLEDState() {
+    private void handleDisabledState() {
         shooter.setHoodSetpoint(HoodSetpoint.HOME);
         shooter.setTurretSetpoint(TurretSetpoint.HOME);
         shooter.setFlywheelSetpoint(FlywheelSetpoint.OFF);
@@ -249,6 +252,22 @@ public class Superstructure extends SubsystemBase {
             swerveDrive.setDesiredTranslationOverrideState(SwerveDrive.DesiredTranslationOverrideState.FROZEN);
         } else {
             swerveDrive.setDesiredTranslationOverrideState(SwerveDrive.DesiredTranslationOverrideState.CAPPED);
+        }
+
+        double now = Timer.getTimestamp();
+        double timeSinceKickerEngaged = now - kickerEngagedTime;
+        if (timeSinceKickerEngaged >= SHOT_DURATION_SECONDS) {
+            if (!hasStartedShooting) {
+                hasStartedShooting = true;
+                lastBallVisualizedTime = now;
+                new VisualizeShot();
+            } else {
+                double ballIntervalSeconds = 1.0 / BALLS_PER_SECOND;
+                if (now - lastBallVisualizedTime >= ballIntervalSeconds) {
+                    lastBallVisualizedTime = now;
+                    new VisualizeShot();
+                }
+            }
         }
     }
 
