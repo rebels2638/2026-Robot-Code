@@ -2,13 +2,13 @@
   "path_elements": [
     {
       "type": "translation",
-      "x_meters": 10.127602211778514,
-      "y_meters": 4.759861696256541,
+      "x_meters": 4.953933147030314,
+      "y_meters": 8.57,
       "intermediate_handoff_radius_meters": 0.25
     },
     {
       "type": "event_trigger",
-      "t_ratio": 0.5000000000000009,
+      "t_ratio": 0.5000000000000008,
       "lib_key": "test1"
     },
     {

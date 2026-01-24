@@ -4,17 +4,24 @@ import org.littletonrobotics.junction.Logger;
 
 import edu.wpi.first.math.MathUtil;
 import edu.wpi.first.math.geometry.Pose2d;
+import edu.wpi.first.math.geometry.Pose3d;
 import edu.wpi.first.math.geometry.Rotation2d;
+import edu.wpi.first.math.geometry.Rotation3d;
+import edu.wpi.first.math.geometry.Translation3d;
 import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.InstantCommand;
 import edu.wpi.first.wpilibj2.command.WaitUntilCommand;
-import frc.robot.commands.autos.tower.ScoreL1;
+// import frc.robot.commands.autos.tower.ScoreL1;
 import frc.robot.constants.Constants;
 import frc.robot.lib.BLine.FollowPath;
 import frc.robot.lib.BLine.Path;
 import frc.robot.lib.BLine.Path.EventTrigger;
 import frc.robot.lib.BLine.Path.Waypoint;
 import frc.robot.lib.input.XboxController;
+import frc.robot.lib.util.ballistics.ProjectileVisualizer;
+import frc.robot.subsystems.Superstructure;
+import frc.robot.subsystems.Superstructure.DesiredState;
+import frc.robot.subsystems.shooter.Shooter;
 import frc.robot.subsystems.swerve.SwerveDrive;
 // import frc.robot.subsystems.vision.Vision;
 import frc.robot.subsystems.vision.Vision;
@@ -33,11 +40,13 @@ public class RobotContainer {
     private final XboxController xboxDriver;
     private final XboxController xboxOperator;
 
-    // private final Shooter shooter = Shooter.getInstance();
+    private final Shooter shooter = Shooter.getInstance();
     private final RobotState robotState = RobotState.getInstance();
     private final SwerveDrive swerveDrive = SwerveDrive.getInstance();
-    // private final Superstructure superstructure = Superstructure.getInstance();
+    private final Superstructure superstructure = Superstructure.getInstance();
     private final Vision vision = Vision.getInstance();
+    @SuppressWarnings("unused")
+    private final ProjectileVisualizer projectileVisualizer = ProjectileVisualizer.getInstance();
 
     // Path for follow path state
     private Path currentPath = null;
@@ -63,9 +72,10 @@ public class RobotContainer {
 
         // Set default state to TELEOP
         swerveDrive.setDesiredSystemState(SwerveDrive.DesiredSystemState.TELEOP);
-
+        
         // Set default superstructure state to HOME
-        // superstructure.setDesiredState(Superstructure.DesiredState.HOME);
+        superstructure.setDesiredState(Superstructure.DesiredState.HOME);
+
 
         configureBindings();
     }
@@ -91,6 +101,26 @@ public class RobotContainer {
         // );
 
         xboxDriver.getXButton().onFalse(new InstantCommand(() -> robotState.resetPose(new Pose2d(0,0, new Rotation2d(0)))));
+
+        // xboxDriver.getAButton().onTrue(new InstantCommand(() -> {
+        //         ProjectileVisualizer.addProjectile(
+        //             0, // vx
+        //             0, // vy
+        //             10, // exitVelocity
+        //             new Pose3d(0, 0, 2, new Rotation3d(0, Math.PI/4, 0)), // position & rotation
+        //             3 // hub height
+        //         );
+        //     })
+        // );
+
+        xboxDriver.getAButton().onTrue(
+            new InstantCommand(() -> superstructure.setDesiredState(DesiredState.SHOOTING))
+        );
+        xboxDriver.getBButton().onTrue(
+            new InstantCommand(() -> superstructure.setDesiredState(DesiredState.TRACKING))
+        );
+
+
     }
 
     public void teleopInit() {

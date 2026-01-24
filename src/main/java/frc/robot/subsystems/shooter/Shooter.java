@@ -14,6 +14,7 @@ import edu.wpi.first.math.numbers.N2;
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
 import edu.wpi.first.wpilibj.RobotBase;
 import frc.robot.configs.ShooterConfig;
+import frc.robot.constants.FieldConstants;
 import frc.robot.lib.util.ConfigLoader;
 import frc.robot.lib.util.DashboardMotorControlLoopConfigurator;
 
@@ -328,9 +329,27 @@ public class Shooter extends SubsystemBase {
         return shooterInputs.flywheelVelocityRotationsPerSec;
     }
 
+    /**
+     * Calculate ball backspin from differential roller surface speeds.
+     * Flywheel (bottom) moving faster than back roller (top) creates backspin.
+     */
+    public double calculateBackSpinRPM(double flywheelVelocityRotationsPerSec) {
+        double flywheelSurfaceVel = flywheelVelocityRotationsPerSec * 2 * Math.PI * config.flywheelRadiusMeters;
+        double backRollerSurfaceVel = flywheelVelocityRotationsPerSec * config.backRollerGearRatio
+            * 2 * Math.PI * config.backRollerRadiusMeters;
+
+        double deltaV = flywheelSurfaceVel - backRollerSurfaceVel;
+        double ballRadiusMeters = FieldConstants.fuelDiameter / 2.0;
+        double spinRadPerSec = deltaV / ballRadiusMeters;
+
+        return spinRadPerSec * 60.0 / (2 * Math.PI);
+    }
+
     public double calculateShotExitVelocityMetersPerSec(double flywheelVelocityRotationsPerSec) {
-        return flywheelVelocityRotationsPerSec * 2 * Math.PI * config.flywheelRadiusMeters / 2; 
-        // divide by 2 because the flywheel is a pulling the ball along the hood radius
+        double flywheelSurfaceVel = flywheelVelocityRotationsPerSec * 2 * Math.PI * config.flywheelRadiusMeters;
+        double backRollerSurfaceVel = flywheelVelocityRotationsPerSec * config.backRollerGearRatio
+            * 2 * Math.PI * config.backRollerRadiusMeters;
+        return (flywheelSurfaceVel + backRollerSurfaceVel) / 2.0;
     }
 
     public double getShotExitVelocityMetersPerSec() {

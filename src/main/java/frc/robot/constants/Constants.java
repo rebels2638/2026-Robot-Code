@@ -7,11 +7,10 @@ package frc.robot.constants;
 import edu.wpi.first.math.geometry.Pose2d;
 import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.math.geometry.Translation2d;
-import edu.wpi.first.math.geometry.Translation3d;
 import edu.wpi.first.math.util.Units;
 import edu.wpi.first.wpilibj.DriverStation;
 import frc.robot.configs.SwerveConfig;
-import frc.robot.constants.AlignmentConstants.Tower;
+import frc.robot.constants.FieldConstants.Tower;
 import frc.robot.lib.util.ConfigLoader;
 
 /**
@@ -27,7 +26,7 @@ import frc.robot.lib.util.ConfigLoader;
  * constants are needed, to reduce verbosity.
  */
 public final class Constants {
-    public static final Mode currentMode = Mode.COMP; // TODO: change this if sim
+    public static final Mode currentMode = Mode.SIM; // TODO: change this if sim
     public static boolean agentMode = false;
 
     // public static final boolean isSYSID = true; // TODO: change this if sysid
@@ -168,15 +167,6 @@ public final class Constants {
         }
 
         private ScoreTowerConstants() {}
-    }
-
-    public static final class FieldConstants {
-        public static final Translation3d kSHOOTER_TARGET = new Translation3d(49.85, 50.0, 0.46);
-
-        public static final double fieldLength = Units.inchesToMeters(651.22);
-        public static final double fieldWidth = Units.inchesToMeters(317.69);
-
-        private FieldConstants() {}
     }
 
     public static final class RobotConstants {

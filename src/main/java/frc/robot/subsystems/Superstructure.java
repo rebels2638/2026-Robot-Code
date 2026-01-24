@@ -21,6 +21,7 @@ import edu.wpi.first.wpilibj2.command.SubsystemBase;
 import frc.robot.RobotState;
 import frc.robot.VisualizeShot;
 import frc.robot.constants.Constants;
+import frc.robot.constants.FieldConstants;
 import frc.robot.lib.util.ShotCalculator;
 import frc.robot.lib.util.ShotCalculator.ShotData;
 import frc.robot.subsystems.kicker.Kicker;
@@ -320,7 +321,7 @@ public class Superstructure extends SubsystemBase {
     }
 
     private ShotData calculateShotData() {
-        Translation3d targetLocation = Constants.FieldConstants.kSHOOTER_TARGET;
+        Translation3d targetLocation = FieldConstants.Hub.hubCenter;
         
         // Calculate shooter position in field coordinates
         Pose3d robotPose = new Pose3d(
@@ -337,6 +338,8 @@ public class Superstructure extends SubsystemBase {
         InterpolatingMatrixTreeMap<Double, N2, N1> lerpTable = shooter.getLerpTable();
         double lcomp = latencyCompensationSeconds.get();
         DoubleUnaryOperator rpsToExitVelocity = shooter::calculateShotExitVelocityMetersPerSec;
+        DoubleUnaryOperator rpsToSpinRateRadPerSec =
+            rps -> shooter.calculateBackSpinRPM(rps) * 2.0 * Math.PI / 60.0;
         
         // Get shooter offset from robot center (for omega compensation)
         Translation2d shooterOffsetFromRobotCenter = shooter.getShooterRelativePose().getTranslation().toTranslation2d();
@@ -349,6 +352,7 @@ public class Superstructure extends SubsystemBase {
             lerpTable,
             lcomp,
             rpsToExitVelocity,
+            rpsToSpinRateRadPerSec,
             shooterOffsetFromRobotCenter,
             robotHeading
         );

@@ -96,6 +96,8 @@ public class ShooterConfig {
 
     public double flywheelMotorToOutputShaftRatio;
     public double flywheelRadiusMeters;
+    public double backRollerGearRatio;
+    public double backRollerRadiusMeters;
 
     public double shooterPoseX;
     public double shooterPoseY;

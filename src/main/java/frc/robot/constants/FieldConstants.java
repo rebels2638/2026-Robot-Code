@@ -16,7 +16,11 @@ import edu.wpi.first.math.util.Units;
  * All units are in meters and poses have a blue alliance origin.
  * Currently using 2026 REBUILT official specifications.
  */
-public class AlignmentConstants {
+public class FieldConstants {
+    public static final Translation3d kSHOOTER_TARGET = new Translation3d(49.85, 50.0, 0.46);
+    public static final double fieldLength = Units.inchesToMeters(651.22);
+    public static final double fieldWidth = Units.inchesToMeters(317.69);
+
     public static final double startingLineX = Units.inchesToMeters(156.61);
     public static final double fuelDiameter = Units.inchesToMeters(5.91);
 
@@ -67,9 +71,10 @@ public class AlignmentConstants {
     }
 
     public static class Hub {
-        public static final Translation2d hubCenter = new Translation2d(
+        public static final Translation3d hubCenter = new Translation3d(
                 Units.inchesToMeters(182.105),
-                Units.inchesToMeters(158.845));
+                Units.inchesToMeters(158.845),
+                Units.inchesToMeters(65.0)); // receded inside of the hub hood 
 
         public static final double sideLength = Units.inchesToMeters(47.5);
         public static final double topHeight = Units.inchesToMeters(44.25);
@@ -77,7 +82,7 @@ public class AlignmentConstants {
 
     public static class AllianceBounds {
         public static final double blueZoneLineX = Units.inchesToMeters(182.11);
-        public static final double redZoneLineX = Constants.FieldConstants.fieldLength - blueZoneLineX;
+        public static final double redZoneLineX = FieldConstants.fieldLength - blueZoneLineX;
     }
 
     public static class Bump {
@@ -96,8 +101,8 @@ public class AlignmentConstants {
         public static final double boxDepth = Units.inchesToMeters(72.0);
         public static final Translation2d boxCenter =
             new Translation2d(
-                Constants.FieldConstants.fieldLength / 2.0,
-                Constants.FieldConstants.fieldWidth / 2.0
+                FieldConstants.fieldLength / 2.0,
+                FieldConstants.fieldWidth / 2.0
             );
     }
 
