@@ -13,16 +13,13 @@ import org.littletonrobotics.junction.wpilog.WPILOGWriter;
 
 import com.ctre.phoenix6.SignalLogger;
 
-import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.net.WebServer;
 import edu.wpi.first.wpilibj.Filesystem;
 import edu.wpi.first.wpilibj.simulation.DriverStationSim;
 import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.CommandScheduler;
-import edu.wpi.first.wpilibj2.command.InstantCommand;
 import frc.robot.constants.Constants;
 import frc.robot.lib.BLine.FollowPath;
-import frc.robot.subsystems.shooter.Shooter;
 
 /**
  * The VM is configured to automatically run this class, and to call the
@@ -74,7 +71,7 @@ public class Robot extends LoggedRobot {
 
                 break;
 
-            case PROTO:
+            case DEV:
                 Logger.addDataReceiver(new NT4Publisher());
                 break;
 
@@ -181,7 +178,7 @@ public class Robot extends LoggedRobot {
 
         // schedule the autonomous command (example)
         if (m_autonomousCommand != null) {
-            m_autonomousCommand.schedule();
+            CommandScheduler.getInstance().schedule(m_autonomousCommand);
         }
     }
 
@@ -192,6 +189,7 @@ public class Robot extends LoggedRobot {
 
     @Override
     public void teleopInit() {
+
 
         // This makes sure that the autonomous stops running when
         // teleop starts running. If you want the autonomous to

@@ -4,12 +4,14 @@ import static edu.wpi.first.units.Units.Radians;
 import static edu.wpi.first.units.Units.RadiansPerSecond;
 
 import com.ctre.phoenix6.BaseStatusSignal;
+import com.ctre.phoenix6.CANBus;
 import com.ctre.phoenix6.StatusSignal;
 import com.ctre.phoenix6.configs.Pigeon2Configuration;
 import com.ctre.phoenix6.hardware.Pigeon2;
 
 import edu.wpi.first.math.MathUtil;
 import edu.wpi.first.math.geometry.Rotation2d;
+import edu.wpi.first.math.geometry.Rotation3d;
 import edu.wpi.first.units.measure.Angle;
 import edu.wpi.first.units.measure.AngularVelocity;
 import java.util.Queue;
@@ -21,13 +23,15 @@ public class GyroIOPigeon2 implements GyroIO {
     private final Pigeon2 gyro;
 
     private final StatusSignal<Angle> yawSignal;
+    private final StatusSignal<Angle> rollSignal;
+    private final StatusSignal<Angle> pitchSignal;
     private final StatusSignal<AngularVelocity> yawVelocitySignal;
 
     private final Queue<Double> odometryTimestampQueue;
     private final Queue<Double> yawPositionQueue;
 
     public GyroIOPigeon2() {
-        gyro = new Pigeon2(2, "drivetrain");
+        gyro = new Pigeon2(2, new CANBus("drivetrain"));
         Pigeon2Configuration config = new Pigeon2Configuration();
         config.MountPose.MountPoseYaw = 88.42582702636719;
         config.MountPose.MountPosePitch = 0.6793335676193237;
@@ -37,11 +41,15 @@ public class GyroIOPigeon2 implements GyroIO {
         PhoenixUtil.tryUntilOk(5, () -> gyro.getConfigurator().apply(config, 0.25));
 
         yawSignal = gyro.getYaw().clone();
+        rollSignal = gyro.getRoll().clone();
+        pitchSignal = gyro.getPitch().clone();
         yawVelocitySignal = gyro.getAngularVelocityZWorld().clone();
 
         BaseStatusSignal.setUpdateFrequencyForAll(
             SwerveDrive.ODOMETRY_FREQUENCY,
             yawSignal,
+            rollSignal,
+            pitchSignal,
             yawVelocitySignal
         );
 
@@ -53,11 +61,18 @@ public class GyroIOPigeon2 implements GyroIO {
 
     @Override
     public synchronized void updateInputs(GyroIOInputs inputs) {
-        BaseStatusSignal.refreshAll(yawVelocitySignal);
+        BaseStatusSignal.refreshAll(yawSignal, rollSignal, pitchSignal, yawVelocitySignal);
 
         inputs.isConnected = true;
 
-        inputs.yawPosition = new Rotation2d(MathUtil.angleModulus(BaseStatusSignal.getLatencyCompensatedValue(yawSignal, yawVelocitySignal).in(Radians)));
+        double yawRadians = MathUtil.angleModulus(
+            BaseStatusSignal.getLatencyCompensatedValue(yawSignal, yawVelocitySignal).in(Radians)
+        );
+        inputs.gyroOrientation = new Rotation3d(
+            rollSignal.getValue().in(Radians),
+            pitchSignal.getValue().in(Radians),
+            yawRadians
+        );
         inputs.yawVelocityRadPerSec = yawVelocitySignal.getValue().in(RadiansPerSecond);
 
         inputs.odometryTimestampsSeconds = odometryTimestampQueue.stream().mapToDouble(Double::doubleValue).toArray();

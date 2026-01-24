@@ -1,0 +1,21 @@
+{
+  "canBusName": "drivetrain",
+  "intakeCanId": 21,
+  "isIntakeInverted": false,
+  "intakeSupplyCurrentLimit": 60.0,
+  "intakeSupplyCurrentLimitLowerTime": 1.0,
+  "intakeSupplyCurrentLimitLowerLimit": 60.0,
+  "intakeStatorCurrentLimit": 60.0,
+  "intakePeakForwardTorqueCurrent": 60.0,
+  "intakePeakReverseTorqueCurrent": -60.0,
+  "intakeKS": 0.0,
+  "intakeKV": 0.3,
+  "intakeKA": 0.0,
+  "intakeKP": 0.1,
+  "intakeKI": 0.0,
+  "intakeKD": 0.0,
+  "intakeMotorToOutputShaftRatio": 5.0,
+  "intakingVelocityRPS": 35.0,
+  "outtakingVelocityRPS": -35.0,
+  "intakeVelocityToleranceRPS": 5.0
+}

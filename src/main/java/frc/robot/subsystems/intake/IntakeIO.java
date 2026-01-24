@@ -1,0 +1,20 @@
+package frc.robot.subsystems.intake;
+
+import org.littletonrobotics.junction.AutoLog;
+
+import frc.robot.lib.util.DashboardMotorControlLoopConfigurator.MotorControlLoopConfig;
+
+public interface IntakeIO {
+    @AutoLog
+    class IntakeIOInputs {
+        public double velocityRotationsPerSec = 0;
+        public double appliedVolts = 0;
+        public double torqueCurrent = 0;
+        public double temperatureFahrenheit = 0;
+    }
+
+    public default void updateInputs(IntakeIOInputs inputs) {}
+    public default void setVelocity(double velocityRotationsPerSec) {}
+    public default void setVoltage(double voltage) {}
+    public default void configureControlLoop(MotorControlLoopConfig config) {}
+}

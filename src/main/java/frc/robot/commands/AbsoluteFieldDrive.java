@@ -10,10 +10,9 @@ import edu.wpi.first.math.kinematics.ChassisSpeeds; // Class to handle chassis s
 import edu.wpi.first.wpilibj.Timer;
 import edu.wpi.first.wpilibj2.command.Command; // Base class for commands.
 import frc.robot.constants.Constants;
-import frc.robot.constants.swerve.drivetrainConfigs.SwerveDrivetrainConfigBase;
-import frc.robot.constants.swerve.drivetrainConfigs.SwerveDrivetrainConfigComp;
-import frc.robot.constants.swerve.drivetrainConfigs.SwerveDrivetrainConfigProto;
-import frc.robot.constants.swerve.drivetrainConfigs.SwerveDrivetrainConfigSim;
+import frc.robot.configs.SwerveConfig;
+import frc.robot.configs.SwerveDrivetrainConfig;
+import frc.robot.lib.util.ConfigLoader;
 import frc.robot.lib.input.XboxController;
 import frc.robot.subsystems.swerve.SwerveDrive;
 
@@ -23,36 +22,12 @@ public class AbsoluteFieldDrive extends Command {
     private final DoubleSupplier vX, vY, heading; // Supplier functions for velocity inputs and heading.
     private int invert = 1;                        // Variable to invert direction based on alliance color.
     
-    private final SwerveDrivetrainConfigBase drivetrainConfig;
+    private final SwerveDrivetrainConfig drivetrainConfig;
 
     // Constructor to initialize the AbsoluteFieldDrive command.
     public AbsoluteFieldDrive(XboxController xboxDriver) {
-        switch (Constants.currentMode) {
-            case COMP:
-                drivetrainConfig = SwerveDrivetrainConfigComp.getInstance();
-
-                break;
-
-            case PROTO:
-                drivetrainConfig = SwerveDrivetrainConfigProto.getInstance();
-                
-                break;
-            
-            case SIM:
-                drivetrainConfig = SwerveDrivetrainConfigSim.getInstance();
-
-                break;
-
-            case REPLAY:
-                drivetrainConfig = SwerveDrivetrainConfigComp.getInstance();
-
-                break;
-
-            default:
-                drivetrainConfig = SwerveDrivetrainConfigComp.getInstance();
-
-                break;
-        }
+        SwerveConfig swerveConfig = ConfigLoader.load("swerve", SwerveConfig.class);
+        drivetrainConfig = swerveConfig.drivetrain;
 
         this.vX = () -> -MathUtil.applyDeadband(xboxDriver.getLeftY(), Constants.OperatorConstants.LEFT_Y_DEADBAND);
         this.vY = () -> -MathUtil.applyDeadband(xboxDriver.getLeftX(), Constants.OperatorConstants.LEFT_X_DEADBAND);
@@ -73,9 +48,9 @@ public class AbsoluteFieldDrive extends Command {
     public void execute() {
         // Calculate speeds based on input and max speed constants.
         ChassisSpeeds desiredFieldRelativeSpeeds = new ChassisSpeeds(
-            vX.getAsDouble() * drivetrainConfig.getMaxTranslationalVelocityMetersPerSec() * invert,
-            vY.getAsDouble() * drivetrainConfig.getMaxTranslationalVelocityMetersPerSec() * invert,
-            heading.getAsDouble() * drivetrainConfig.getMaxAngularVelocityRadiansPerSec()
+            vX.getAsDouble() * drivetrainConfig.maxTranslationalVelocityMetersPerSec * invert,
+            vY.getAsDouble() * drivetrainConfig.maxTranslationalVelocityMetersPerSec * invert,
+            heading.getAsDouble() * drivetrainConfig.maxAngularVelocityRadiansPerSec
         );
         Logger.recordOutput("AbsoluteFieldDrive/desiredFieldRelativeSpeeds", desiredFieldRelativeSpeeds);
 
@@ -97,9 +72,9 @@ public class AbsoluteFieldDrive extends Command {
 
     public Supplier<ChassisSpeeds> getDesiredFieldRelativeSpeedsSupplier() {
         return () -> new ChassisSpeeds(
-            vX.getAsDouble() * drivetrainConfig.getMaxTranslationalVelocityMetersPerSec() * invert,
-            vY.getAsDouble() * drivetrainConfig.getMaxTranslationalVelocityMetersPerSec() * invert,
-            heading.getAsDouble() * drivetrainConfig.getMaxAngularVelocityRadiansPerSec()
+            vX.getAsDouble() * drivetrainConfig.maxTranslationalVelocityMetersPerSec * invert,
+            vY.getAsDouble() * drivetrainConfig.maxTranslationalVelocityMetersPerSec * invert,
+            heading.getAsDouble() * drivetrainConfig.maxAngularVelocityRadiansPerSec
         );
     }
 }

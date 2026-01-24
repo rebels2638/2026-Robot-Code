@@ -9,15 +9,14 @@ import edu.wpi.first.math.system.plant.LinearSystemId;
 import edu.wpi.first.math.trajectory.TrapezoidProfile;
 import edu.wpi.first.wpilibj.Timer;
 import edu.wpi.first.wpilibj.simulation.DCMotorSim;
-import frc.robot.constants.shooter.ShooterConfigBase;
+import frc.robot.configs.ShooterConfig;
 import frc.robot.lib.util.DashboardMotorControlLoopConfigurator.MotorControlLoopConfig;
 
 public class ShooterIOSim implements ShooterIO {
     private final DCMotor hoodMotorModel = DCMotor.getKrakenX60Foc(1);
     private final DCMotor turretMotorModel = DCMotor.getKrakenX60Foc(1);
-    private final DCMotor flywheelMotorModel = DCMotor.getKrakenX60Foc(1);
-    private final DCMotor feederMotorModel = DCMotor.getKrakenX60Foc(1);
-    private final DCMotor indexerMotorModel = DCMotor.getKrakenX60Foc(1);
+    // 2 motors for flywheel with 1:1 gearing
+    private final DCMotor flywheelMotorModel = DCMotor.getKrakenX60Foc(2);
 
     private final DCMotorSim hoodSim =
         new DCMotorSim(
@@ -34,72 +33,50 @@ public class ShooterIOSim implements ShooterIO {
             LinearSystemId.createDCMotorSystem(flywheelMotorModel, 0.00015, 1.53),
             flywheelMotorModel
         );
-    private final DCMotorSim feederSim =
-        new DCMotorSim(
-            LinearSystemId.createDCMotorSystem(feederMotorModel, 0.00015, 1.53),
-            feederMotorModel
-        );
-    private final DCMotorSim indexerSim =
-        new DCMotorSim(
-            LinearSystemId.createDCMotorSystem(indexerMotorModel, 0.00015, 1.53),
-            indexerMotorModel
-        );
 
     private PIDController hoodFeedback;
     private ProfiledPIDController turretFeedback;
     private PIDController flywheelFeedback;
-    private PIDController feederFeedback;
-    private PIDController indexerFeedback;
 
     private SimpleMotorFeedforward flywheelFeedforward;
-    private SimpleMotorFeedforward feederFeedforward;
-    private SimpleMotorFeedforward indexerFeedforward;
 
     private boolean isHoodClosedLoop = true;
     private boolean isTurretClosedLoop = true;
     private boolean isFlywheelClosedLoop = true;
-    private boolean isFeederClosedLoop = true;
-    private boolean isIndexerClosedLoop = true;
 
     private double desiredFlywheelVelocityRotationsPerSec = 0;
-    private double desiredFeederVelocityRotationsPerSec = 0;
-    private double desiredIndexerVelocityRotationsPerSec = 0;
 
     private double lastTimeInputs = Timer.getTimestamp();
 
-    private final ShooterConfigBase config;
+    private final ShooterConfig config;
 
-    public ShooterIOSim(ShooterConfigBase config) {
+    public ShooterIOSim(ShooterConfig config) {
         this.config = config;
 
         // Initialize PID controllers with config values
-        hoodFeedback = new PIDController(config.getHoodKP(), config.getHoodKI(), config.getHoodKD());
+        hoodFeedback = new PIDController(config.hoodKP, config.hoodKI, config.hoodKD);
 
         // Turret uses a profiled PID controller in radians with trapezoidal constraints
-        double turretMaxVelRadPerSec = Math.toRadians(config.getTurretMaxVelocityDegPerSec());
-        double turretMaxAccelRadPerSec2 = Math.toRadians(config.getTurretMaxAccelerationDegPerSec2());
+        double turretMaxVelRadPerSec = Math.toRadians(config.turretMaxVelocityDegPerSec);
+        double turretMaxAccelRadPerSec2 = Math.toRadians(config.turretMaxAccelerationDegPerSec2);
         turretFeedback =
             new ProfiledPIDController(
-                config.getTurretKP(),
-                config.getTurretKI(),
-                config.getTurretKD(),
+                config.turretKP,
+                config.turretKI,
+                config.turretKD,
                 new TrapezoidProfile.Constraints(turretMaxVelRadPerSec, turretMaxAccelRadPerSec2)
             );
 
-        flywheelFeedback = new PIDController(config.getFlywheelKP(), config.getFlywheelKI(), config.getFlywheelKD());
-        feederFeedback = new PIDController(config.getFeederKP(), config.getFeederKI(), config.getFeederKD());
-        indexerFeedback = new PIDController(config.getIndexerKP(), config.getIndexerKI(), config.getIndexerKD());
+        flywheelFeedback = new PIDController(config.flywheelKP, config.flywheelKI, config.flywheelKD);
 
         // Initialize feedforward controllers with config values
-        flywheelFeedforward = new SimpleMotorFeedforward(config.getFlywheelKS(), config.getFlywheelKV(), config.getFlywheelKA());
-        feederFeedforward = new SimpleMotorFeedforward(config.getFeederKS(), config.getFeederKV(), config.getFeederKA());
-        indexerFeedforward = new SimpleMotorFeedforward(config.getIndexerKS(), config.getIndexerKV(), config.getIndexerKA());
+        flywheelFeedforward = new SimpleMotorFeedforward(config.flywheelKS, config.flywheelKV, config.flywheelKA);
 
         // Initialize hood position to starting angle (config gives rotations)
-        hoodSim.setState(config.getHoodStartingAngleRotations() * 2 * Math.PI, 0);
+        hoodSim.setState(config.hoodStartingAngleRotations * 2 * Math.PI, 0);
 
         // Initialize turret position to starting angle (config gives degrees)
-        double turretStartRad = Math.toRadians(config.getTurretStartingAngleDeg());
+        double turretStartRad = Math.toRadians(config.turretStartingAngleDeg);
         turretSim.setState(turretStartRad, 0);
     }
 
@@ -139,33 +116,9 @@ public class ShooterIOSim implements ShooterIO {
             );
         }
 
-        if (isFeederClosedLoop) {
-            feederSim.setInputVoltage(
-                MathUtil.clamp(
-                    feederFeedforward.calculate(desiredFeederVelocityRotationsPerSec) +
-                    feederFeedback.calculate(feederSim.getAngularVelocityRadPerSec()),
-                    -12,
-                    12
-                )
-            );
-        }
-
-        if (isIndexerClosedLoop) {
-            indexerSim.setInputVoltage(
-                MathUtil.clamp(
-                    indexerFeedforward.calculate(desiredIndexerVelocityRotationsPerSec) +
-                    indexerFeedback.calculate(indexerSim.getAngularVelocityRadPerSec()),
-                    -12,
-                    12
-                )
-            );
-        }
-
         hoodSim.update(dt);
         turretSim.update(dt);
         flywheelSim.update(dt);
-        feederSim.update(dt);
-        indexerSim.update(dt);
 
         inputs.hoodAngleRotations = hoodSim.getAngularPositionRotations();
         inputs.hoodVelocityRotationsPerSec = hoodSim.getAngularVelocityRadPerSec() / (2 * Math.PI);
@@ -175,28 +128,26 @@ public class ShooterIOSim implements ShooterIO {
 
         inputs.flywheelVelocityRotationsPerSec = flywheelSim.getAngularVelocityRadPerSec();
         inputs.flywheelAppliedVolts = flywheelSim.getInputVoltage();
+        inputs.flywheelTorqueCurrent = flywheelSim.getCurrentDrawAmps();
 
-        inputs.feederVelocityRotationsPerSec = feederSim.getAngularVelocityRadPerSec();
-        inputs.feederAppliedVolts = feederSim.getInputVoltage();
-
-        inputs.indexerVelocityRotationsPerSec = indexerSim.getAngularVelocityRadPerSec();
-        inputs.indexerAppliedVolts = indexerSim.getInputVoltage();
+        // Follower simulated as identical to leader
+        inputs.flywheelFollowerTorqueCurrent = flywheelSim.getCurrentDrawAmps();
 
         inputs.hoodTorqueCurrent = hoodSim.getCurrentDrawAmps();
 
         // Simulation doesn't have temperature sensors, use default values
         inputs.hoodTemperatureFahrenheit = 70.0;
+        inputs.turretTemperatureFahrenheit = 70.0;
         inputs.flywheelTemperatureFahrenheit = 70.0;
-        inputs.feederTemperatureFahrenheit = 70.0;
-        inputs.indexerTemperatureFahrenheit = 70.0;
+        inputs.flywheelFollowerTemperatureFahrenheit = 70.0;
     }
 
     @Override
     public void setAngle(double angleRotations) {
         // Clamp angle within software limits
         double clampedAngle = MathUtil.clamp(angleRotations,
-            config.getHoodMinAngleRotations(),
-            config.getHoodMaxAngleRotations());
+            config.hoodMinAngleRotations,
+            config.hoodMaxAngleRotations);
         hoodFeedback.setSetpoint(clampedAngle * (2 * Math.PI));
         isHoodClosedLoop = true;
     }
@@ -204,8 +155,8 @@ public class ShooterIOSim implements ShooterIO {
     @Override
     public void setTurretAngle(double angleRotations) {
         // Clamp angle within software limits
-        double minRot = config.getTurretMinAngleDeg() / 360.0;
-        double maxRot = config.getTurretMaxAngleDeg() / 360.0;
+        double minRot = config.turretMinAngleDeg / 360.0;
+        double maxRot = config.turretMaxAngleDeg / 360.0;
         double clampedAngle = MathUtil.clamp(angleRotations, minRot, maxRot);
         double goalRadians = clampedAngle * (2 * Math.PI);
         turretFeedback.setGoal(goalRadians);
@@ -217,13 +168,6 @@ public class ShooterIOSim implements ShooterIO {
         flywheelFeedback.setSetpoint(velocityRotationsPerSec);
         desiredFlywheelVelocityRotationsPerSec = velocityRotationsPerSec;
         isFlywheelClosedLoop = true;
-    }
-
-    @Override
-    public void setFeedVelocity(double velocityRotationsPerSec) {
-        feederFeedback.setSetpoint(velocityRotationsPerSec);
-        desiredFeederVelocityRotationsPerSec = velocityRotationsPerSec;
-        isFeederClosedLoop = true;
     }
 
     @Override
@@ -242,25 +186,6 @@ public class ShooterIOSim implements ShooterIO {
     public void setFlywheelVoltage(double voltage) {
         flywheelSim.setInputVoltage(voltage);
         isFlywheelClosedLoop = false;
-    }
-    
-    @Override
-    public void setFeederVoltage(double voltage) {
-        feederSim.setInputVoltage(voltage);
-        isFeederClosedLoop = false;
-    }
-
-    @Override
-    public void setIndexerVelocity(double velocityRotationsPerSec) {
-        indexerFeedback.setSetpoint(velocityRotationsPerSec);
-        desiredIndexerVelocityRotationsPerSec = velocityRotationsPerSec;
-        isIndexerClosedLoop = true;
-    }
-
-    @Override
-    public void setIndexerVoltage(double voltage) {
-        indexerSim.setInputVoltage(voltage);
-        isIndexerClosedLoop = false;
     }
 
     @Override
@@ -286,27 +211,5 @@ public class ShooterIOSim implements ShooterIO {
         flywheelFeedforward.setKs(config.kS());
         flywheelFeedforward.setKv(config.kV());
         flywheelFeedforward.setKa(config.kA());
-    }
-    
-    @Override
-    public void configureFeederControlLoop(MotorControlLoopConfig config) {
-        feederFeedback.setP(config.kP());
-        feederFeedback.setI(config.kI());
-        feederFeedback.setD(config.kD());
-
-        feederFeedforward.setKs(config.kS());
-        feederFeedforward.setKv(config.kV());
-        feederFeedforward.setKa(config.kA());
-    }
-
-    @Override
-    public void configureIndexerControlLoop(MotorControlLoopConfig config) {
-        indexerFeedback.setP(config.kP());
-        indexerFeedback.setI(config.kI());
-        indexerFeedback.setD(config.kD());
-
-        indexerFeedforward.setKs(config.kS());
-        indexerFeedforward.setKv(config.kV());
-        indexerFeedforward.setKa(config.kA());
     }
 }

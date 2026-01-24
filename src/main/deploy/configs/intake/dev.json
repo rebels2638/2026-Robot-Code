@@ -1,0 +1,21 @@
+{
+  "canBusName": "rio",
+  "intakeCanId": 21,
+  "isIntakeInverted": false,
+  "intakeSupplyCurrentLimit": 30.0,
+  "intakeSupplyCurrentLimitLowerTime": 1.0,
+  "intakeSupplyCurrentLimitLowerLimit": 25.0,
+  "intakeStatorCurrentLimit": 40.0,
+  "intakePeakForwardTorqueCurrent": 40.0,
+  "intakePeakReverseTorqueCurrent": -40.0,
+  "intakeKS": 0.1,
+  "intakeKV": 0.002,
+  "intakeKA": 0.0005,
+  "intakeKP": 0.08,
+  "intakeKI": 0.0,
+  "intakeKD": 0.0,
+  "intakeMotorToOutputShaftRatio": 5.0,
+  "intakingVelocityRPS": 35.0,
+  "outtakingVelocityRPS": -35.0,
+  "intakeVelocityToleranceRPS": 5.0
+}
