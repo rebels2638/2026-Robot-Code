@@ -42,6 +42,8 @@ public class ProjectileVisualizer extends Command {
      * @param launchVelocity Magnitude of launch velocity (m/s)
      * @param launchPose Initial pose of the shooter (includes position and orientation)
      */
+
+    // TODO: add feature to vary z terminal height in the constructor
     public ProjectileVisualizer(double robotVx, double robotVy, double launchVelocity, Pose3d launchPose) {
         this.initialVx = robotVx;
         this.initialVy = robotVy;
