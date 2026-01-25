@@ -119,10 +119,6 @@ public class Superstructure extends SubsystemBase {
                 break;
 
             case READY_FOR_SHOT:
-                if (currentState == CurrentState.SHOOTING && Timer.getTimestamp() - lastShotTime < SHOT_DURATION_SECONDS) {
-                    break;
-                }
-
                 // READY_FOR_SHOT requires mechanisms to be at setpoints
                 // Otherwise we're in PREPARING_FOR_SHOT
                 if (isReadyForShot()) {
@@ -134,10 +130,6 @@ public class Superstructure extends SubsystemBase {
                 break;
 
             case SHOOTING:
-                // Stay in SHOOTING if already shooting
-                if (currentState == CurrentState.SHOOTING) {
-                    break;
-                }
                 // SHOOTING only allowed when we're in READY_FOR_SHOT
                 if (currentState == CurrentState.READY_FOR_SHOT) {
                     currentState = CurrentState.SHOOTING;
@@ -147,7 +139,7 @@ public class Superstructure extends SubsystemBase {
                 } else {
                     // Not ready yet, go to preparing
                     if (isReadyForShot()) {
-                        currentState = CurrentState.READY_FOR_SHOT;
+                        currentState = CurrentState.SHOOTING;
                         lastShotTime = Timer.getTimestamp();
                     } else {
                         currentState = CurrentState.PREPARING_FOR_SHOT;
@@ -247,12 +239,14 @@ public class Superstructure extends SubsystemBase {
         shooter.setFlywheelSetpoint(FlywheelSetpoint.DYNAMIC);
         kicker.setSetpoint(KickerSetpoint.KICKING);
         swerveDrive.setDesiredOmegaOverrideState(SwerveDrive.DesiredOmegaOverrideState.RANGED_ROTATION);
+        swerveDrive.setDesiredTranslationOverrideState(SwerveDrive.DesiredTranslationOverrideState.CAPPED);
 
-        if (Timer.getTimestamp() - lastShotTime < SHOT_DURATION_SECONDS) {
-            swerveDrive.setDesiredTranslationOverrideState(SwerveDrive.DesiredTranslationOverrideState.FROZEN);
-        } else {
-            swerveDrive.setDesiredTranslationOverrideState(SwerveDrive.DesiredTranslationOverrideState.CAPPED);
-        }
+        // if (Timer.getTimestamp() - lastShotTime < SHOT_DURATION_SECONDS) {
+        //     swerveDrive.setDesiredTranslationOverrideState(SwerveDrive.DesiredTranslationOverrideState.FROZEN);
+        // } else {
+        //     swerveDrive.setDesiredTranslationOverrideState(SwerveDrive.DesiredTranslationOverrideState.CAPPED);
+
+        // }
 
         double now = Timer.getTimestamp();
         double timeSinceKickerEngaged = now - kickerEngagedTime;

@@ -128,17 +128,17 @@ public class RobotContainer {
 
         // Ensure we're in teleop state
         swerveDrive.setDesiredSystemState(SwerveDrive.DesiredSystemState.TELEOP);
-        // superstructure.setDesiredState(Superstructure.DesiredState.HOME);
+        superstructure.setDesiredState(Superstructure.DesiredState.HOME);
     }
 
     public void autonomousInit() {
         // Set up for autonomous
-        // superstructure.setDesiredState(DesiredState.HOME);
+        superstructure.setDesiredState(DesiredState.HOME);
         swerveDrive.setDesiredSystemState(SwerveDrive.DesiredSystemState.IDLE);
     }
 
     public void disabledInit() {
-        // superstructure.setDesiredState(Superstructure.DesiredState.DISABLED);
+        superstructure.setDesiredState(Superstructure.DesiredState.DISABLED);
         swerveDrive.setDesiredSystemState(SwerveDrive.DesiredSystemState.DISABLED);
     }
 
