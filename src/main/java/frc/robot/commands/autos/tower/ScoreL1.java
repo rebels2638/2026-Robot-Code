@@ -15,6 +15,7 @@
 // import frc.robot.constants.Constants;
 // import frc.robot.constants.FieldConstants;
 // import frc.robot.lib.BLine.Path.PathConstraints;
+// import frc.robot.lib.BLine.FlippingUtil;
 // import frc.robot.lib.BLine.Path;
 // import frc.robot.lib.BLine.Path.TranslationTarget;
 // import frc.robot.lib.BLine.Path.Waypoint;
@@ -26,7 +27,7 @@
 // public class ScoreL1 extends Command {
 //     private final SwerveDrive swerveDrive;
 //     private final RobotState robotState;
-//     private boolean isFinished = false;
+//     private boolean insideAllianceBounds = true;
 
 //     public ScoreL1() {
 //         this.swerveDrive = SwerveDrive.getInstance();
@@ -35,32 +36,25 @@
 
 //     @Override
 //     public void initialize() {
-//         isFinished = false;
-
-//         Optional<Alliance> alliance = DriverStation.getAlliance();
-//         boolean isRed = alliance.isPresent() && alliance.get() == Alliance.Red;
 //         Pose2d currentPose = robotState.getEstimatedPose();
 
 //         double blueZoneX = FieldConstants.AllianceBounds.blueZoneLineX;
 //         double redZoneX = FieldConstants.AllianceBounds.redZoneLineX;
 
-//         boolean behindBoundLine = isRed ? (currentPose.getX() > redZoneX) : (currentPose.getX() < blueZoneX);
-
-//         if (!behindBoundLine) {
-//             isFinished = true;
+//         insideAllianceBounds = Constants.shouldFlipPath() ? (currentPose.getX() > redZoneX) : (currentPose.getX() < blueZoneX);
+//         if (!insideAllianceBounds) {
 //             return;
 //         }
 
 //         Logger.recordOutput("ScoreL1/Status", "Running");
 
-//         // note: i cant see this working without a pose flip
-//         Pose2d currentPoseBlue = RebelUtil.applyFlip(currentPose);
-//         Pose2d towerPoseBlue = Constants.ScoreTowerConstants.TOWER_WAYPOINTS[0];
+//         Pose2d currentPoseBlue = FlippingUtil.flipFieldPose(currentPose);
+//         Pose2d towerPoseBlue = Constants.AlignmentConstants.TOWER_WAYPOINTS[0];
 //         double minDistanceToTower = towerPoseBlue.getTranslation().getDistance(currentPoseBlue.getTranslation());
 //         int towerPoseIndex = 0;
 
-//         for (int i = 0; i < Constants.ScoreTowerConstants.TOWER_WAYPOINTS.length; i++) {
-//             Pose2d pose = Constants.ScoreTowerConstants.TOWER_WAYPOINTS[i];
+//         for (int i = 0; i < Constants.AlignmentConstants.TOWER_WAYPOINTS.length; i++) {
+//             Pose2d pose = Constants.AlignmentConstants.TOWER_WAYPOINTS[i];
 //             double distance = pose.getTranslation().getDistance(currentPoseBlue.getTranslation());
 
 //             if (distance < minDistanceToTower) {
@@ -74,8 +68,8 @@
 //         List<Path.PathElement> pathElements = new ArrayList<>();
 //         pathElements.add(new Waypoint(currentPoseBlue));
 
-//         boolean needsIntermediate = Constants.ScoreTowerConstants.shouldUseIntermediate(currentPoseBlue, towerPoseBlue);
-//         Translation2d[] intermediateTranslation = Constants.ScoreTowerConstants.intermediateTranslation(
+//         boolean needsIntermediate = Constants.AlignmentConstants.shouldUseIntermediate(currentPoseBlue, towerPoseBlue);
+//         Translation2d[] intermediateTranslation = Constants.AlignmentConstants.intermediateTranslation(
 //             currentPoseBlue,
 //             towerPoseIndex
 //         );
@@ -92,15 +86,13 @@
 //         PathConstraints constraints = new PathConstraints()
 //                 .setMaxVelocityMetersPerSec(
 //                     new Path.RangedConstraint(
-//                         Constants.ScoreTowerConstants.APPROACH_MAX_VELOCITY_METERS_PER_SEC,
+//                         Constants.AlignmentConstants.APPROACH_MAX_VELOCITY_METERS_PER_SEC,
 //                         0,
 //                         finalTranslationOrdinal),
 //                     new Path.RangedConstraint(
-//                         Constants.ScoreTowerConstants.MAX_VELOCITY_METERS_PER_SEC,
+//                         Constants.AlignmentConstants.MAX_VELOCITY_METERS_PER_SEC,
 //                         finalTranslationOrdinal,
-//                         pathElements.size() - 1))
-//                 .setMaxAccelerationMetersPerSec2(Constants.ScoreTowerConstants.MAX_ACCELERATION_METERS_PER_SEC2);
-
+//                         pathElements.size() - 1));
 //         Path toClimb = new Path(pathElements, constraints);
 
 //         swerveDrive.setPathSupplier(() -> toClimb, () -> false);
@@ -109,20 +101,16 @@
 
 //     @Override
 //     public void execute() {
-//         Logger.recordOutput("ScoreL1/Execute/SwerveState", swerveDrive.getCurrentSystemState().toString());
-//         if (swerveDrive.getCurrentSystemState() == CurrentSystemState.IDLE) {
-//             isFinished = true;
-//         }
+
 //     }
 
 //     @Override
 //     public void end(boolean interrupted) {
 //         Logger.recordOutput("ScoreL1/End/Interrupted", interrupted);
-//         swerveDrive.setDesiredSystemState(DesiredSystemState.TELEOP);
 //     }
 
 //     @Override
 //     public boolean isFinished() {
-//         return isFinished;
+//         return swerveDrive.getCurrentSystemState() == CurrentSystemState.IDLE || !insideAllianceBounds;
 //     }
 // }

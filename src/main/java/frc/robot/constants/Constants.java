@@ -88,96 +88,87 @@ public final class Constants {
         private OperatorConstants() {}
     }
 
-    public static final class VisionConstants {
+    // public static final class AlignmentConstants {
+    //     public static final double MAX_VELOCITY_METERS_PER_SEC = 2.65;
+        
+    //     public static final double APPROACH_MAX_VELOCITY_METERS_PER_SEC = 2.15;
+    //     public static final Translation2d INTERMEDIATE_CLEARANCE_METERS = new Translation2d(
+    //             RobotConstants.robotRadius / 2.0 - 0.3, RobotConstants.robotRadius / 2.0 + 0.35);
+    //     public static final double DUPLICATE_TRANSLATION_EPSILON_METERS = 1e-3;
 
-        private VisionConstants() {}
-    }
+    //     public static final Pose2d[] TOWER_WAYPOINTS = {
+    //             new Pose2d(
+    //                     Units.inchesToMeters(59.76),
+    //                     Units.inchesToMeters(141.2),
+    //                     Rotation2d.fromDegrees(180.0)),
+    //             new Pose2d(
+    //                     Units.inchesToMeters(59.76),
+    //                     Units.inchesToMeters(149.094),
+    //                     Rotation2d.fromDegrees(180.0)),
+    //             new Pose2d(
+    //                     Units.inchesToMeters(59.76),
+    //                     Units.inchesToMeters(163.0),
+    //                     Rotation2d.fromDegrees(180.0))
+    //     };
 
-    public static final class AlignmentConstants {
+    //     public static boolean shouldUseIntermediate(Pose2d currentPoseBlue, Pose2d towerPoseBlue) {
+    //         return isBehindTower(currentPoseBlue, towerPoseBlue) || isInsideTower(currentPoseBlue);
+    //     }
 
-        private AlignmentConstants() {}
-    }
+    //     public static Translation2d[] intermediateTranslation(Pose2d currentPoseBlue, int towerPoseIndex) {
+    //         if (shouldUseIntermediate(currentPoseBlue, TOWER_WAYPOINTS[towerPoseIndex])) {
+    //             // left
+    //             if (towerPoseIndex == 0) {
+    //                 return new Translation2d[] {
+    //                     new Translation2d(
+    //                         TOWER_WAYPOINTS[towerPoseIndex].getX() + INTERMEDIATE_CLEARANCE_METERS.getX(),
+    //                         Tower.towerPoses[towerPoseIndex].getY() - INTERMEDIATE_CLEARANCE_METERS.getY()),
+    //                     isInsideTower(currentPoseBlue) ? new Translation2d(
+    //                         RobotConstants.robotRadius / 2.0 + 0.1,
+    //                         Tower.towerPoses[towerPoseIndex].getY() - INTERMEDIATE_CLEARANCE_METERS.getY()) : currentPoseBlue.getTranslation()
+    //                 };
+    //                 // middle and right
+    //             } else {
+    //                 return new Translation2d[] {
+    //                     new Translation2d(
+    //                         Tower.towerPoses[2].getX() + INTERMEDIATE_CLEARANCE_METERS.getX(),
+    //                         Tower.towerPoses[towerPoseIndex].getY() + INTERMEDIATE_CLEARANCE_METERS.getY()),
+    //                     isInsideTower(currentPoseBlue) ? new Translation2d(
+    //                         RobotConstants.robotRadius / 2.0 + 0.1,
+    //                         Tower.towerPoses[towerPoseIndex].getY() + INTERMEDIATE_CLEARANCE_METERS.getY()) : currentPoseBlue.getTranslation()
+    //                 };
+    //             }
+    //         }
 
-    public static final class ScoreTowerConstants {
-        public static final double MAX_VELOCITY_METERS_PER_SEC = 2.65;
-        public static final double MAX_ACCELERATION_METERS_PER_SEC2 = 8.0;
-        public static final double APPROACH_MAX_VELOCITY_METERS_PER_SEC = 2.15;
-        public static final Translation2d INTERMEDIATE_CLEARANCE_METERS = new Translation2d(
-                RobotConstants.robotWidth / 2.0 - 0.3, RobotConstants.robotWidth / 2.0 + 0.35);
-        public static final double DUPLICATE_TRANSLATION_EPSILON_METERS = 1e-3;
+    //         return new Translation2d[]{};
+    //     }
 
-        public static final Pose2d[] TOWER_WAYPOINTS = {
-                new Pose2d(
-                        Units.inchesToMeters(59.76),
-                        Units.inchesToMeters(141.2),
-                        Rotation2d.fromDegrees(180.0)),
-                new Pose2d(
-                        Units.inchesToMeters(59.76),
-                        Units.inchesToMeters(149.094),
-                        Rotation2d.fromDegrees(180.0)),
-                new Pose2d(
-                        Units.inchesToMeters(59.76),
-                        Units.inchesToMeters(163.0),
-                        Rotation2d.fromDegrees(180.0))
-        };
+    //     public static boolean isInsideTower(Pose2d currentPoseBlue) {
+    //         double robotRadius = RobotConstants.robotRadius / 2.0;
 
-        public static boolean shouldUseIntermediate(Pose2d currentPoseBlue, Pose2d towerPoseBlue) {
-            return isBehindTower(currentPoseBlue, towerPoseBlue) || isInsideTower(currentPoseBlue);
-        }
+    //         return currentPoseBlue.getX() < Tower.towerPoses[0].getX() &&
+    //                 currentPoseBlue.getY() > (Tower.towerPoses[1].getY() - Tower.towerWidth / 2.0 - robotRadius) &&
+    //                 currentPoseBlue.getY() < (Tower.towerPoses[1].getY() + Tower.towerWidth / 2.0 + robotRadius);
+    //     }
 
-        public static Translation2d[] intermediateTranslation(Pose2d currentPoseBlue, int towerPoseIndex) {
-            if (shouldUseIntermediate(currentPoseBlue, TOWER_WAYPOINTS[towerPoseIndex])) {
-                // left
-                if (towerPoseIndex == 0) {
-                    return new Translation2d[] {
-                        new Translation2d(
-                            TOWER_WAYPOINTS[towerPoseIndex].getX() + INTERMEDIATE_CLEARANCE_METERS.getX(),
-                            Tower.towerPoses[towerPoseIndex].getY() - INTERMEDIATE_CLEARANCE_METERS.getY()),
-                        isInsideTower(currentPoseBlue) ? new Translation2d(
-                            RobotConstants.robotWidth / 2.0 + 0.1,
-                            Tower.towerPoses[towerPoseIndex].getY() - INTERMEDIATE_CLEARANCE_METERS.getY()) : currentPoseBlue.getTranslation()
-                    };
-                    // middle and right
-                } else {
-                    return new Translation2d[] {
-                        new Translation2d(
-                            Tower.towerPoses[2].getX() + INTERMEDIATE_CLEARANCE_METERS.getX(),
-                            Tower.towerPoses[towerPoseIndex].getY() + INTERMEDIATE_CLEARANCE_METERS.getY()),
-                        isInsideTower(currentPoseBlue) ? new Translation2d(
-                            RobotConstants.robotWidth / 2.0 + 0.1,
-                            Tower.towerPoses[towerPoseIndex].getY() + INTERMEDIATE_CLEARANCE_METERS.getY()) : currentPoseBlue.getTranslation()
-                    };
-                }
-            }
+    //     public static boolean isBehindTower(Pose2d currentPoseBlue, Pose2d towerPoseBlue) {
+    //         return (currentPoseBlue.getX() < towerPoseBlue.getX() +
+    //                 RobotConstants.robotRadius / 2.0);
+    //     }
 
-            return new Translation2d[]{};
-        }
+    //     private AlignmentConstants() {}
+    // }
 
-        public static boolean isInsideTower(Pose2d currentPoseBlue) {
-            double robotRadius = RobotConstants.robotWidth / 2.0;
+    // public static final class RobotConstants {
+    //     static SwerveConfig swerveConfig = ConfigLoader.load("swerve", SwerveConfig.class);
 
-            return currentPoseBlue.getX() < Tower.towerPoses[0].getX() &&
-                    currentPoseBlue.getY() > (Tower.towerPoses[1].getY() - Tower.towerWidth / 2.0 - robotRadius) &&
-                    currentPoseBlue.getY() < (Tower.towerPoses[1].getY() + Tower.towerWidth / 2.0 + robotRadius);
-        }
+    //     public static final double robotRadius = Math.hypot(
+    //             swerveConfig.drivetrain.frontLeftX - swerveConfig.drivetrain.backRightX,
+    //             swerveConfig.drivetrain.frontLeftY - swerveConfig.drivetrain.backRightY
+    //     ) / 2.0;
 
-        public static boolean isBehindTower(Pose2d currentPoseBlue, Pose2d towerPoseBlue) {
-            return (currentPoseBlue.getX() < towerPoseBlue.getX() +
-                    RobotConstants.robotWidth / 2.0);
-        }
-
-        private ScoreTowerConstants() {}
-    }
-
-    public static final class RobotConstants {
-        static SwerveConfig swerveConfig = ConfigLoader.load("swerve", SwerveConfig.class);
-
-        public static final double robotWidth = Math.abs(
-                Math.max(swerveConfig.drivetrain.frontLeftY, swerveConfig.drivetrain.backLeftY)
-                        - Math.min(swerveConfig.drivetrain.frontRightY, swerveConfig.drivetrain.backRightY));
-
-        private RobotConstants() {}
-    }
+    //     private RobotConstants() {}
+    // }
 
     public static boolean shouldFlipPath() {
         var alliance = DriverStation.getAlliance();

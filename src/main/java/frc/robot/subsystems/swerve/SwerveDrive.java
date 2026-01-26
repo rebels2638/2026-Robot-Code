@@ -8,7 +8,6 @@ import java.util.ArrayList;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.DoubleSupplier;
-import java.util.function.Supplier;
 
 import org.littletonrobotics.junction.AutoLogOutput;
 import org.littletonrobotics.junction.Logger;
@@ -120,8 +119,8 @@ public class SwerveDrive extends SubsystemBase {
     private DoubleSupplier omegaNormalizedSupplier = () -> 0.0;
 
     // Path following
-    private Supplier<Path> pathSupplier = () -> null;
-    private Supplier<Boolean> shouldPoseResetSupplier = () -> false;
+    private Path currentPath = null;
+    private boolean shouldResetPose = false;
     private Command currentPathCommand = null;
     private FollowPath.Builder followPathBuilder;
 
@@ -396,8 +395,8 @@ public class SwerveDrive extends SubsystemBase {
                 break;
                 
             case PREPARE_FOR_AUTO:
-                if (pathSupplier.get() != null) {
-                    modulesAlignmentTargetRotation = pathSupplier.get().getInitialModuleDirection();
+                if (currentPath != null) {
+                    modulesAlignmentTargetRotation = currentPath.getInitialModuleDirection();
                     modulesAlignmentToleranceDeg = 15;
                 }
                 if (areModulesAligned()) {
@@ -550,9 +549,8 @@ public class SwerveDrive extends SubsystemBase {
         }
         
         // Schedule path command if not already running
-        Path path = pathSupplier.get();
-        if (path != null && (currentPathCommand == null || (!currentPathCommand.isScheduled() && !currentPathCommand.isFinished()))) {
-            currentPathCommand = buildPathCommand(path);
+        if (currentPath != null && (currentPathCommand == null || (!currentPathCommand.isScheduled() && !currentPathCommand.isFinished()))) {
+            currentPathCommand = buildPathCommand(currentPath);
             CommandScheduler.getInstance().schedule(currentPathCommand);
         }
         // The path command handles driving via the callback
@@ -566,8 +564,8 @@ public class SwerveDrive extends SubsystemBase {
         }
         cancelPathCommand();
 
-        if (pathSupplier.get() != null) {
-            alignModules(pathSupplier.get().getInitialModuleDirection(), 15);
+        if (currentPath != null) {
+            alignModules(currentPath.getInitialModuleDirection(), 15);
         }
     }
 
@@ -648,7 +646,7 @@ public class SwerveDrive extends SubsystemBase {
      * Builds a path command using the followPathBuilder, applying pose reset if configured.
      */
     private Command buildPathCommand(Path path) {
-        if (shouldPoseResetSupplier.get()) {
+        if (shouldResetPose) {
             return followPathBuilder.withPoseReset(RobotState.getInstance()::resetPose).build(path);
         }
         return followPathBuilder.withPoseReset((Pose2d pose) -> {}).build(path);
@@ -796,16 +794,16 @@ public class SwerveDrive extends SubsystemBase {
         this.omegaNormalizedSupplier = omegaNormalized;
     }
 
-    public void setPathSupplier(Supplier<Path> pathSupplier) {
-        this.pathSupplier = pathSupplier;
-        this.shouldPoseResetSupplier = () -> false;
+    public void setCurrentPath(Path path) {
+        this.currentPath = path;
+        this.shouldResetPose = false;
         // Clear existing command to allow fresh path to be scheduled
         cancelPathCommand();
     }
 
-    public void setPathSupplier(Supplier<Path> pathSupplier, Supplier<Boolean> shouldPoseResetSupplier) {
-        this.pathSupplier = pathSupplier;
-        this.shouldPoseResetSupplier = shouldPoseResetSupplier;
+    public void setCurrentPath(Path path, boolean shouldResetPose) {
+        this.currentPath = path;
+        this.shouldResetPose = shouldResetPose;
         // Clear existing command to allow fresh path to be scheduled
         cancelPathCommand();
     }
