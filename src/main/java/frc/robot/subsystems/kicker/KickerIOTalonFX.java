@@ -31,12 +31,9 @@ public class KickerIOTalonFX implements KickerIO {
 
     private final VelocityVoltage kickerMotorRequest = new VelocityVoltage(0).withSlot(0);
 
-    private final KickerConfig config;
     private final TalonFXConfiguration kickerConfig;
 
     public KickerIOTalonFX(KickerConfig config) {
-        this.config = config;
-
         // Kicker motor configuration (velocity control)
         kickerConfig = new TalonFXConfiguration();
 
@@ -56,11 +53,7 @@ public class KickerIOTalonFX implements KickerIO {
             InvertedValue.Clockwise_Positive : InvertedValue.CounterClockwise_Positive;
 
         // Current and torque limiting
-        kickerConfig.CurrentLimits.SupplyCurrentLimitEnable = true;
-        kickerConfig.CurrentLimits.SupplyCurrentLimit = config.kickerSupplyCurrentLimit;
-        kickerConfig.CurrentLimits.SupplyCurrentLowerLimit = config.kickerSupplyCurrentLimitLowerLimit;
-        kickerConfig.CurrentLimits.SupplyCurrentLowerTime = config.kickerSupplyCurrentLimitLowerTime;
-
+        kickerConfig.CurrentLimits.SupplyCurrentLimitEnable = false;
         kickerConfig.CurrentLimits.StatorCurrentLimitEnable = true;
         kickerConfig.CurrentLimits.StatorCurrentLimit = config.kickerStatorCurrentLimit;
 
