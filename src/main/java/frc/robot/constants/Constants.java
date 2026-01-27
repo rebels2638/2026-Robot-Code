@@ -11,7 +11,6 @@ import edu.wpi.first.math.geometry.Translation3d;
 import edu.wpi.first.math.util.Units;
 import edu.wpi.first.wpilibj.DriverStation;
 import frc.robot.configs.SwerveConfig;
-import frc.robot.constants.AlignmentConstants.Tower;
 import frc.robot.lib.util.ConfigLoader;
 
 /**
@@ -121,51 +120,6 @@ public final class Constants {
                         Units.inchesToMeters(163.0),
                         Rotation2d.fromDegrees(180.0))
         };
-
-        public static boolean shouldUseIntermediate(Pose2d currentPoseBlue, Pose2d towerPoseBlue) {
-            return isBehindTower(currentPoseBlue, towerPoseBlue) || isInsideTower(currentPoseBlue);
-        }
-
-        public static Translation2d[] intermediateTranslation(Pose2d currentPoseBlue, int towerPoseIndex) {
-            if (shouldUseIntermediate(currentPoseBlue, TOWER_WAYPOINTS[towerPoseIndex])) {
-                // left
-                if (towerPoseIndex == 0) {
-                    return new Translation2d[] {
-                        new Translation2d(
-                            TOWER_WAYPOINTS[towerPoseIndex].getX() + INTERMEDIATE_CLEARANCE_METERS.getX(),
-                            Tower.towerPoses[towerPoseIndex].getY() - INTERMEDIATE_CLEARANCE_METERS.getY()),
-                        isInsideTower(currentPoseBlue) ? new Translation2d(
-                            RobotConstants.robotWidth / 2.0 + 0.1,
-                            Tower.towerPoses[towerPoseIndex].getY() - INTERMEDIATE_CLEARANCE_METERS.getY()) : currentPoseBlue.getTranslation()
-                    };
-                    // middle and right
-                } else {
-                    return new Translation2d[] {
-                        new Translation2d(
-                            Tower.towerPoses[2].getX() + INTERMEDIATE_CLEARANCE_METERS.getX(),
-                            Tower.towerPoses[towerPoseIndex].getY() + INTERMEDIATE_CLEARANCE_METERS.getY()),
-                        isInsideTower(currentPoseBlue) ? new Translation2d(
-                            RobotConstants.robotWidth / 2.0 + 0.1,
-                            Tower.towerPoses[towerPoseIndex].getY() + INTERMEDIATE_CLEARANCE_METERS.getY()) : currentPoseBlue.getTranslation()
-                    };
-                }
-            }
-
-            return new Translation2d[]{};
-        }
-
-        public static boolean isInsideTower(Pose2d currentPoseBlue) {
-            double robotRadius = RobotConstants.robotWidth / 2.0;
-
-            return currentPoseBlue.getX() < Tower.towerPoses[0].getX() &&
-                    currentPoseBlue.getY() > (Tower.towerPoses[1].getY() - Tower.towerWidth / 2.0 - robotRadius) &&
-                    currentPoseBlue.getY() < (Tower.towerPoses[1].getY() + Tower.towerWidth / 2.0 + robotRadius);
-        }
-
-        public static boolean isBehindTower(Pose2d currentPoseBlue, Pose2d towerPoseBlue) {
-            return (currentPoseBlue.getX() < towerPoseBlue.getX() +
-                    RobotConstants.robotWidth / 2.0);
-        }
 
         private ScoreTowerConstants() {}
     }

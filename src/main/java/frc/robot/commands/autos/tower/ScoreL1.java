@@ -18,6 +18,7 @@ import frc.robot.lib.BLine.Path.PathConstraints;
 import frc.robot.lib.BLine.Path;
 import frc.robot.lib.BLine.Path.TranslationTarget;
 import frc.robot.lib.BLine.Path.Waypoint;
+import frc.robot.lib.util.IntermediateGenerator;
 import frc.robot.lib.util.RebelUtil;
 import frc.robot.subsystems.swerve.SwerveDrive;
 import frc.robot.subsystems.swerve.SwerveDrive.CurrentSystemState;
@@ -26,11 +27,17 @@ import frc.robot.subsystems.swerve.SwerveDrive.DesiredSystemState;
 public class ScoreL1 extends Command {
     private final SwerveDrive swerveDrive;
     private final RobotState robotState;
+    private final IntermediateGenerator.GeneratorMode intermediateMode;
     private boolean isFinished = false;
 
     public ScoreL1() {
+        this(IntermediateGenerator.GeneratorMode.DEFAULT);
+    }
+
+    public ScoreL1(IntermediateGenerator.GeneratorMode intermediateMode) {
         this.swerveDrive = SwerveDrive.getInstance();
         this.robotState = RobotState.getInstance();
+        this.intermediateMode = intermediateMode;
     }
 
     @Override
@@ -53,7 +60,6 @@ public class ScoreL1 extends Command {
 
         Logger.recordOutput("ScoreL1/Status", "Running");
 
-        // note: i cant see this working without a pose flip
         Pose2d currentPoseBlue = RebelUtil.applyFlip(currentPose);
         Pose2d towerPoseBlue = Constants.ScoreTowerConstants.TOWER_WAYPOINTS[0];
         double minDistanceToTower = towerPoseBlue.getTranslation().getDistance(currentPoseBlue.getTranslation());
@@ -74,11 +80,14 @@ public class ScoreL1 extends Command {
         List<Path.PathElement> pathElements = new ArrayList<>();
         pathElements.add(new Waypoint(currentPoseBlue));
 
-        boolean needsIntermediate = Constants.ScoreTowerConstants.shouldUseIntermediate(currentPoseBlue, towerPoseBlue);
-        Translation2d[] intermediateTranslation = Constants.ScoreTowerConstants.intermediateTranslation(
+        boolean needsIntermediate = IntermediateGenerator.shouldUseIntermediate(
+            intermediateMode,
             currentPoseBlue,
-            towerPoseIndex
-        );
+            towerPoseBlue);
+        Translation2d[] intermediateTranslation = IntermediateGenerator.intermediateTranslations(
+            intermediateMode,
+            currentPoseBlue,
+            towerPoseIndex);
 
         if (needsIntermediate) {
             for (int i = intermediateTranslation.length - 1; i >= 0; i--) {
