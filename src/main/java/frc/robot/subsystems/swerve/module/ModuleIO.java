@@ -4,6 +4,7 @@ import org.littletonrobotics.junction.AutoLog;
 
 import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.math.kinematics.SwerveModuleState;
+import frc.robot.lib.util.DashboardMotorControlLoopConfigurator.MotorControlLoopConfig;
 
 public interface ModuleIO {
     @AutoLog
@@ -33,5 +34,7 @@ public interface ModuleIO {
     public default void setState(SwerveModuleState state) {}
     public default void setSteerTorqueCurrentFOC(double torqueCurrentFOC, double driveVelocityMetersPerSec) {}
     public default void setDriveTorqueCurrentFOC(double torqueCurrentFOC, Rotation2d steerAngle) {}
+    public default void configureDriveControlLoop(MotorControlLoopConfig config) {}
+    public default void configureSteerControlLoop(MotorControlLoopConfig config) {}
     public default void setWheelCoast(boolean isCoast) {}
 }

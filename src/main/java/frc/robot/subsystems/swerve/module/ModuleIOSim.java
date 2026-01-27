@@ -10,6 +10,7 @@ import edu.wpi.first.math.system.plant.LinearSystemId;
 import edu.wpi.first.wpilibj.Timer;
 import edu.wpi.first.wpilibj.simulation.DCMotorSim;
 import frc.robot.configs.SwerveModuleGeneralConfig;
+import frc.robot.lib.util.DashboardMotorControlLoopConfigurator.MotorControlLoopConfig;
 
 public class ModuleIOSim implements ModuleIO {
     private final DCMotor driveMotorModel = DCMotor.getKrakenX60Foc(1);
@@ -118,5 +119,15 @@ public class ModuleIOSim implements ModuleIO {
 
         isDriveClosedLoop = false;
         isSteerClosedLoop = true;
+    }
+
+    @Override
+    public void configureDriveControlLoop(MotorControlLoopConfig config) {
+        // No-op in sim
+    }
+
+    @Override
+    public void configureSteerControlLoop(MotorControlLoopConfig config) {
+        // No-op in sim
     }
 }

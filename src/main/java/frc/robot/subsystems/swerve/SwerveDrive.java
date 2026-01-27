@@ -35,6 +35,7 @@ import frc.robot.configs.SwerveConfig;
 import frc.robot.configs.SwerveDrivetrainConfig;
 import frc.robot.configs.SwerveModuleGeneralConfig;
 import frc.robot.lib.util.ConfigLoader;
+import frc.robot.lib.util.DashboardMotorControlLoopConfigurator;
 import frc.robot.lib.BLine.ChassisRateLimiter;
 import frc.robot.lib.BLine.FollowPath;
 import frc.robot.lib.BLine.Path;
@@ -188,6 +189,9 @@ public class SwerveDrive extends SubsystemBase {
     private final SwerveDrivetrainConfig drivetrainConfig;
     private SwerveDriveKinematics kinematics;
 
+    private final DashboardMotorControlLoopConfigurator driveControlLoopConfigurator;
+    private final DashboardMotorControlLoopConfigurator steerControlLoopConfigurator;
+
     private final SysIdRoutine driveCharacterizationSysIdRoutine;
     private final SysIdRoutine steerCharacterizationSysIdRoutine;
 
@@ -223,6 +227,29 @@ public class SwerveDrive extends SubsystemBase {
             gyroIO = new GyroIOPigeon2();
             PhoenixOdometryThread.getInstance().start();
         }
+
+        driveControlLoopConfigurator = new DashboardMotorControlLoopConfigurator(
+            "Swerve/driveControlLoop",
+            new DashboardMotorControlLoopConfigurator.MotorControlLoopConfig(
+                moduleGeneralConfig.driveKP,
+                moduleGeneralConfig.driveKI,
+                moduleGeneralConfig.driveKD,
+                moduleGeneralConfig.driveKS,
+                moduleGeneralConfig.driveKV,
+                moduleGeneralConfig.driveKA
+            )
+        );
+        steerControlLoopConfigurator = new DashboardMotorControlLoopConfigurator(
+            "Swerve/steerControlLoop",
+            new DashboardMotorControlLoopConfigurator.MotorControlLoopConfig(
+                moduleGeneralConfig.steerKP,
+                moduleGeneralConfig.steerKI,
+                moduleGeneralConfig.steerKD,
+                moduleGeneralConfig.steerKS,
+                moduleGeneralConfig.steerKV,
+                moduleGeneralConfig.steerKA
+            )
+        );
 
         kinematics = new SwerveDriveKinematics(
             drivetrainConfig.getFrontLeftPositionMeters(),
@@ -326,6 +353,17 @@ public class SwerveDrive extends SubsystemBase {
                 moduleInputs[i].driveVelocityMetersPerSec,
                 moduleInputs[i].steerPosition
             );
+        }
+
+        if (driveControlLoopConfigurator.hasChanged()) {
+            for (ModuleIO module : modules) {
+                module.configureDriveControlLoop(driveControlLoopConfigurator.getConfig());
+            }
+        }
+        if (steerControlLoopConfigurator.hasChanged()) {
+            for (ModuleIO module : modules) {
+                module.configureSteerControlLoop(steerControlLoopConfigurator.getConfig());
+            }
         }
 
         ArrayList<Pose2d> updatedPoses = new ArrayList<Pose2d>();
