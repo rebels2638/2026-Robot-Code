@@ -241,13 +241,6 @@ public class Superstructure extends SubsystemBase {
         swerveDrive.setDesiredOmegaOverrideState(SwerveDrive.DesiredOmegaOverrideState.RANGED_ROTATION);
         swerveDrive.setDesiredTranslationOverrideState(SwerveDrive.DesiredTranslationOverrideState.CAPPED);
 
-        // if (Timer.getTimestamp() - lastShotTime < SHOT_DURATION_SECONDS) {
-        //     swerveDrive.setDesiredTranslationOverrideState(SwerveDrive.DesiredTranslationOverrideState.FROZEN);
-        // } else {
-        //     swerveDrive.setDesiredTranslationOverrideState(SwerveDrive.DesiredTranslationOverrideState.CAPPED);
-
-        // }
-
         double now = Timer.getTimestamp();
         double timeSinceKickerEngaged = now - kickerEngagedTime;
         if (timeSinceKickerEngaged >= SHOT_DURATION_SECONDS) {

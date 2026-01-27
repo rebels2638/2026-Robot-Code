@@ -111,36 +111,36 @@ public class RobotContainer {
         //     })
         // );
 
-        // xboxDriver.getAButton().onTrue(
-        //     new InstantCommand(() -> superstructure.setDesiredState(DesiredState.SHOOTING))
-        // );
-        // xboxDriver.getBButton().onTrue(
-        //     new InstantCommand(() -> superstructure.setDesiredState(DesiredState.TRACKING))
-        // );
-
         xboxDriver.getAButton().onTrue(
-            new ConditionalCommand(
-                new SequentialCommandGroup(
-                    followPath(
-                        new Path(
-                            new PathConstraints()
-                                .setMaxVelocityMetersPerSec(AlignmentConstants.Tower.INTERMEDIARY_MAX_VELOCITY_METERS_PER_SEC)
-                                .setEndTranslationToleranceMeters(AlignmentConstants.Tower.INTERMEDIARY_TRANSLATION_TOLERANCE_METERS)
-                                .setEndRotationToleranceDeg(AlignmentConstants.Tower.INTERMEDIARY_ROTATION_TOLERANCE_DEG),
-                            new Waypoint(AlignmentConstants.Tower.Left.INTERMEDIATE_WAYPOINT)),
-                        false
-                    ),
-                    followPath(
-                        new Path(
-                            new PathConstraints().setMaxVelocityMetersPerSec(AlignmentConstants.Tower.APPROACH_MAX_VELOCITY_METERS_PER_SEC),
-                            new Waypoint(AlignmentConstants.Tower.Left.FINAL_WAYPOINT)),
-                        false
-                    )                
-                ),
-                new InstantCommand(() -> {}),
-                () -> AlignmentConstants.Tower.isWithinBounds(robotState.getEstimatedPose(), AlignmentConstants.Tower.Left.BOUNDS)
-            )
+            new InstantCommand(() -> superstructure.setDesiredState(DesiredState.SHOOTING))
         );
+        xboxDriver.getBButton().onTrue(
+            new InstantCommand(() -> superstructure.setDesiredState(DesiredState.TRACKING))
+        );
+
+        // xboxDriver.getAButton().onTrue(
+        //     new ConditionalCommand(
+        //         new SequentialCommandGroup(
+        //             followPath(
+        //                 new Path(
+        //                     new PathConstraints()
+        //                         .setMaxVelocityMetersPerSec(AlignmentConstants.Tower.INTERMEDIARY_MAX_VELOCITY_METERS_PER_SEC)
+        //                         .setEndTranslationToleranceMeters(AlignmentConstants.Tower.INTERMEDIARY_TRANSLATION_TOLERANCE_METERS)
+        //                         .setEndRotationToleranceDeg(AlignmentConstants.Tower.INTERMEDIARY_ROTATION_TOLERANCE_DEG),
+        //                     new Waypoint(AlignmentConstants.Tower.Left.INTERMEDIATE_WAYPOINT)),
+        //                 false
+        //             ),
+        //             followPath(
+        //                 new Path(
+        //                     new PathConstraints().setMaxVelocityMetersPerSec(AlignmentConstants.Tower.APPROACH_MAX_VELOCITY_METERS_PER_SEC),
+        //                     new Waypoint(AlignmentConstants.Tower.Left.FINAL_WAYPOINT)),
+        //                 false
+        //             )                
+        //         ),
+        //         new InstantCommand(() -> {}),
+        //         () -> AlignmentConstants.Tower.isWithinBounds(robotState.getEstimatedPose(), AlignmentConstants.Tower.Left.BOUNDS)
+        //     )
+        // );
 
 
     }
