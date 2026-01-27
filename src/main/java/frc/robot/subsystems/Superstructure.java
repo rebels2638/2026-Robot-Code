@@ -266,7 +266,7 @@ public class Superstructure extends SubsystemBase {
     private boolean isReadyForShot() {
         // Check if swerve is in a nominal ranged rotation state
         boolean swerveReady = 
-            swerveDrive.getCurrentOmegaOverrideState() == SwerveDrive.CurrentOmegaOverrideState.RANGED_ROTATION_NOMINAL &&
+            swerveDrive.getCurrentOmegaOverrideState() == SwerveDrive.CurrentOmegaOverrideState.RANGED_NOMINAL &&
             Math.hypot(
                 robotState.getFieldRelativeSpeeds().vxMetersPerSecond,
                 robotState.getFieldRelativeSpeeds().vyMetersPerSecond
