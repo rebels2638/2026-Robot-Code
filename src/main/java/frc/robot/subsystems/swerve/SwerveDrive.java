@@ -8,7 +8,6 @@ import java.util.ArrayList;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.DoubleSupplier;
-import java.util.function.Supplier;
 
 import org.littletonrobotics.junction.AutoLogOutput;
 import org.littletonrobotics.junction.Logger;
@@ -36,6 +35,7 @@ import frc.robot.configs.SwerveConfig;
 import frc.robot.configs.SwerveDrivetrainConfig;
 import frc.robot.configs.SwerveModuleGeneralConfig;
 import frc.robot.lib.util.ConfigLoader;
+import frc.robot.lib.util.DashboardMotorControlLoopConfigurator;
 import frc.robot.lib.BLine.ChassisRateLimiter;
 import frc.robot.lib.BLine.FollowPath;
 import frc.robot.lib.BLine.Path;
@@ -120,8 +120,8 @@ public class SwerveDrive extends SubsystemBase {
     private DoubleSupplier omegaNormalizedSupplier = () -> 0.0;
 
     // Path following
-    private Supplier<Path> pathSupplier = () -> null;
-    private Supplier<Boolean> shouldPoseResetSupplier = () -> false;
+    private Path currentPath = null;
+    private boolean shouldResetPose = false;
     private Command currentPathCommand = null;
     private FollowPath.Builder followPathBuilder;
 
@@ -189,6 +189,9 @@ public class SwerveDrive extends SubsystemBase {
     private final SwerveDrivetrainConfig drivetrainConfig;
     private SwerveDriveKinematics kinematics;
 
+    private final DashboardMotorControlLoopConfigurator driveControlLoopConfigurator;
+    private final DashboardMotorControlLoopConfigurator steerControlLoopConfigurator;
+
     private final SysIdRoutine driveCharacterizationSysIdRoutine;
     private final SysIdRoutine steerCharacterizationSysIdRoutine;
 
@@ -224,6 +227,29 @@ public class SwerveDrive extends SubsystemBase {
             gyroIO = new GyroIOPigeon2();
             PhoenixOdometryThread.getInstance().start();
         }
+
+        driveControlLoopConfigurator = new DashboardMotorControlLoopConfigurator(
+            "Swerve/driveControlLoop",
+            new DashboardMotorControlLoopConfigurator.MotorControlLoopConfig(
+                moduleGeneralConfig.driveKP,
+                moduleGeneralConfig.driveKI,
+                moduleGeneralConfig.driveKD,
+                moduleGeneralConfig.driveKS,
+                moduleGeneralConfig.driveKV,
+                moduleGeneralConfig.driveKA
+            )
+        );
+        steerControlLoopConfigurator = new DashboardMotorControlLoopConfigurator(
+            "Swerve/steerControlLoop",
+            new DashboardMotorControlLoopConfigurator.MotorControlLoopConfig(
+                moduleGeneralConfig.steerKP,
+                moduleGeneralConfig.steerKI,
+                moduleGeneralConfig.steerKD,
+                moduleGeneralConfig.steerKS,
+                moduleGeneralConfig.steerKV,
+                moduleGeneralConfig.steerKA
+            )
+        );
 
         kinematics = new SwerveDriveKinematics(
             drivetrainConfig.getFrontLeftPositionMeters(),
@@ -329,6 +355,17 @@ public class SwerveDrive extends SubsystemBase {
             );
         }
 
+        if (driveControlLoopConfigurator.hasChanged()) {
+            for (ModuleIO module : modules) {
+                module.configureDriveControlLoop(driveControlLoopConfigurator.getConfig());
+            }
+        }
+        if (steerControlLoopConfigurator.hasChanged()) {
+            for (ModuleIO module : modules) {
+                module.configureSteerControlLoop(steerControlLoopConfigurator.getConfig());
+            }
+        }
+
         ArrayList<Pose2d> updatedPoses = new ArrayList<Pose2d>();
 
         double[] odometryTimestampsSeconds = moduleInputs[0].odometryTimestampsSeconds;
@@ -396,8 +433,8 @@ public class SwerveDrive extends SubsystemBase {
                 break;
                 
             case PREPARE_FOR_AUTO:
-                if (pathSupplier.get() != null) {
-                    modulesAlignmentTargetRotation = pathSupplier.get().getInitialModuleDirection();
+                if (currentPath != null) {
+                    modulesAlignmentTargetRotation = currentPath.getInitialModuleDirection();
                     modulesAlignmentToleranceDeg = 15;
                 }
                 if (areModulesAligned()) {
@@ -550,9 +587,8 @@ public class SwerveDrive extends SubsystemBase {
         }
         
         // Schedule path command if not already running
-        Path path = pathSupplier.get();
-        if (path != null && (currentPathCommand == null || (!currentPathCommand.isScheduled() && !currentPathCommand.isFinished()))) {
-            currentPathCommand = buildPathCommand(path);
+        if (currentPath != null && (currentPathCommand == null || (!currentPathCommand.isScheduled() && !currentPathCommand.isFinished()))) {
+            currentPathCommand = buildPathCommand(currentPath);
             CommandScheduler.getInstance().schedule(currentPathCommand);
         }
         // The path command handles driving via the callback
@@ -566,8 +602,8 @@ public class SwerveDrive extends SubsystemBase {
         }
         cancelPathCommand();
 
-        if (pathSupplier.get() != null) {
-            alignModules(pathSupplier.get().getInitialModuleDirection(), 15);
+        if (currentPath != null) {
+            alignModules(currentPath.getInitialModuleDirection(), 15);
         }
     }
 
@@ -648,7 +684,7 @@ public class SwerveDrive extends SubsystemBase {
      * Builds a path command using the followPathBuilder, applying pose reset if configured.
      */
     private Command buildPathCommand(Path path) {
-        if (shouldPoseResetSupplier.get()) {
+        if (shouldResetPose) {
             return followPathBuilder.withPoseReset(RobotState.getInstance()::resetPose).build(path);
         }
         return followPathBuilder.withPoseReset((Pose2d pose) -> {}).build(path);
@@ -796,16 +832,16 @@ public class SwerveDrive extends SubsystemBase {
         this.omegaNormalizedSupplier = omegaNormalized;
     }
 
-    public void setPathSupplier(Supplier<Path> pathSupplier) {
-        this.pathSupplier = pathSupplier;
-        this.shouldPoseResetSupplier = () -> false;
+    public void setCurrentPath(Path path) {
+        this.currentPath = path;
+        this.shouldResetPose = false;
         // Clear existing command to allow fresh path to be scheduled
         cancelPathCommand();
     }
 
-    public void setPathSupplier(Supplier<Path> pathSupplier, Supplier<Boolean> shouldPoseResetSupplier) {
-        this.pathSupplier = pathSupplier;
-        this.shouldPoseResetSupplier = shouldPoseResetSupplier;
+    public void setCurrentPath(Path path, boolean shouldResetPose) {
+        this.currentPath = path;
+        this.shouldResetPose = shouldResetPose;
         // Clear existing command to allow fresh path to be scheduled
         cancelPathCommand();
     }
