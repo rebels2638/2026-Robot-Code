@@ -52,11 +52,7 @@ public class HopperIOTalonFX implements HopperIO {
             ? InvertedValue.Clockwise_Positive
             : InvertedValue.CounterClockwise_Positive;
 
-        hopperConfig.CurrentLimits.SupplyCurrentLimitEnable = true;
-        hopperConfig.CurrentLimits.SupplyCurrentLimit = config.hopperSupplyCurrentLimit;
-        hopperConfig.CurrentLimits.SupplyCurrentLowerLimit = config.hopperSupplyCurrentLimitLowerLimit;
-        hopperConfig.CurrentLimits.SupplyCurrentLowerTime = config.hopperSupplyCurrentLimitLowerTime;
-
+        hopperConfig.CurrentLimits.SupplyCurrentLimitEnable = false;
         hopperConfig.CurrentLimits.StatorCurrentLimitEnable = true;
         hopperConfig.CurrentLimits.StatorCurrentLimit = config.hopperStatorCurrentLimit;
 

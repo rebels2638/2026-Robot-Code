@@ -6,9 +6,6 @@ public class IntakeConfig {
     public int intakeCanId;
     public boolean isIntakeInverted;
 
-    public double intakeSupplyCurrentLimit;
-    public double intakeSupplyCurrentLimitLowerTime;
-    public double intakeSupplyCurrentLimitLowerLimit;
     public double intakeStatorCurrentLimit;
     public double intakePeakForwardTorqueCurrent;
     public double intakePeakReverseTorqueCurrent;

@@ -89,11 +89,7 @@ public class ShooterIOTalonFX implements ShooterIO {
             InvertedValue.Clockwise_Positive : InvertedValue.CounterClockwise_Positive;
 
         // Current and torque limiting
-        hoodConfig.CurrentLimits.SupplyCurrentLimitEnable = true;
-        hoodConfig.CurrentLimits.SupplyCurrentLimit = config.hoodSupplyCurrentLimit;
-        hoodConfig.CurrentLimits.SupplyCurrentLowerLimit = config.hoodSupplyCurrentLimitLowerLimit;
-        hoodConfig.CurrentLimits.SupplyCurrentLowerTime = config.hoodSupplyCurrentLimitLowerTime;
-
+        hoodConfig.CurrentLimits.SupplyCurrentLimitEnable = false;
         hoodConfig.CurrentLimits.StatorCurrentLimitEnable = true;
         hoodConfig.CurrentLimits.StatorCurrentLimit = config.hoodStatorCurrentLimit;
 
@@ -130,11 +126,7 @@ public class ShooterIOTalonFX implements ShooterIO {
             InvertedValue.Clockwise_Positive : InvertedValue.CounterClockwise_Positive;
 
         // Current and torque limiting
-        turretConfig.CurrentLimits.SupplyCurrentLimitEnable = true;
-        turretConfig.CurrentLimits.SupplyCurrentLimit = config.turretSupplyCurrentLimit;
-        turretConfig.CurrentLimits.SupplyCurrentLowerLimit = config.turretSupplyCurrentLimitLowerLimit;
-        turretConfig.CurrentLimits.SupplyCurrentLowerTime = config.turretSupplyCurrentLimitLowerTime;
-
+        turretConfig.CurrentLimits.SupplyCurrentLimitEnable = false;
         turretConfig.CurrentLimits.StatorCurrentLimitEnable = true;
         turretConfig.CurrentLimits.StatorCurrentLimit = config.turretStatorCurrentLimit;
 
@@ -178,11 +170,7 @@ public class ShooterIOTalonFX implements ShooterIO {
             InvertedValue.Clockwise_Positive : InvertedValue.CounterClockwise_Positive;
 
         // Current and torque limiting
-        flywheelConfig.CurrentLimits.SupplyCurrentLimitEnable = true;
-        flywheelConfig.CurrentLimits.SupplyCurrentLimit = config.flywheelSupplyCurrentLimit;
-        flywheelConfig.CurrentLimits.SupplyCurrentLowerLimit = config.flywheelSupplyCurrentLimitLowerLimit;
-        flywheelConfig.CurrentLimits.SupplyCurrentLowerTime = config.flywheelSupplyCurrentLimitLowerTime;
-
+        flywheelConfig.CurrentLimits.SupplyCurrentLimitEnable = false;
         flywheelConfig.CurrentLimits.StatorCurrentLimitEnable = true;
         flywheelConfig.CurrentLimits.StatorCurrentLimit = config.flywheelStatorCurrentLimit;
 
@@ -201,11 +189,7 @@ public class ShooterIOTalonFX implements ShooterIO {
         // Follower inverted state will be handled by the Follower control request
 
         // Current and torque limiting (same as leader)
-        flywheelFollowerConfig.CurrentLimits.SupplyCurrentLimitEnable = true;
-        flywheelFollowerConfig.CurrentLimits.SupplyCurrentLimit = config.flywheelSupplyCurrentLimit;
-        flywheelFollowerConfig.CurrentLimits.SupplyCurrentLowerLimit = config.flywheelSupplyCurrentLimitLowerLimit;
-        flywheelFollowerConfig.CurrentLimits.SupplyCurrentLowerTime = config.flywheelSupplyCurrentLimitLowerTime;
-
+        flywheelFollowerConfig.CurrentLimits.SupplyCurrentLimitEnable = false;
         flywheelFollowerConfig.CurrentLimits.StatorCurrentLimitEnable = true;
         flywheelFollowerConfig.CurrentLimits.StatorCurrentLimit = config.flywheelStatorCurrentLimit;
 
