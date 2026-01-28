@@ -1,6 +1,6 @@
 {
   "canBusName": "drivetrain",
-  "kickerCanId": 20,
+  "kickerCanId": 23,
   "isKickerInverted": true,
   "kickerStatorCurrentLimit": 90.0,
   "kickerPeakForwardTorqueCurrent": 90.0,
