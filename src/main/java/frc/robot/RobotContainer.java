@@ -47,7 +47,7 @@ public class RobotContainer {
     private final RobotState robotState = RobotState.getInstance();
     private final SwerveDrive swerveDrive = SwerveDrive.getInstance();
     private final Superstructure superstructure = Superstructure.getInstance();
-    // private final Vision vision = Vision.getInstance();
+    private final Vision vision = Vision.getInstance();
     @SuppressWarnings("unused")
     private final ProjectileVisualizer projectileVisualizer = ProjectileVisualizer.getInstance();
 
@@ -78,11 +78,11 @@ public class RobotContainer {
     }
 
     private void registerEventTriggers() {
-        FollowPath.registerEventTrigger("test1", new InstantCommand(() -> {
-            Logger.recordOutput("In a command", true);
+        FollowPath.registerEventTrigger("shoot", new InstantCommand(() -> {
+            superstructure.setDesiredState(Superstructure.DesiredState.SHOOTING);
         }));
-        FollowPath.registerEventTrigger("test2", () -> {
-            System.out.println("As a runnable");
+        FollowPath.registerEventTrigger("rev", () -> {
+            superstructure.setDesiredState(Superstructure.DesiredState.READY_FOR_SHOT);
         });
     }
 
@@ -177,6 +177,6 @@ public class RobotContainer {
     }
 
     public Command getAutonomousCommand() {
-        return null;
+        return followPath(new Path("simple_back"), true);
     }
 }
