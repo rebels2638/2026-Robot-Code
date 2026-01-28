@@ -44,11 +44,11 @@ public class RobotContainer {
     private final XboxController xboxDriver;
     private final XboxController xboxOperator;
 
-    private final Shooter shooter = Shooter.getInstance();
+    // private final Shooter shooter = Shooter.getInstance();
     private final RobotState robotState = RobotState.getInstance();
     private final SwerveDrive swerveDrive = SwerveDrive.getInstance();
-    private final Superstructure superstructure = Superstructure.getInstance();
-    private final Vision vision = Vision.getInstance();
+    // private final Superstructure superstructure = Superstructure.getInstance();
+    // private final Vision vision = Vision.getInstance();
     @SuppressWarnings("unused")
     private final ProjectileVisualizer projectileVisualizer = ProjectileVisualizer.getInstance();
 
@@ -72,7 +72,7 @@ public class RobotContainer {
         swerveDrive.setDesiredSystemState(SwerveDrive.DesiredSystemState.TELEOP);
         
         // Set default superstructure state to HOME
-        superstructure.setDesiredState(Superstructure.DesiredState.HOME);
+        // superstructure.setDesiredState(Superstructure.DesiredState.HOME);
 
 
         configureBindings();
@@ -143,8 +143,8 @@ public class RobotContainer {
         // );
 
         // Test snap-to-angle bindings
-        xboxDriver.getAButton().onTrue(new InstantCommand(() -> superstructure.setDesiredState(Superstructure.DesiredState.BUMP)));
-        xboxDriver.getAButton().onFalse(new InstantCommand(() -> superstructure.setDesiredState(Superstructure.DesiredState.HOME)));
+        // xboxDriver.getAButton().onTrue(new InstantCommand(() -> superstructure.setDesiredState(Superstructure.DesiredState.BUMP)));
+        // xboxDriver.getAButton().onFalse(new InstantCommand(() -> superstructure.setDesiredState(Superstructure.DesiredState.HOME)));
     }
 
     private Command followPath(Path path, boolean shouldResetPose) {
@@ -163,17 +163,17 @@ public class RobotContainer {
     public void teleopInit() {
         // Ensure we're in teleop state
         swerveDrive.setDesiredSystemState(SwerveDrive.DesiredSystemState.TELEOP);
-        superstructure.setDesiredState(Superstructure.DesiredState.HOME);
+        // superstructure.setDesiredState(Superstructure.DesiredState.HOME);
     }
 
     public void autonomousInit() {
         // Set up for autonomous
-        superstructure.setDesiredState(DesiredState.HOME);
+        // superstructure.setDesiredState(DesiredState.HOME);
         swerveDrive.setDesiredSystemState(SwerveDrive.DesiredSystemState.IDLE);
     }
 
     public void disabledInit() {
-        superstructure.setDesiredState(Superstructure.DesiredState.DISABLED);
+        // superstructure.setDesiredState(Superstructure.DesiredState.DISABLED);
         swerveDrive.setDesiredSystemState(SwerveDrive.DesiredSystemState.DISABLED);
     }
 
