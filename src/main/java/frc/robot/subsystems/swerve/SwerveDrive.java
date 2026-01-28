@@ -22,7 +22,6 @@ import edu.wpi.first.math.kinematics.SwerveModulePosition;
 import edu.wpi.first.math.kinematics.SwerveModuleState;
 import edu.wpi.first.math.kinematics.SwerveDriveKinematics;
 import edu.wpi.first.wpilibj.Timer;
-import edu.wpi.first.wpilibj.RobotBase;
 import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.CommandScheduler;
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
@@ -202,11 +201,16 @@ public class SwerveDrive extends SubsystemBase {
 
     @SuppressWarnings("static-access")
     private SwerveDrive() {
-        SwerveConfig swerveConfig = ConfigLoader.load("swerve", SwerveConfig.class);
+        boolean useSimulation = Constants.shouldUseSimulation(Constants.SimOnlySubsystems.SWERVE);
+        SwerveConfig swerveConfig = ConfigLoader.load(
+            "swerve",
+            ConfigLoader.getModeFolder(Constants.SimOnlySubsystems.SWERVE),
+            SwerveConfig.class
+        );
         drivetrainConfig = swerveConfig.drivetrain;
         moduleGeneralConfig = swerveConfig.moduleGeneral;
 
-        if (RobotBase.isSimulation()) {
+        if (useSimulation) {
             modules = new ModuleIO[] {
                 new ModuleIOSim(moduleGeneralConfig, 0),
                 new ModuleIOSim(moduleGeneralConfig, 1),

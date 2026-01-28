@@ -4,14 +4,7 @@
 
 package frc.robot.constants;
 
-import edu.wpi.first.math.geometry.Pose2d;
-import edu.wpi.first.math.geometry.Rotation2d;
-import edu.wpi.first.math.geometry.Translation2d;
-import edu.wpi.first.math.util.Units;
 import edu.wpi.first.wpilibj.DriverStation;
-import frc.robot.configs.SwerveConfig;
-import frc.robot.constants.FieldConstants.Tower;
-import frc.robot.lib.util.ConfigLoader;
 
 /**
  * The Constants class provides a convenient place for teams to hold robot-wide
@@ -43,6 +36,38 @@ public final class Constants {
 
         /** Replaying from a log file. */
         REPLAY
+    }
+
+    public static final class SimOnlySubsystems {
+        public static final boolean SWERVE = false;
+        public static final boolean SHOOTER = false;
+        public static final boolean KICKER = false;
+        public static final boolean HOPPER = false;
+        public static final boolean INTAKE = false;
+        public static final boolean CLIMBER = false;
+        public static final boolean VISION = false;
+
+        private SimOnlySubsystems() {}
+    }
+
+    /**
+     * Returns true if the subsystem should use simulation IO and config.
+     * - If simOnlyFlag is false: use normal mode-based behavior
+     * - If simOnlyFlag is true AND mode is REPLAY: use normal replay behavior (COMP config)
+     * - If simOnlyFlag is true AND mode is NOT REPLAY: force simulation
+     */
+    public static boolean shouldUseSimulation(boolean simOnlyFlag) {
+        if (!simOnlyFlag) {
+            // Normal behavior: use simulation only in SIM mode
+            return currentMode == Mode.SIM;
+        }
+        // Sim-only flag is enabled
+        // In REPLAY mode, preserve normal replay behavior (don't force sim)
+        if (currentMode == Mode.REPLAY) {
+            return false;
+        }
+        // In all other modes (SIM, COMP, DEV), use simulation
+        return true;
     }
 
     public static final double kLOOP_CYCLE_MS;
@@ -87,88 +112,6 @@ public final class Constants {
 
         private OperatorConstants() {}
     }
-
-    // public static final class AlignmentConstants {
-    //     public static final double MAX_VELOCITY_METERS_PER_SEC = 2.65;
-        
-    //     public static final double APPROACH_MAX_VELOCITY_METERS_PER_SEC = 2.15;
-    //     public static final Translation2d INTERMEDIATE_CLEARANCE_METERS = new Translation2d(
-    //             RobotConstants.robotRadius / 2.0 - 0.3, RobotConstants.robotRadius / 2.0 + 0.35);
-    //     public static final double DUPLICATE_TRANSLATION_EPSILON_METERS = 1e-3;
-
-    //     public static final Pose2d[] TOWER_WAYPOINTS = {
-    //             new Pose2d(
-    //                     Units.inchesToMeters(59.76),
-    //                     Units.inchesToMeters(141.2),
-    //                     Rotation2d.fromDegrees(180.0)),
-    //             new Pose2d(
-    //                     Units.inchesToMeters(59.76),
-    //                     Units.inchesToMeters(149.094),
-    //                     Rotation2d.fromDegrees(180.0)),
-    //             new Pose2d(
-    //                     Units.inchesToMeters(59.76),
-    //                     Units.inchesToMeters(163.0),
-    //                     Rotation2d.fromDegrees(180.0))
-    //     };
-
-    //     public static boolean shouldUseIntermediate(Pose2d currentPoseBlue, Pose2d towerPoseBlue) {
-    //         return isBehindTower(currentPoseBlue, towerPoseBlue) || isInsideTower(currentPoseBlue);
-    //     }
-
-    //     public static Translation2d[] intermediateTranslation(Pose2d currentPoseBlue, int towerPoseIndex) {
-    //         if (shouldUseIntermediate(currentPoseBlue, TOWER_WAYPOINTS[towerPoseIndex])) {
-    //             // left
-    //             if (towerPoseIndex == 0) {
-    //                 return new Translation2d[] {
-    //                     new Translation2d(
-    //                         TOWER_WAYPOINTS[towerPoseIndex].getX() + INTERMEDIATE_CLEARANCE_METERS.getX(),
-    //                         Tower.towerPoses[towerPoseIndex].getY() - INTERMEDIATE_CLEARANCE_METERS.getY()),
-    //                     isInsideTower(currentPoseBlue) ? new Translation2d(
-    //                         RobotConstants.robotRadius / 2.0 + 0.1,
-    //                         Tower.towerPoses[towerPoseIndex].getY() - INTERMEDIATE_CLEARANCE_METERS.getY()) : currentPoseBlue.getTranslation()
-    //                 };
-    //                 // middle and right
-    //             } else {
-    //                 return new Translation2d[] {
-    //                     new Translation2d(
-    //                         Tower.towerPoses[2].getX() + INTERMEDIATE_CLEARANCE_METERS.getX(),
-    //                         Tower.towerPoses[towerPoseIndex].getY() + INTERMEDIATE_CLEARANCE_METERS.getY()),
-    //                     isInsideTower(currentPoseBlue) ? new Translation2d(
-    //                         RobotConstants.robotRadius / 2.0 + 0.1,
-    //                         Tower.towerPoses[towerPoseIndex].getY() + INTERMEDIATE_CLEARANCE_METERS.getY()) : currentPoseBlue.getTranslation()
-    //                 };
-    //             }
-    //         }
-
-    //         return new Translation2d[]{};
-    //     }
-
-    //     public static boolean isInsideTower(Pose2d currentPoseBlue) {
-    //         double robotRadius = RobotConstants.robotRadius / 2.0;
-
-    //         return currentPoseBlue.getX() < Tower.towerPoses[0].getX() &&
-    //                 currentPoseBlue.getY() > (Tower.towerPoses[1].getY() - Tower.towerWidth / 2.0 - robotRadius) &&
-    //                 currentPoseBlue.getY() < (Tower.towerPoses[1].getY() + Tower.towerWidth / 2.0 + robotRadius);
-    //     }
-
-    //     public static boolean isBehindTower(Pose2d currentPoseBlue, Pose2d towerPoseBlue) {
-    //         return (currentPoseBlue.getX() < towerPoseBlue.getX() +
-    //                 RobotConstants.robotRadius / 2.0);
-    //     }
-
-    //     private AlignmentConstants() {}
-    // }
-
-    // public static final class RobotConstants {
-    //     static SwerveConfig swerveConfig = ConfigLoader.load("swerve", SwerveConfig.class);
-
-    //     public static final double robotRadius = Math.hypot(
-    //             swerveConfig.drivetrain.frontLeftX - swerveConfig.drivetrain.backRightX,
-    //             swerveConfig.drivetrain.frontLeftY - swerveConfig.drivetrain.backRightY
-    //     ) / 2.0;
-
-    //     private RobotConstants() {}
-    // }
 
     public static boolean shouldFlipPath() {
         var alliance = DriverStation.getAlliance();
