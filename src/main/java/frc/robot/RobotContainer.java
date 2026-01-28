@@ -44,11 +44,10 @@ public class RobotContainer {
     private final XboxController xboxDriver;
     private final XboxController xboxOperator;
 
-    private final Shooter shooter = Shooter.getInstance();
     private final RobotState robotState = RobotState.getInstance();
     private final SwerveDrive swerveDrive = SwerveDrive.getInstance();
     private final Superstructure superstructure = Superstructure.getInstance();
-    private final Vision vision = Vision.getInstance();
+    // private final Vision vision = Vision.getInstance();
     @SuppressWarnings("unused")
     private final ProjectileVisualizer projectileVisualizer = ProjectileVisualizer.getInstance();
 

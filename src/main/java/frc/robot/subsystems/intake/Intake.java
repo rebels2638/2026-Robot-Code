@@ -3,9 +3,9 @@ package frc.robot.subsystems.intake;
 import org.littletonrobotics.junction.AutoLogOutput;
 import org.littletonrobotics.junction.Logger;
 
-import edu.wpi.first.wpilibj.RobotBase;
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
 import frc.robot.configs.IntakeConfig;
+import frc.robot.constants.Constants;
 import frc.robot.lib.util.ConfigLoader;
 import frc.robot.lib.util.DashboardMotorControlLoopConfigurator;
 
@@ -44,8 +44,13 @@ public class Intake extends SubsystemBase {
     private double intakeSetpointRPS = 0.0;
 
     private Intake() {
-        config = ConfigLoader.load("intake", IntakeConfig.class);
-        intakeIO = RobotBase.isSimulation() ? new IntakeIOSim(config) : new IntakeIOTalonFX(config);
+        boolean useSimulation = Constants.shouldUseSimulation(Constants.SimOnlySubsystems.INTAKE);
+        config = ConfigLoader.load(
+            "intake",
+            ConfigLoader.getModeFolder(Constants.SimOnlySubsystems.INTAKE),
+            IntakeConfig.class
+        );
+        intakeIO = useSimulation ? new IntakeIOSim(config) : new IntakeIOTalonFX(config);
 
         intakeControlLoopConfigurator = new DashboardMotorControlLoopConfigurator("Intake/intakeControlLoop",
             new DashboardMotorControlLoopConfigurator.MotorControlLoopConfig(

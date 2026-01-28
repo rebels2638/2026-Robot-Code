@@ -3,9 +3,9 @@ package frc.robot.subsystems.climber;
 import org.littletonrobotics.junction.AutoLogOutput;
 import org.littletonrobotics.junction.Logger;
 
-import edu.wpi.first.wpilibj.RobotBase;
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
 import frc.robot.configs.ClimberConfig;
+import frc.robot.constants.Constants;
 import frc.robot.lib.util.ConfigLoader;
 import frc.robot.lib.util.DashboardMotorControlLoopConfigurator;
 
@@ -35,8 +35,13 @@ public class Climber extends SubsystemBase {
     private double targetPositionRotations = 0.0;
 
     private Climber() {
-        config = ConfigLoader.load("climber", ClimberConfig.class);
-        climberIO = RobotBase.isSimulation() ? new ClimberIOSim(config) : new ClimberIOTalonFX(config);
+        boolean useSimulation = Constants.shouldUseSimulation(Constants.SimOnlySubsystems.CLIMBER);
+        config = ConfigLoader.load(
+            "climber",
+            ConfigLoader.getModeFolder(Constants.SimOnlySubsystems.CLIMBER),
+            ClimberConfig.class
+        );
+        climberIO = useSimulation ? new ClimberIOSim(config) : new ClimberIOTalonFX(config);
 
         climberControlLoopConfigurator = new DashboardMotorControlLoopConfigurator("Climber/climberControlLoop",
             new DashboardMotorControlLoopConfigurator.MotorControlLoopConfig(

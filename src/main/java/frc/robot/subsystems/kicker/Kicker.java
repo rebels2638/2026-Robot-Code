@@ -4,8 +4,8 @@ import org.littletonrobotics.junction.AutoLogOutput;
 import org.littletonrobotics.junction.Logger;
 
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
-import edu.wpi.first.wpilibj.RobotBase;
 import frc.robot.configs.KickerConfig;
+import frc.robot.constants.Constants;
 import frc.robot.lib.util.ConfigLoader;
 import frc.robot.lib.util.DashboardMotorControlLoopConfigurator;
 
@@ -44,8 +44,13 @@ public class Kicker extends SubsystemBase {
     private double kickerSetpointRPS = 0.0;
 
     private Kicker() {
-        config = ConfigLoader.load("kicker", KickerConfig.class);
-        kickerIO = RobotBase.isSimulation() ? new KickerIOSim(config) : new KickerIOTalonFX(config);
+        boolean useSimulation = Constants.shouldUseSimulation(Constants.SimOnlySubsystems.KICKER);
+        config = ConfigLoader.load(
+            "kicker",
+            ConfigLoader.getModeFolder(Constants.SimOnlySubsystems.KICKER),
+            KickerConfig.class
+        );
+        kickerIO = useSimulation ? new KickerIOSim(config) : new KickerIOTalonFX(config);
 
         kickerControlLoopConfigurator = new DashboardMotorControlLoopConfigurator("Kicker/kickerControlLoop",
             new DashboardMotorControlLoopConfigurator.MotorControlLoopConfig(
