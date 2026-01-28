@@ -42,20 +42,6 @@ public class Shooter extends SubsystemBase {
         }
     }
 
-    public enum TurretSetpoint {
-        HOME(Rotation2d.fromDegrees(180.0)),
-        DYNAMIC(null);
-
-        private final Rotation2d angle;
-        TurretSetpoint(Rotation2d angle) {
-            this.angle = angle;
-        }
-
-        public Rotation2d getAngle() {
-            return angle;
-        }
-    }
-
     public enum FlywheelSetpoint {
         OFF(0.0),
         DYNAMIC(Double.NaN);
@@ -72,7 +58,6 @@ public class Shooter extends SubsystemBase {
 
     // Setpoint Suppliers (set by Superstructure)
     private Supplier<Rotation2d> hoodAngleSupplier = () -> Rotation2d.fromDegrees(45.0);
-    private Supplier<Rotation2d> turretAngleSupplier = () -> new Rotation2d(0);
     private Supplier<Double> flywheelRPSSupplier = () -> 0.0;
 
     private final ShooterIO shooterIO;
@@ -81,11 +66,9 @@ public class Shooter extends SubsystemBase {
     private final ShooterConfig config;
     
     private final DashboardMotorControlLoopConfigurator hoodControlLoopConfigurator;
-    private final DashboardMotorControlLoopConfigurator turretControlLoopConfigurator;
     private final DashboardMotorControlLoopConfigurator flywheelControlLoopConfigurator;
 
     private double hoodSetpointRotations = 0.0;
-    private double turretSetpointRotations = 0.0;
     private double flywheelSetpointRPS = 0.0;
 
     private Shooter() {
@@ -100,16 +83,6 @@ public class Shooter extends SubsystemBase {
                 config.hoodKS,
                 config.hoodKV,
                 config.hoodKA
-            )
-        );
-        turretControlLoopConfigurator = new DashboardMotorControlLoopConfigurator("Shooter/turretControlLoop", 
-            new DashboardMotorControlLoopConfigurator.MotorControlLoopConfig(
-                config.turretKP,
-                config.turretKI,
-                config.turretKD,
-                config.turretKS,
-                config.turretKV,
-                config.turretKA
             )
         );
         flywheelControlLoopConfigurator = new DashboardMotorControlLoopConfigurator("Shooter/flywheelControlLoop", 
@@ -133,9 +106,6 @@ public class Shooter extends SubsystemBase {
         if (hoodControlLoopConfigurator.hasChanged()) {
             shooterIO.configureHoodControlLoop(hoodControlLoopConfigurator.getConfig());
         }
-        if (turretControlLoopConfigurator.hasChanged()) {
-            shooterIO.configureTurretControlLoop(turretControlLoopConfigurator.getConfig());
-        }
         if (flywheelControlLoopConfigurator.hasChanged()) {
             shooterIO.configureFlywheelControlLoop(flywheelControlLoopConfigurator.getConfig());
         }
@@ -147,10 +117,6 @@ public class Shooter extends SubsystemBase {
         this.hoodAngleSupplier = supplier;
     }
 
-    public void setTurretAngleSupplier(Supplier<Rotation2d> supplier) {
-        this.turretAngleSupplier = supplier;
-    }
-
     public void setFlywheelRPSSupplier(Supplier<Double> supplier) {
         this.flywheelRPSSupplier = supplier;
     }
@@ -158,11 +124,6 @@ public class Shooter extends SubsystemBase {
     public void setHoodSetpoint(HoodSetpoint setpoint) {
         Rotation2d target = setpoint == HoodSetpoint.DYNAMIC ? hoodAngleSupplier.get() : setpoint.getAngle();
         setHoodAngle(target);
-    }
-
-    public void setTurretSetpoint(TurretSetpoint setpoint) {
-        Rotation2d target = setpoint == TurretSetpoint.DYNAMIC ? turretAngleSupplier.get() : setpoint.getAngle();
-        setTurretAngle(target);
     }
 
     public void setFlywheelSetpoint(FlywheelSetpoint setpoint) {
@@ -181,34 +142,6 @@ public class Shooter extends SubsystemBase {
         shooterIO.setAngle(clampedAngle);
     }
 
-    private void setTurretAngle(Rotation2d angle) {
-        Logger.recordOutput("Shooter/unclampedTurretAngleRotations", angle.getRotations());
-
-        double initAngle = angle.getDegrees();
-        double minDeg = config.turretMinAngleDeg;
-        double maxDeg = config.turretMaxAngleDeg;
-        
-        double targetAngleDeg;
-        
-        // Check if the angle (or wrapped equivalents) are within the valid range
-        if (initAngle >= minDeg && initAngle <= maxDeg) {
-            targetAngleDeg = initAngle;
-        } else if (initAngle + 360.0 >= minDeg && initAngle + 360.0 <= maxDeg) {
-            targetAngleDeg = initAngle + 360.0;
-        } else if (initAngle - 360.0 >= minDeg && initAngle - 360.0 <= maxDeg) {
-            targetAngleDeg = initAngle - 360.0;
-        } else {
-            // None of the wrapped angles are in range, clamp to nearest bound
-            targetAngleDeg = MathUtil.clamp(initAngle, minDeg, maxDeg);
-        }
-
-        double clampedAngleRotations = targetAngleDeg / 360.0;
-        turretSetpointRotations = clampedAngleRotations;
-        Logger.recordOutput("Shooter/turretAngleSetpointRotations", clampedAngleRotations);
-
-        shooterIO.setTurretAngle(clampedAngleRotations);
-    }
-
     private void setShotVelocity(double velocityRotationsPerSec) {
         flywheelSetpointRPS = velocityRotationsPerSec;
         Logger.recordOutput("Shooter/shotVelocitySetpointRotationsPerSec", velocityRotationsPerSec);
@@ -218,10 +151,6 @@ public class Shooter extends SubsystemBase {
     // Mechanism getters
     public double getHoodAngleRotations() {
         return shooterInputs.hoodAngleRotations;
-    }
-
-    public double getTurretAngleRotations() {
-        return shooterInputs.turretAngleRotations;
     }
 
     public double getFlywheelVelocityRotationsPerSec() {
@@ -261,11 +190,6 @@ public class Shooter extends SubsystemBase {
         return Math.abs(shooterInputs.hoodAngleRotations - hoodSetpointRotations) < config.hoodAngleToleranceRotations;
     }
 
-    @AutoLogOutput(key = "Shooter/isTurretAtSetpoint")
-    public boolean isTurretAtSetpoint() {
-        return Math.abs(shooterInputs.turretAngleRotations - turretSetpointRotations) < config.turretAngleToleranceRotations;
-    }
-
     @AutoLogOutput(key = "Shooter/isFlywheelAtSetpoint")
     public boolean isFlywheelAtSetpoint() {
         return Math.abs(shooterInputs.flywheelVelocityRotationsPerSec - flywheelSetpointRPS) < config.flywheelVelocityToleranceRPS;
@@ -290,17 +214,5 @@ public class Shooter extends SubsystemBase {
 
     public double getLatencyCompensationSeconds() {
         return config.latencyCompensationSeconds;
-    }
-
-    public double getTurretMinAngleDeg() {
-        return config.turretMinAngleDeg;
-    }
-
-    public double getTurretMaxAngleDeg() {
-        return config.turretMaxAngleDeg;
-    }
-
-    public double getTurretAngleToleranceDeg() {
-        return config.turretAngleToleranceRotations * 360.0;
     }
 }

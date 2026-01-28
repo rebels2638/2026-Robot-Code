@@ -29,7 +29,6 @@ import frc.robot.subsystems.kicker.Kicker.KickerSetpoint;
 import frc.robot.subsystems.shooter.Shooter;
 import frc.robot.subsystems.shooter.Shooter.FlywheelSetpoint;
 import frc.robot.subsystems.shooter.Shooter.HoodSetpoint;
-import frc.robot.subsystems.shooter.Shooter.TurretSetpoint;
 import frc.robot.subsystems.swerve.SwerveDrive;
 
 public class Superstructure extends SubsystemBase {
@@ -72,12 +71,11 @@ public class Superstructure extends SubsystemBase {
     private static final double SHOT_DURATION_SECONDS = .3; // Time to complete one shot
     private static final double BALLS_PER_SECOND = 12.0; // Balls per second to visualize
 
-    // Margin for swerve rotation range (degrees)
-    private static final double SWERVE_ROTATION_MARGIN_DEG = 20.0;
     private static final double MAX_TRANSLATIONAL_VELOCITY_DURING_SHOT_METERS_PER_SEC = 2.5;
     private static final double SHOT_IMPACT_TOLERANCE_METERS = 0.3;
     private static final double BUMP_MAX_VELOCITY_METERS_PER_SEC = 1.8;
     private static final Rotation2d BUMP_SNAP_ANGLE = Rotation2d.fromDegrees(45);
+    private static final Rotation2d SHOOT_TARGETING_OFFSET = Rotation2d.fromDegrees(-2.0);
     private LoggedNetworkNumber latencyCompensationSeconds = new LoggedNetworkNumber("Shooter/latencyCompSec");
     private double kickerEngagedTime = 0;
     private double lastBallVisualizedTime = 0;
@@ -86,7 +84,6 @@ public class Superstructure extends SubsystemBase {
     private Superstructure() {
         // Set up suppliers for the shooter - these provide dynamic setpoints based on shot calculation
         shooter.setHoodAngleSupplier(this::getTargetHoodAngle);
-        shooter.setTurretAngleSupplier(this::getTargetTurretAngle);
         shooter.setFlywheelRPSSupplier(this::getTargetFlywheelRPS);
     }
 
@@ -190,7 +187,6 @@ public class Superstructure extends SubsystemBase {
 
     private void handleDisabledState() {
         shooter.setHoodSetpoint(HoodSetpoint.HOME);
-        shooter.setTurretSetpoint(TurretSetpoint.HOME);
         shooter.setFlywheelSetpoint(FlywheelSetpoint.OFF);
         kicker.setSetpoint(KickerSetpoint.OFF);
         swerveDrive.setDesiredOmegaOverrideState(SwerveDrive.DesiredOmegaOverrideState.NONE);
@@ -199,7 +195,6 @@ public class Superstructure extends SubsystemBase {
 
     private void handleHomeState() {
         shooter.setHoodSetpoint(HoodSetpoint.HOME);
-        shooter.setTurretSetpoint(TurretSetpoint.HOME);
         shooter.setFlywheelSetpoint(FlywheelSetpoint.OFF);
         kicker.setSetpoint(KickerSetpoint.OFF);
         swerveDrive.setDesiredOmegaOverrideState(SwerveDrive.DesiredOmegaOverrideState.NONE);
@@ -208,7 +203,6 @@ public class Superstructure extends SubsystemBase {
 
     private void handleTrackingState() {
         shooter.setHoodSetpoint(HoodSetpoint.DYNAMIC);
-        shooter.setTurretSetpoint(TurretSetpoint.DYNAMIC);
         shooter.setFlywheelSetpoint(FlywheelSetpoint.OFF);
         kicker.setSetpoint(KickerSetpoint.OFF);
         swerveDrive.setDesiredOmegaOverrideState(SwerveDrive.DesiredOmegaOverrideState.NONE);
@@ -216,39 +210,38 @@ public class Superstructure extends SubsystemBase {
     }
 
     private void handlePreparingForShotState() {
-        updateSwerveRotationRange();
+        ShotData shotData = calculateShotData();
+        swerveDrive.setSnapTargetAngle(shotData.targetFieldYaw().plus(SHOOT_TARGETING_OFFSET));
         swerveDrive.setVelocityCapMaxVelocityMetersPerSec(MAX_TRANSLATIONAL_VELOCITY_DURING_SHOT_METERS_PER_SEC);
 
-
         shooter.setHoodSetpoint(HoodSetpoint.DYNAMIC);
-        shooter.setTurretSetpoint(TurretSetpoint.DYNAMIC);
         shooter.setFlywheelSetpoint(FlywheelSetpoint.DYNAMIC);
         kicker.setSetpoint(KickerSetpoint.FEEDING);
-        swerveDrive.setDesiredOmegaOverrideState(SwerveDrive.DesiredOmegaOverrideState.RANGED_ROTATION);
+        swerveDrive.setDesiredOmegaOverrideState(SwerveDrive.DesiredOmegaOverrideState.SNAPPED);
         swerveDrive.setDesiredTranslationOverrideState(SwerveDrive.DesiredTranslationOverrideState.CAPPED);
     }
 
     private void handleReadyForShotState() {
-        updateSwerveRotationRange();
+        ShotData shotData = calculateShotData();
+        swerveDrive.setSnapTargetAngle(shotData.targetFieldYaw().plus(SHOOT_TARGETING_OFFSET));
         swerveDrive.setVelocityCapMaxVelocityMetersPerSec(MAX_TRANSLATIONAL_VELOCITY_DURING_SHOT_METERS_PER_SEC);
 
         shooter.setHoodSetpoint(HoodSetpoint.DYNAMIC);
-        shooter.setTurretSetpoint(TurretSetpoint.DYNAMIC);
         shooter.setFlywheelSetpoint(FlywheelSetpoint.DYNAMIC);
         kicker.setSetpoint(KickerSetpoint.FEEDING);
-        swerveDrive.setDesiredOmegaOverrideState(SwerveDrive.DesiredOmegaOverrideState.RANGED_ROTATION);
+        swerveDrive.setDesiredOmegaOverrideState(SwerveDrive.DesiredOmegaOverrideState.SNAPPED);
         swerveDrive.setDesiredTranslationOverrideState(SwerveDrive.DesiredTranslationOverrideState.CAPPED);
     }
 
     private void handleShootingState() {        
-        updateSwerveRotationRange();
+        ShotData shotData = calculateShotData();
+        swerveDrive.setSnapTargetAngle(shotData.targetFieldYaw().plus(SHOOT_TARGETING_OFFSET));
         swerveDrive.setVelocityCapMaxVelocityMetersPerSec(MAX_TRANSLATIONAL_VELOCITY_DURING_SHOT_METERS_PER_SEC);
 
         shooter.setHoodSetpoint(HoodSetpoint.DYNAMIC);
-        shooter.setTurretSetpoint(TurretSetpoint.DYNAMIC);
         shooter.setFlywheelSetpoint(FlywheelSetpoint.DYNAMIC);
         kicker.setSetpoint(KickerSetpoint.KICKING);
-        swerveDrive.setDesiredOmegaOverrideState(SwerveDrive.DesiredOmegaOverrideState.RANGED_ROTATION);
+        swerveDrive.setDesiredOmegaOverrideState(SwerveDrive.DesiredOmegaOverrideState.SNAPPED);
         swerveDrive.setDesiredTranslationOverrideState(SwerveDrive.DesiredTranslationOverrideState.CAPPED);
 
         double now = Timer.getTimestamp();
@@ -276,20 +269,19 @@ public class Superstructure extends SubsystemBase {
         
         // Keep shooter in home position during bump
         shooter.setHoodSetpoint(HoodSetpoint.HOME);
-        shooter.setTurretSetpoint(TurretSetpoint.HOME);
         shooter.setFlywheelSetpoint(FlywheelSetpoint.OFF);
         kicker.setSetpoint(KickerSetpoint.OFF);
     }
 
     /**
      * Checks if all mechanisms are at their setpoints and ready to shoot.
-     * Requires swerve to be in nominal ranged rotation, shooter to be ready,
+     * Requires swerve to be snapped to the target angle, shooter to be ready,
      * kicker to be ready, and robot to be within valid shooting distance.
      */
     private boolean isReadyForShot() {
-        // Check if swerve is in a nominal ranged rotation state
+        // Check if swerve is snapped to the target angle
         boolean swerveReady = 
-            swerveDrive.getCurrentOmegaOverrideState() == SwerveDrive.CurrentOmegaOverrideState.RANGED_NOMINAL &&
+            swerveDrive.getCurrentOmegaOverrideState() == SwerveDrive.CurrentOmegaOverrideState.SNAPPED_NOMINAL &&
             Math.hypot(
                 robotState.getFieldRelativeSpeeds().vxMetersPerSecond,
                 robotState.getFieldRelativeSpeeds().vyMetersPerSecond
@@ -297,15 +289,13 @@ public class Superstructure extends SubsystemBase {
         Logger.recordOutput("Superstructure/swerveReady", swerveReady);
         
         double actualHood = shooter.getHoodAngleRotations();
-        double actualTurret = shooter.getTurretAngleRotations();
         double actualFlywheel = shooter.getFlywheelVelocityRotationsPerSec();
 
         double setpointHood = getTargetHoodAngle().getRotations();
-        double setpointTurret = getTargetTurretAngle().getRotations();
         double setpointFlywheel = getTargetFlywheelRPS();
 
-        Translation3d actualLanding = simulateShotLanding(actualHood, actualTurret, actualFlywheel);
-        Translation3d setpointLanding = simulateShotLanding(setpointHood, setpointTurret, setpointFlywheel);
+        Translation3d actualLanding = simulateShotLanding(actualHood, actualFlywheel);
+        Translation3d setpointLanding = simulateShotLanding(setpointHood, setpointFlywheel);
         double impactErrorMeters = actualLanding.toTranslation2d()
             .getDistance(setpointLanding.toTranslation2d());
         boolean shooterReady = impactErrorMeters <= SHOT_IMPACT_TOLERANCE_METERS;
@@ -329,31 +319,6 @@ public class Superstructure extends SubsystemBase {
         return swerveReady && shooterReady && kickerReady && withinShotDistance;
     }
 
-    /**
-     * Updates the swerve rotation range based on turret limits and target shot angle.
-     * This ensures the robot heading keeps the turret within its physical limits.
-     */
-    private void updateSwerveRotationRange() {
-        ShotData shotData = calculateShotData();
-        Logger.recordOutput("Superstructure/shotData", shotData);
-        Rotation2d targetFieldYaw = shotData.targetFieldYaw();
-        
-        // Get turret physical limits
-        double turretMinDeg = shooter.getTurretMinAngleDeg();
-        double turretMaxDeg = shooter.getTurretMaxAngleDeg();
-        
-        // Calculate robot rotation range
-        // Robot rotation = target field yaw - turret angle
-        // So: turret angle = target field yaw - robot rotation
-        // For turret to be within [turretMin, turretMax]:
-        // Robot rotation must be within [targetYaw - turretMax, targetYaw - turretMin]
-        // Add margin to ensure we stay well within bounds
-        Rotation2d robotRotationMin = targetFieldYaw.minus(Rotation2d.fromDegrees(turretMaxDeg - SWERVE_ROTATION_MARGIN_DEG));
-        Rotation2d robotRotationMax = targetFieldYaw.minus(Rotation2d.fromDegrees(turretMinDeg + SWERVE_ROTATION_MARGIN_DEG));
-        
-        swerveDrive.setRotationRange(robotRotationMin, robotRotationMax);
-    }
-
     // Target suppliers for shooter - these calculate dynamic setpoints
     // Target suppliers always provide values from shot calculator
     // Shooter decides when to use them based on its state
@@ -361,12 +326,6 @@ public class Superstructure extends SubsystemBase {
         ShotData shotData = calculateShotData();
         Logger.recordOutput("Superstructure/shotData", shotData);
         return shotData.hoodPitch();
-    }
-
-    private Rotation2d getTargetTurretAngle() {
-        ShotData shotData = calculateShotData();
-        Logger.recordOutput("Superstructure/shotData", shotData);
-        return shotData.targetFieldYaw().minus(robotState.getEstimatedPose().getRotation());
     }
 
     private double getTargetFlywheelRPS() {
@@ -415,7 +374,6 @@ public class Superstructure extends SubsystemBase {
 
     private Translation3d simulateShotLanding(
         double hoodAngleRotations,
-        double turretAngleRotations,
         double flywheelRPS
     ) {
         Pose3d robotPose = new Pose3d(
@@ -433,8 +391,7 @@ public class Superstructure extends SubsystemBase {
         double spinRateRadPerSec = shooter.calculateBackSpinRPM(flywheelRPS) * 2.0 * Math.PI / 60.0;
 
         double pitch = hoodAngleRotations * 2.0 * Math.PI;
-        double turretYaw = turretAngleRotations * 2.0 * Math.PI;
-        double fieldYaw = turretYaw + robotState.getEstimatedPose().getRotation().getRadians();
+        double fieldYaw = robotState.getEstimatedPose().getRotation().getRadians();
 
         double vHorizontal = exitVelocity * Math.cos(pitch);
         ChassisSpeeds fieldSpeeds = robotState.getFieldRelativeSpeeds();

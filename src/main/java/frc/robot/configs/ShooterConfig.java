@@ -46,29 +46,6 @@ public class ShooterConfig {
     public double hoodMinAngleRotations;
     public double hoodMaxAngleRotations;
 
-    public int turretCanId;
-    public boolean isTurretInverted;
-
-    public double turretStatorCurrentLimit;
-    public double turretPeakForwardTorqueCurrent;
-    public double turretPeakReverseTorqueCurrent;
-
-    public double turretKS;
-    public double turretKV;
-    public double turretKA;
-    public double turretKP;
-    public double turretKI;
-    public double turretKD;
-
-    public double turretMotorToOutputShaftRatio;
-
-    public double turretStartingAngleDeg;
-    public double turretMinAngleDeg;
-    public double turretMaxAngleDeg;
-
-    public double turretMaxVelocityDegPerSec;
-    public double turretMaxAccelerationDegPerSec2;
-
     public int flywheelCanId;
     public int flywheelFollowerCanId;
     public boolean isFlywheelInverted;
@@ -98,7 +75,6 @@ public class ShooterConfig {
     public double shooterPoseYawDeg;
 
     public double hoodAngleToleranceRotations;
-    public double turretAngleToleranceRotations;
     public double flywheelVelocityToleranceRPS;
 
     public InterpolatingMatrixTreeMap<Double, N2, N1> getLerpTable() {
