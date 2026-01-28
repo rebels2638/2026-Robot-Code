@@ -24,6 +24,8 @@ import frc.robot.constants.FieldConstants;
 import frc.robot.lib.util.ballistics.BallisticsPhysics;
 import frc.robot.lib.util.ShotCalculator;
 import frc.robot.lib.util.ShotCalculator.ShotData;
+import frc.robot.subsystems.hopper.Hopper;
+import frc.robot.subsystems.hopper.Hopper.HopperSetpoint;
 import frc.robot.subsystems.kicker.Kicker;
 import frc.robot.subsystems.kicker.Kicker.KickerSetpoint;
 import frc.robot.subsystems.shooter.Shooter;
@@ -65,6 +67,7 @@ public class Superstructure extends SubsystemBase {
 
     private final Shooter shooter = Shooter.getInstance();
     private final Kicker kicker = Kicker.getInstance();
+    private final Hopper hopper = Hopper.getInstance();
     private final SwerveDrive swerveDrive = SwerveDrive.getInstance();
     private final RobotState robotState = RobotState.getInstance();
 
@@ -193,6 +196,7 @@ public class Superstructure extends SubsystemBase {
         shooter.setTurretSetpoint(TurretSetpoint.HOME);
         shooter.setFlywheelSetpoint(FlywheelSetpoint.OFF);
         kicker.setSetpoint(KickerSetpoint.OFF);
+        hopper.setSetpoint(HopperSetpoint.OFF);
         swerveDrive.setDesiredOmegaOverrideState(SwerveDrive.DesiredOmegaOverrideState.NONE);
         swerveDrive.setDesiredTranslationOverrideState(SwerveDrive.DesiredTranslationOverrideState.NONE);
     }
@@ -202,6 +206,7 @@ public class Superstructure extends SubsystemBase {
         shooter.setTurretSetpoint(TurretSetpoint.HOME);
         shooter.setFlywheelSetpoint(FlywheelSetpoint.OFF);
         kicker.setSetpoint(KickerSetpoint.OFF);
+        hopper.setSetpoint(HopperSetpoint.OFF);
         swerveDrive.setDesiredOmegaOverrideState(SwerveDrive.DesiredOmegaOverrideState.NONE);
         swerveDrive.setDesiredTranslationOverrideState(SwerveDrive.DesiredTranslationOverrideState.NONE);
     }
@@ -211,6 +216,7 @@ public class Superstructure extends SubsystemBase {
         shooter.setTurretSetpoint(TurretSetpoint.DYNAMIC);
         shooter.setFlywheelSetpoint(FlywheelSetpoint.OFF);
         kicker.setSetpoint(KickerSetpoint.OFF);
+        hopper.setSetpoint(HopperSetpoint.OFF);
         swerveDrive.setDesiredOmegaOverrideState(SwerveDrive.DesiredOmegaOverrideState.NONE);
         swerveDrive.setDesiredTranslationOverrideState(SwerveDrive.DesiredTranslationOverrideState.NONE);
     }
@@ -224,7 +230,8 @@ public class Superstructure extends SubsystemBase {
         shooter.setTurretSetpoint(TurretSetpoint.DYNAMIC);
         shooter.setFlywheelSetpoint(FlywheelSetpoint.DYNAMIC);
         kicker.setSetpoint(KickerSetpoint.FEEDING);
-        swerveDrive.setDesiredOmegaOverrideState(SwerveDrive.DesiredOmegaOverrideState.RANGED_ROTATION);
+        hopper.setSetpoint(HopperSetpoint.OFF);
+        swerveDrive.setDesiredOmegaOverrideState(SwerveDrive.DesiredOmegaOverrideState.SNAPPED);
         swerveDrive.setDesiredTranslationOverrideState(SwerveDrive.DesiredTranslationOverrideState.CAPPED);
     }
 
@@ -236,7 +243,8 @@ public class Superstructure extends SubsystemBase {
         shooter.setTurretSetpoint(TurretSetpoint.DYNAMIC);
         shooter.setFlywheelSetpoint(FlywheelSetpoint.DYNAMIC);
         kicker.setSetpoint(KickerSetpoint.FEEDING);
-        swerveDrive.setDesiredOmegaOverrideState(SwerveDrive.DesiredOmegaOverrideState.RANGED_ROTATION);
+        hopper.setSetpoint(HopperSetpoint.OFF);
+        swerveDrive.setDesiredOmegaOverrideState(SwerveDrive.DesiredOmegaOverrideState.SNAPPED);
         swerveDrive.setDesiredTranslationOverrideState(SwerveDrive.DesiredTranslationOverrideState.CAPPED);
     }
 
@@ -248,7 +256,8 @@ public class Superstructure extends SubsystemBase {
         shooter.setTurretSetpoint(TurretSetpoint.DYNAMIC);
         shooter.setFlywheelSetpoint(FlywheelSetpoint.DYNAMIC);
         kicker.setSetpoint(KickerSetpoint.KICKING);
-        swerveDrive.setDesiredOmegaOverrideState(SwerveDrive.DesiredOmegaOverrideState.RANGED_ROTATION);
+        hopper.setSetpoint(HopperSetpoint.FEEDING);
+        swerveDrive.setDesiredOmegaOverrideState(SwerveDrive.DesiredOmegaOverrideState.SNAPPED);
         swerveDrive.setDesiredTranslationOverrideState(SwerveDrive.DesiredTranslationOverrideState.CAPPED);
 
         double now = Timer.getTimestamp();
