@@ -24,6 +24,8 @@ import frc.robot.constants.FieldConstants;
 import frc.robot.lib.util.ballistics.BallisticsPhysics;
 import frc.robot.lib.util.ShotCalculator;
 import frc.robot.lib.util.ShotCalculator.ShotData;
+import frc.robot.subsystems.hopper.Hopper;
+import frc.robot.subsystems.hopper.Hopper.HopperSetpoint;
 import frc.robot.subsystems.kicker.Kicker;
 import frc.robot.subsystems.kicker.Kicker.KickerSetpoint;
 import frc.robot.subsystems.shooter.Shooter;
@@ -47,7 +49,8 @@ public class Superstructure extends SubsystemBase {
         TRACKING,
         PREPARING_FOR_SHOT,
         READY_FOR_SHOT,
-        SHOOTING
+        SHOOTING,
+        BUMP
     }
 
     public enum DesiredState {
@@ -55,7 +58,8 @@ public class Superstructure extends SubsystemBase {
         HOME,
         TRACKING,
         READY_FOR_SHOT,
-        SHOOTING
+        SHOOTING,
+        BUMP
     }
 
     private CurrentState currentState = CurrentState.DISABLED;
@@ -63,17 +67,20 @@ public class Superstructure extends SubsystemBase {
 
     private final Shooter shooter = Shooter.getInstance();
     private final Kicker kicker = Kicker.getInstance();
+    private final Hopper hopper = Hopper.getInstance();
     private final SwerveDrive swerveDrive = SwerveDrive.getInstance();
     private final RobotState robotState = RobotState.getInstance();
 
     private double lastShotTime = 0;
     private static final double SHOT_DURATION_SECONDS = .3; // Time to complete one shot
-    private static final double BALLS_PER_SECOND = 12.0;
+    private static final double BALLS_PER_SECOND = 12.0; // Balls per second to visualize
 
     // Margin for swerve rotation range (degrees)
     private static final double SWERVE_ROTATION_MARGIN_DEG = 20.0;
     private static final double MAX_TRANSLATIONAL_VELOCITY_DURING_SHOT_METERS_PER_SEC = 2.5;
     private static final double SHOT_IMPACT_TOLERANCE_METERS = 0.3;
+    private static final double BUMP_MAX_VELOCITY_METERS_PER_SEC = 1.8;
+    private static final Rotation2d BUMP_SNAP_ANGLE = Rotation2d.fromDegrees(45);
     private LoggedNetworkNumber latencyCompensationSeconds = new LoggedNetworkNumber("Shooter/latencyCompSec");
     private double kickerEngagedTime = 0;
     private double lastBallVisualizedTime = 0;
@@ -146,6 +153,10 @@ public class Superstructure extends SubsystemBase {
                     }
                 }
                 break;
+
+            case BUMP:
+                currentState = CurrentState.BUMP;
+                break;
         }
 
         latencyCompensationSeconds.setDefault(shooter.getLatencyCompensationSeconds());
@@ -174,6 +185,9 @@ public class Superstructure extends SubsystemBase {
             case SHOOTING:
                 handleShootingState();
                 break;
+            case BUMP:
+                handleBumpState();
+                break;
         }
     }
 
@@ -182,7 +196,7 @@ public class Superstructure extends SubsystemBase {
         shooter.setTurretSetpoint(TurretSetpoint.HOME);
         shooter.setFlywheelSetpoint(FlywheelSetpoint.OFF);
         kicker.setSetpoint(KickerSetpoint.OFF);
-        swerveDrive.setDesiredSystemState(SwerveDrive.DesiredSystemState.DISABLED);
+        hopper.setSetpoint(HopperSetpoint.OFF);
         swerveDrive.setDesiredOmegaOverrideState(SwerveDrive.DesiredOmegaOverrideState.NONE);
         swerveDrive.setDesiredTranslationOverrideState(SwerveDrive.DesiredTranslationOverrideState.NONE);
     }
@@ -192,6 +206,7 @@ public class Superstructure extends SubsystemBase {
         shooter.setTurretSetpoint(TurretSetpoint.HOME);
         shooter.setFlywheelSetpoint(FlywheelSetpoint.OFF);
         kicker.setSetpoint(KickerSetpoint.OFF);
+        hopper.setSetpoint(HopperSetpoint.OFF);
         swerveDrive.setDesiredOmegaOverrideState(SwerveDrive.DesiredOmegaOverrideState.NONE);
         swerveDrive.setDesiredTranslationOverrideState(SwerveDrive.DesiredTranslationOverrideState.NONE);
     }
@@ -201,6 +216,7 @@ public class Superstructure extends SubsystemBase {
         shooter.setTurretSetpoint(TurretSetpoint.DYNAMIC);
         shooter.setFlywheelSetpoint(FlywheelSetpoint.OFF);
         kicker.setSetpoint(KickerSetpoint.OFF);
+        hopper.setSetpoint(HopperSetpoint.OFF);
         swerveDrive.setDesiredOmegaOverrideState(SwerveDrive.DesiredOmegaOverrideState.NONE);
         swerveDrive.setDesiredTranslationOverrideState(SwerveDrive.DesiredTranslationOverrideState.NONE);
     }
@@ -214,7 +230,8 @@ public class Superstructure extends SubsystemBase {
         shooter.setTurretSetpoint(TurretSetpoint.DYNAMIC);
         shooter.setFlywheelSetpoint(FlywheelSetpoint.DYNAMIC);
         kicker.setSetpoint(KickerSetpoint.FEEDING);
-        swerveDrive.setDesiredOmegaOverrideState(SwerveDrive.DesiredOmegaOverrideState.RANGED_ROTATION);
+        hopper.setSetpoint(HopperSetpoint.OFF);
+        swerveDrive.setDesiredOmegaOverrideState(SwerveDrive.DesiredOmegaOverrideState.SNAPPED);
         swerveDrive.setDesiredTranslationOverrideState(SwerveDrive.DesiredTranslationOverrideState.CAPPED);
     }
 
@@ -226,7 +243,8 @@ public class Superstructure extends SubsystemBase {
         shooter.setTurretSetpoint(TurretSetpoint.DYNAMIC);
         shooter.setFlywheelSetpoint(FlywheelSetpoint.DYNAMIC);
         kicker.setSetpoint(KickerSetpoint.FEEDING);
-        swerveDrive.setDesiredOmegaOverrideState(SwerveDrive.DesiredOmegaOverrideState.RANGED_ROTATION);
+        hopper.setSetpoint(HopperSetpoint.OFF);
+        swerveDrive.setDesiredOmegaOverrideState(SwerveDrive.DesiredOmegaOverrideState.SNAPPED);
         swerveDrive.setDesiredTranslationOverrideState(SwerveDrive.DesiredTranslationOverrideState.CAPPED);
     }
 
@@ -238,7 +256,8 @@ public class Superstructure extends SubsystemBase {
         shooter.setTurretSetpoint(TurretSetpoint.DYNAMIC);
         shooter.setFlywheelSetpoint(FlywheelSetpoint.DYNAMIC);
         kicker.setSetpoint(KickerSetpoint.KICKING);
-        swerveDrive.setDesiredOmegaOverrideState(SwerveDrive.DesiredOmegaOverrideState.RANGED_ROTATION);
+        hopper.setSetpoint(HopperSetpoint.FEEDING);
+        swerveDrive.setDesiredOmegaOverrideState(SwerveDrive.DesiredOmegaOverrideState.SNAPPED);
         swerveDrive.setDesiredTranslationOverrideState(SwerveDrive.DesiredTranslationOverrideState.CAPPED);
 
         double now = Timer.getTimestamp();
@@ -258,6 +277,19 @@ public class Superstructure extends SubsystemBase {
         }
     }
 
+    private void handleBumpState() {
+        swerveDrive.setSnapTargetAngle(BUMP_SNAP_ANGLE);
+        swerveDrive.setVelocityCapMaxVelocityMetersPerSec(BUMP_MAX_VELOCITY_METERS_PER_SEC);
+        swerveDrive.setDesiredOmegaOverrideState(SwerveDrive.DesiredOmegaOverrideState.SNAPPED);
+        swerveDrive.setDesiredTranslationOverrideState(SwerveDrive.DesiredTranslationOverrideState.CAPPED);
+        
+        // Keep shooter in home position during bump
+        shooter.setHoodSetpoint(HoodSetpoint.HOME);
+        shooter.setTurretSetpoint(TurretSetpoint.HOME);
+        shooter.setFlywheelSetpoint(FlywheelSetpoint.OFF);
+        kicker.setSetpoint(KickerSetpoint.OFF);
+    }
+
     /**
      * Checks if all mechanisms are at their setpoints and ready to shoot.
      * Requires swerve to be in nominal ranged rotation, shooter to be ready,
@@ -266,7 +298,7 @@ public class Superstructure extends SubsystemBase {
     private boolean isReadyForShot() {
         // Check if swerve is in a nominal ranged rotation state
         boolean swerveReady = 
-            swerveDrive.getCurrentOmegaOverrideState() == SwerveDrive.CurrentOmegaOverrideState.RANGED_ROTATION_NOMINAL &&
+            swerveDrive.getCurrentOmegaOverrideState() == SwerveDrive.CurrentOmegaOverrideState.RANGED_NOMINAL &&
             Math.hypot(
                 robotState.getFieldRelativeSpeeds().vxMetersPerSecond,
                 robotState.getFieldRelativeSpeeds().vyMetersPerSecond

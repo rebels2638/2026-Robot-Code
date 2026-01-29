@@ -3,9 +3,9 @@ package frc.robot.subsystems.hopper;
 import org.littletonrobotics.junction.AutoLogOutput;
 import org.littletonrobotics.junction.Logger;
 
-import edu.wpi.first.wpilibj.RobotBase;
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
 import frc.robot.configs.HopperConfig;
+import frc.robot.constants.Constants;
 import frc.robot.lib.util.ConfigLoader;
 import frc.robot.lib.util.DashboardMotorControlLoopConfigurator;
 
@@ -44,8 +44,13 @@ public class Hopper extends SubsystemBase {
     private double hopperSetpointRPS = 0.0;
 
     private Hopper() {
-        config = ConfigLoader.load("hopper", HopperConfig.class);
-        hopperIO = RobotBase.isSimulation() ? new HopperIOSim(config) : new HopperIOTalonFX(config);
+        boolean useSimulation = Constants.shouldUseSimulation(Constants.SimOnlySubsystems.HOPPER);
+        config = ConfigLoader.load(
+            "hopper",
+            ConfigLoader.getModeFolder(Constants.SimOnlySubsystems.HOPPER),
+            HopperConfig.class
+        );
+        hopperIO = useSimulation ? new HopperIOSim(config) : new HopperIOTalonFX(config);
 
         hopperControlLoopConfigurator = new DashboardMotorControlLoopConfigurator("Hopper/hopperControlLoop",
             new DashboardMotorControlLoopConfigurator.MotorControlLoopConfig(

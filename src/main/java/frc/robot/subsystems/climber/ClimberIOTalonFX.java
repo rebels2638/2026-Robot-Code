@@ -57,11 +57,7 @@ public class ClimberIOTalonFX implements ClimberIO {
             ? InvertedValue.Clockwise_Positive
             : InvertedValue.CounterClockwise_Positive;
 
-        climberConfig.CurrentLimits.SupplyCurrentLimitEnable = true;
-        climberConfig.CurrentLimits.SupplyCurrentLimit = config.climberSupplyCurrentLimit;
-        climberConfig.CurrentLimits.SupplyCurrentLowerLimit = config.climberSupplyCurrentLimitLowerLimit;
-        climberConfig.CurrentLimits.SupplyCurrentLowerTime = config.climberSupplyCurrentLimitLowerTime;
-
+        climberConfig.CurrentLimits.SupplyCurrentLimitEnable = false;
         climberConfig.CurrentLimits.StatorCurrentLimitEnable = true;
         climberConfig.CurrentLimits.StatorCurrentLimit = config.climberStatorCurrentLimit;
 

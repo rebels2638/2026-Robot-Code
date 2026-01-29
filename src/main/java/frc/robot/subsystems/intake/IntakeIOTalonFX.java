@@ -52,11 +52,7 @@ public class IntakeIOTalonFX implements IntakeIO {
             ? InvertedValue.Clockwise_Positive
             : InvertedValue.CounterClockwise_Positive;
 
-        intakeConfig.CurrentLimits.SupplyCurrentLimitEnable = true;
-        intakeConfig.CurrentLimits.SupplyCurrentLimit = config.intakeSupplyCurrentLimit;
-        intakeConfig.CurrentLimits.SupplyCurrentLowerLimit = config.intakeSupplyCurrentLimitLowerLimit;
-        intakeConfig.CurrentLimits.SupplyCurrentLowerTime = config.intakeSupplyCurrentLimitLowerTime;
-
+        intakeConfig.CurrentLimits.SupplyCurrentLimitEnable = false;
         intakeConfig.CurrentLimits.StatorCurrentLimitEnable = true;
         intakeConfig.CurrentLimits.StatorCurrentLimit = config.intakeStatorCurrentLimit;
 

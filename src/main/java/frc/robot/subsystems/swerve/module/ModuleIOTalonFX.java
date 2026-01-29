@@ -108,6 +108,7 @@ public class ModuleIOTalonFX implements ModuleIO {
                 InvertedValue.CounterClockwise_Positive;
 
         // Current and torque limiting
+        driveConfig.CurrentLimits.SupplyCurrentLimitEnable = false;
         driveConfig.CurrentLimits.StatorCurrentLimitEnable = true;
         driveConfig.CurrentLimits.StatorCurrentLimit = generalConfig.driveStatorCurrentLimit;
 
@@ -160,6 +161,7 @@ public class ModuleIOTalonFX implements ModuleIO {
         steerConfig.Feedback.RotorToSensorRatio = generalConfig.steerRotorToSensorRatio;
 
         // current and torque limiting
+        steerConfig.CurrentLimits.SupplyCurrentLimitEnable = false;
         steerConfig.CurrentLimits.StatorCurrentLimitEnable = true;
         steerConfig.CurrentLimits.StatorCurrentLimit = generalConfig.steerStatorCurrentLimit;
 

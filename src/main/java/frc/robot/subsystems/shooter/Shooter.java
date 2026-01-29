@@ -12,8 +12,8 @@ import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.math.numbers.N1;
 import edu.wpi.first.math.numbers.N2;
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
-import edu.wpi.first.wpilibj.RobotBase;
 import frc.robot.configs.ShooterConfig;
+import frc.robot.constants.Constants;
 import frc.robot.constants.FieldConstants;
 import frc.robot.lib.util.ConfigLoader;
 import frc.robot.lib.util.DashboardMotorControlLoopConfigurator;
@@ -89,8 +89,13 @@ public class Shooter extends SubsystemBase {
     private double flywheelSetpointRPS = 0.0;
 
     private Shooter() {
-        config = ConfigLoader.load("shooter", ShooterConfig.class);
-        shooterIO = RobotBase.isSimulation() ? new ShooterIOSim(config) : new ShooterIOTalonFX(config);
+        boolean useSimulation = Constants.shouldUseSimulation(Constants.SimOnlySubsystems.SHOOTER);
+        config = ConfigLoader.load(
+            "shooter",
+            ConfigLoader.getModeFolder(Constants.SimOnlySubsystems.SHOOTER),
+            ShooterConfig.class
+        );
+        shooterIO = useSimulation ? new ShooterIOSim(config) : new ShooterIOTalonFX(config);
 
         hoodControlLoopConfigurator = new DashboardMotorControlLoopConfigurator("Shooter/hoodControlLoop", 
             new DashboardMotorControlLoopConfigurator.MotorControlLoopConfig(

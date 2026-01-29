@@ -44,11 +44,10 @@ public class RobotContainer {
     private final XboxController xboxDriver;
     private final XboxController xboxOperator;
 
-    private final Shooter shooter = Shooter.getInstance();
     private final RobotState robotState = RobotState.getInstance();
     private final SwerveDrive swerveDrive = SwerveDrive.getInstance();
     private final Superstructure superstructure = Superstructure.getInstance();
-    private final Vision vision = Vision.getInstance();
+    // private final Vision vision = Vision.getInstance();
     @SuppressWarnings("unused")
     private final ProjectileVisualizer projectileVisualizer = ProjectileVisualizer.getInstance();
 
@@ -111,12 +110,12 @@ public class RobotContainer {
         //     })
         // );
 
-        xboxDriver.getAButton().onTrue(
-            new InstantCommand(() -> superstructure.setDesiredState(DesiredState.SHOOTING))
-        );
-        xboxDriver.getBButton().onTrue(
-            new InstantCommand(() -> superstructure.setDesiredState(DesiredState.TRACKING))
-        );
+        // xboxDriver.getAButton().onTrue(
+        //     new InstantCommand(() -> superstructure.setDesiredState(DesiredState.SHOOTING))
+        // );
+        // xboxDriver.getBButton().onTrue(
+        //     new InstantCommand(() -> superstructure.setDesiredState(DesiredState.TRACKING))
+        // );
 
         // xboxDriver.getAButton().onTrue(
         //     new ConditionalCommand(
@@ -142,7 +141,9 @@ public class RobotContainer {
         //     )
         // );
 
-
+        // Test snap-to-angle bindings
+        xboxDriver.getAButton().onTrue(new InstantCommand(() -> superstructure.setDesiredState(Superstructure.DesiredState.BUMP)));
+        xboxDriver.getAButton().onFalse(new InstantCommand(() -> superstructure.setDesiredState(Superstructure.DesiredState.HOME)));
     }
 
     private Command followPath(Path path, boolean shouldResetPose) {
