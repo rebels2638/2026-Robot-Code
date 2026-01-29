@@ -6,6 +6,7 @@ import static edu.wpi.first.units.Units.RadiansPerSecond;
 import static edu.wpi.first.units.Units.Radians;
 import static edu.wpi.first.units.Units.Rotation;
 import static edu.wpi.first.units.Units.RotationsPerSecond;
+import static edu.wpi.first.units.Units.Volts;
 
 import java.util.Queue;
 
@@ -29,6 +30,7 @@ import edu.wpi.first.units.measure.Angle;
 import edu.wpi.first.units.measure.AngularVelocity;
 import edu.wpi.first.units.measure.Current;
 import edu.wpi.first.units.measure.Temperature;
+import edu.wpi.first.units.measure.Voltage;
 import edu.wpi.first.wpilibj.Timer;
 import frc.robot.configs.SwerveModuleGeneralConfig;
 import frc.robot.configs.SwerveModuleSpecificConfig;
@@ -49,9 +51,11 @@ public class ModuleIOTalonFX implements ModuleIO {
 
     private final StatusSignal<Angle> drivePositionStatusSignal;
     private final StatusSignal<AngularVelocity> driveVelocityStatusSignal;
+    private final StatusSignal<Voltage> driveMotorVoltage;
 
     private final StatusSignal<Angle> steerPositionStatusSignal;
     private final StatusSignal<AngularVelocity> steerVelocityStatusSignal;
+    private final StatusSignal<Voltage> steerMotorVoltage;
 
     private final StatusSignal<Angle> steerEncoderPositionStatusSignal;
     private final StatusSignal<Angle> steerEncoderAbsolutePosition;
@@ -176,9 +180,11 @@ public class ModuleIOTalonFX implements ModuleIO {
         // status signals
         driveTorqueCurrent = driveMotor.getTorqueCurrent().clone();
         driveTemperature = driveMotor.getDeviceTemp().clone();
+        driveMotorVoltage = driveMotor.getMotorVoltage().clone();
 
         steerTorqueCurrent = steerMotor.getTorqueCurrent().clone();
         steerTemperature = steerMotor.getDeviceTemp().clone();
+        steerMotorVoltage = steerMotor.getMotorVoltage().clone();
 
         steerEncoderAbsolutePosition = steerEncoder.getAbsolutePosition().clone();
         steerEncoderPositionStatusSignal = steerEncoder.getPosition().clone();
@@ -197,9 +203,11 @@ public class ModuleIOTalonFX implements ModuleIO {
             100,
             driveTorqueCurrent,
             driveTemperature,
+            driveMotorVoltage,
 
             steerTorqueCurrent,
             steerTemperature,
+            steerMotorVoltage,
 
             steerEncoderAbsolutePosition,
             steerEncoderPositionStatusSignal
@@ -224,9 +232,11 @@ public class ModuleIOTalonFX implements ModuleIO {
         BaseStatusSignal.refreshAll(
             driveTorqueCurrent,
             driveTemperature,
+            driveMotorVoltage,
 
             steerTorqueCurrent,
             steerTemperature,
+            steerMotorVoltage,
 
             steerEncoderAbsolutePosition,
             steerEncoderPositionStatusSignal,
@@ -240,9 +250,11 @@ public class ModuleIOTalonFX implements ModuleIO {
 
         inputs.drivePositionMeters = BaseStatusSignal.getLatencyCompensatedValue(drivePositionStatusSignal, driveVelocityStatusSignal).in(Rotation);
         inputs.driveVelocityMetersPerSec = driveVelocityStatusSignal.getValue().in(RotationsPerSecond);
+        inputs.driveAppliedVolts = driveMotorVoltage.getValue().in(Volts);
 
         inputs.steerPosition = new Rotation2d(BaseStatusSignal.getLatencyCompensatedValue(steerPositionStatusSignal, steerVelocityStatusSignal).in(Radians));
         inputs.steerVelocityRadPerSec = steerVelocityStatusSignal.getValue().in(RadiansPerSecond);
+        inputs.steerAppliedVolts = steerMotorVoltage.getValue().in(Volts);
 
         inputs.steerEncoderAbsolutePosition = new Rotation2d(steerEncoderAbsolutePosition.getValue().in(Radians));
         inputs.steerEncoderPosition = new Rotation2d(steerEncoderPositionStatusSignal.getValue().in(Radians));
