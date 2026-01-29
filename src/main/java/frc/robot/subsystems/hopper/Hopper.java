@@ -75,7 +75,7 @@ public class Hopper extends SubsystemBase {
 
     }
 
-    private void setHopperVelocity(double velocityRotationsPerSec) {
+    public void setHopperVelocity(double velocityRotationsPerSec) {
         hopperSetpointRPS = velocityRotationsPerSec;
         Logger.recordOutput("Hopper/velocitySetpointRPS", velocityRotationsPerSec);
         hopperIO.setVelocity(velocityRotationsPerSec);

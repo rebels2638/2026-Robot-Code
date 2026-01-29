@@ -75,7 +75,7 @@ public class ShooterIOTalonFX implements ShooterIO {
         hoodConfig.Slot0.kS = config.hoodKS;
         hoodConfig.Slot0.kV = config.hoodKV;
         hoodConfig.Slot0.kA = config.hoodKA;
-        hoodConfig.Slot0.StaticFeedforwardSign = StaticFeedforwardSignValue.UseVelocitySign;
+        hoodConfig.Slot0.StaticFeedforwardSign = StaticFeedforwardSignValue.UseClosedLoopSign;
 
         hoodConfig.ClosedLoopGeneral.ContinuousWrap = false;
         hoodConfig.Feedback.SensorToMechanismRatio = config.hoodMotorToOutputShaftRatio;
