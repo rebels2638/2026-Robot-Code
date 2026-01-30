@@ -13,12 +13,6 @@ public interface ShooterIO {
         public double hoodAppliedVolts = 0;
         public double hoodTorqueCurrent = 0;
 
-        // Turret
-        public double turretAngleRotations = 0;
-        public double turretVelocityRotationsPerSec = 0;
-        public double turretAppliedVolts = 0;
-        public double turretTorqueCurrent = 0;
-
         // Flywheel (leader)
         public double flywheelVelocityRotationsPerSec = 0;
         public double flywheelAppliedVolts = 0;

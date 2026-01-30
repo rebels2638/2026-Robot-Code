@@ -137,7 +137,7 @@ public class Shooter extends SubsystemBase {
     }
 
     // Direct setters for mechanism control (now private, used internally by state handlers)
-    private void setHoodAngle(Rotation2d angle) {
+    public void setHoodAngle(Rotation2d angle) {
         double clampedAngle = MathUtil.clamp(angle.getRotations(), config.hoodMinAngleRotations, config.hoodMaxAngleRotations); 
 
         hoodSetpointRotations = clampedAngle;
@@ -147,7 +147,7 @@ public class Shooter extends SubsystemBase {
         shooterIO.setAngle(clampedAngle);
     }
 
-    private void setShotVelocity(double velocityRotationsPerSec) {
+    public void setShotVelocity(double velocityRotationsPerSec) {
         flywheelSetpointRPS = velocityRotationsPerSec;
         Logger.recordOutput("Shooter/shotVelocitySetpointRotationsPerSec", velocityRotationsPerSec);
         shooterIO.setShotVelocity(velocityRotationsPerSec);
