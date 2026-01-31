@@ -19,7 +19,7 @@
     },
     {
       "type": "event_trigger",
-      "t_ratio": 0.0,
+      "t_ratio": 1.0,
       "lib_key": "shooting_zone_0_end"
     },
     {
