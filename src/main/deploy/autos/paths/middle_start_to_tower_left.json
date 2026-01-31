@@ -13,6 +13,16 @@
       }
     },
     {
+      "type": "event_trigger",
+      "t_ratio": 0.0,
+      "lib_key": "shooting_zone_0_start"
+    },
+    {
+      "type": "event_trigger",
+      "t_ratio": 1.0,
+      "lib_key": "shooting_zone_0_end"
+    },
+    {
       "type": "waypoint",
       "translation_target": {
         "x_meters": 1.2538375025779391,
@@ -28,7 +38,7 @@
   "constraints": {
     "max_velocity_meters_per_sec": [
       {
-        "value": 4.0,
+        "value": 2.5,
         "start_ordinal": 0,
         "end_ordinal": 1
       }

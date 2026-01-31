@@ -7,13 +7,14 @@ import edu.wpi.first.math.geometry.Pose2d;
 import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.InstantCommand;
+import edu.wpi.first.wpilibj2.command.ParallelCommandGroup;
 import edu.wpi.first.wpilibj2.command.WaitUntilCommand;
+import frc.robot.commands.autos.AutoShootingController;
+import frc.robot.commands.autos.AutoShootingZoneManager;
 import frc.robot.commands.autos.tower.ScoreL1;
 import frc.robot.constants.Constants;
 import frc.robot.lib.BLine.FollowPath;
 import frc.robot.lib.BLine.Path;
-import frc.robot.lib.BLine.Path.EventTrigger;
-import frc.robot.lib.BLine.Path.Waypoint;
 import frc.robot.lib.input.XboxController;
 import frc.robot.subsystems.swerve.SwerveDrive;
 // import frc.robot.subsystems.vision.Vision;
@@ -53,10 +54,9 @@ public class RobotContainer {
         // Configure teleop input suppliers for SwerveDrive FSM
         // Using normalized inputs (-1 to 1) with deadband applied
         swerveDrive.setTeleopInputSuppliers(
-            () -> -MathUtil.applyDeadband(xboxDriver.getLeftY(), Constants.OperatorConstants.LEFT_Y_DEADBAND),
-            () -> -MathUtil.applyDeadband(xboxDriver.getLeftX(), Constants.OperatorConstants.LEFT_X_DEADBAND),
-            () -> -MathUtil.applyDeadband(xboxDriver.getRightX(), Constants.OperatorConstants.RIGHT_X_DEADBAND)
-        );
+                () -> -MathUtil.applyDeadband(xboxDriver.getLeftY(), Constants.OperatorConstants.LEFT_Y_DEADBAND),
+                () -> -MathUtil.applyDeadband(xboxDriver.getLeftX(), Constants.OperatorConstants.LEFT_X_DEADBAND),
+                () -> -MathUtil.applyDeadband(xboxDriver.getRightX(), Constants.OperatorConstants.RIGHT_X_DEADBAND));
 
         // Set up path supplier for SwerveDrive
         swerveDrive.setPathSupplier(() -> currentPath, () -> shouldResetPose);
@@ -71,6 +71,17 @@ public class RobotContainer {
     }
 
     private void registerEventTriggers() {
+        // register shooting trigger (up to 5 per path but change if necessary lol)
+        for (int i = 0; i < 5; i++) {
+            final int zoneId = i;
+            FollowPath.registerEventTrigger("shooting_zone_" + i + "_start", () -> {
+                AutoShootingZoneManager.getInstance().enterShootingZone(zoneId);
+            });
+            FollowPath.registerEventTrigger("shooting_zone_" + i + "_end", () -> {
+                AutoShootingZoneManager.getInstance().exitShootingZone(zoneId);
+            });
+        }
+
         FollowPath.registerEventTrigger("test1", new InstantCommand(() -> {
             Logger.recordOutput("In a command", true);
         }));
@@ -82,15 +93,19 @@ public class RobotContainer {
     private void configureBindings() {
         // Path toClimb = new Path(new Waypoint(1,3, new Rotation2d(0)));
         // xboxDriver.getXButton().onTrue(
-        //     new InstantCommand(() -> currentPath = toClimb).andThen(
-        //         new InstantCommand(() -> swerveDrive.setDesiredSystemState(SwerveDrive.DesiredSystemState.FOLLOW_PATH)).andThen(
-        //             new WaitUntilCommand(() -> swerveDrive.getCurrentSystemState() == SwerveDrive.CurrentSystemState.IDLE)).andThen(
-        //                 new InstantCommand(() -> swerveDrive.setDesiredSystemState(SwerveDrive.DesiredSystemState.TELEOP))
-        //             )
-        //         )
+        // new InstantCommand(() -> currentPath = toClimb).andThen(
+        // new InstantCommand(() ->
+        // swerveDrive.setDesiredSystemState(SwerveDrive.DesiredSystemState.FOLLOW_PATH)).andThen(
+        // new WaitUntilCommand(() -> swerveDrive.getCurrentSystemState() ==
+        // SwerveDrive.CurrentSystemState.IDLE)).andThen(
+        // new InstantCommand(() ->
+        // swerveDrive.setDesiredSystemState(SwerveDrive.DesiredSystemState.TELEOP))
+        // )
+        // )
         // );
 
-        xboxDriver.getXButton().onFalse(new InstantCommand(() -> robotState.resetPose(new Pose2d(0,0, new Rotation2d(0)))));
+        xboxDriver.getXButton()
+                .onFalse(new InstantCommand(() -> robotState.resetPose(new Pose2d(0, 0, new Rotation2d(0)))));
     }
 
     public void teleopInit() {
@@ -116,19 +131,23 @@ public class RobotContainer {
         Logger.recordOutput("TRIGGER1", false);
         Logger.recordOutput("TRIGGER2", false);
 
-        currentPath = new Path("event_test");
-        shouldResetPose = true; 
+        // Reset shooting zone state at start of auto
+        AutoShootingZoneManager.getInstance().reset();
 
-        new Path(
-            new Waypoint(0, 0, new Rotation2d(0)),
-            new EventTrigger(0.5, "test"),
-            new Waypoint(1, 1, new Rotation2d(0))
-        );
+        currentPath = new Path("bottom_start_to_output_shoot");
+        shouldResetPose = true;
 
-        return new InstantCommand(() -> swerveDrive.setDesiredSystemState(SwerveDrive.DesiredSystemState.PREPARE_FOR_AUTO)).andThen(
-            new WaitUntilCommand(() -> swerveDrive.getCurrentSystemState() == SwerveDrive.CurrentSystemState.READY_FOR_AUTO)).andThen(
-            new InstantCommand(() -> swerveDrive.setDesiredSystemState(SwerveDrive.DesiredSystemState.FOLLOW_PATH))
-        );
+        Command pathFollowingCommand = new InstantCommand(
+                () -> swerveDrive.setDesiredSystemState(SwerveDrive.DesiredSystemState.PREPARE_FOR_AUTO)).andThen(
+                        new WaitUntilCommand(
+                                () -> swerveDrive
+                                        .getCurrentSystemState() == SwerveDrive.CurrentSystemState.READY_FOR_AUTO))
+                .andThen(
+                        new InstantCommand(
+                                () -> swerveDrive.setDesiredSystemState(SwerveDrive.DesiredSystemState.FOLLOW_PATH)));
 
+        return new ParallelCommandGroup(
+                new AutoShootingController(),
+                pathFollowingCommand);
     }
 }
