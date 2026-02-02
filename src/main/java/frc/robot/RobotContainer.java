@@ -1,7 +1,9 @@
 package frc.robot;
 
 import org.littletonrobotics.junction.Logger;
+import org.littletonrobotics.junction.networktables.LoggedNetworkNumber;
 
+import edu.wpi.first.epilogue.Logged;
 import edu.wpi.first.math.MathUtil;
 import edu.wpi.first.math.geometry.Pose2d;
 import edu.wpi.first.math.geometry.Pose3d;
@@ -25,6 +27,9 @@ import frc.robot.lib.input.XboxController;
 import frc.robot.lib.util.ballistics.ProjectileVisualizer;
 import frc.robot.subsystems.Superstructure;
 import frc.robot.subsystems.Superstructure.DesiredState;
+import frc.robot.subsystems.hopper.Hopper;
+import frc.robot.subsystems.kicker.Kicker;
+import frc.robot.subsystems.kicker.Kicker.KickerSetpoint;
 import frc.robot.subsystems.shooter.Shooter;
 import frc.robot.subsystems.swerve.SwerveDrive;
 // import frc.robot.subsystems.vision.Vision;
@@ -48,9 +53,9 @@ public class RobotContainer {
     private final SwerveDrive swerveDrive = SwerveDrive.getInstance();
     private final Superstructure superstructure = Superstructure.getInstance();
     private final Vision vision = Vision.getInstance();
+
     @SuppressWarnings("unused")
     private final ProjectileVisualizer projectileVisualizer = ProjectileVisualizer.getInstance();
-
 
     private RobotContainer() {
         registerEventTriggers();
@@ -71,19 +76,20 @@ public class RobotContainer {
         swerveDrive.setDesiredSystemState(SwerveDrive.DesiredSystemState.TELEOP);
         
         // Set default superstructure state to HOME
-        // superstructure.setDesiredState(Superstructure.DesiredState.HOME);
+        superstructure.setDesiredState(Superstructure.DesiredState.HOME);
+
 
 
         configureBindings();
     }
 
     private void registerEventTriggers() {
-        FollowPath.registerEventTrigger("shoot", new InstantCommand(() -> {
-            superstructure.setDesiredState(Superstructure.DesiredState.SHOOTING);
-        }));
-        FollowPath.registerEventTrigger("rev", () -> {
-            superstructure.setDesiredState(Superstructure.DesiredState.READY_FOR_SHOT);
-        });
+        // FollowPath.registerEventTrigger("shoot", new InstantCommand(() -> {
+        //     superstructure.setDesiredState(Superstructure.DesiredState.SHOOTING);
+        // }));
+        // FollowPath.registerEventTrigger("rev", () -> {
+        //     superstructure.setDesiredState(Superstructure.DesiredState.READY_FOR_SHOT);
+        // });
     }
 
     private void configureBindings() {
@@ -96,9 +102,13 @@ public class RobotContainer {
         //             )
         //         )
         // );
+        // LoggedNetworkNumber p = new LoggedNetworkNumber("KICKER_SET_VELOCITY_RPS", 0);
 
         // xboxDriver.getXButton().onFalse(new InstantCommand(() -> robotState.resetPose(new Pose2d(0,0, new Rotation2d(0)))));
-
+        // this.xboxDriver.getAButton().onTrue(new InstantCommand(() -> 
+        //     kicker.setKickerVelocity(p.getAsDouble())
+        // ));
+        
         // xboxDriver.getAButton().onTrue(new InstantCommand(() -> {
         //         ProjectileVisualizer.addProjectile(
         //             0, // vx
@@ -110,12 +120,28 @@ public class RobotContainer {
         //     })
         // );
 
-        xboxDriver.getAButton().onTrue(
-            new InstantCommand(() -> superstructure.setDesiredState(DesiredState.SHOOTING))
-        );
-        xboxDriver.getBButton().onTrue(
-            new InstantCommand(() -> superstructure.setDesiredState(DesiredState.TRACKING))
-        );
+        // xboxDriver.getAButton().onTrue(
+        //     new InstantCommand(() -> Shooter.getInstance().setShotVelocity(30)).andThen(
+        //         new InstantCommand(() -> Shooter.getInstance().setHoodAngle(Rotation2d.fromDegrees(30)))
+        //     )
+                
+        // );
+        // xboxDriver.getBButton().onTrue(
+        //     new InstantCommand(() -> Kicker.getInstance().setKickerVelocity(30)).andThen(
+        //         new InstantCommand(() -> Hopper.getInstance().setHopperVelocity(7)
+        //     ))
+        // );
+        // xboxDriver.getXButton().onTrue(
+        //     new InstantCommand(() -> Shooter.getInstance().setShotVelocity(0)).andThen(
+        //         new InstantCommand(() -> Shooter.getInstance().setHoodAngle(Rotation2d.fromDegrees(0)))
+        //     )
+                
+        // );
+        // xboxDriver.getYButton().onTrue(
+        //     new InstantCommand(() -> Kicker.getInstance().setKickerVelocity(0)).andThen(
+        //         new InstantCommand(() -> Hopper.getInstance().setHopperVelocity(0)
+        //     ))
+        // );
 
         // xboxDriver.getAButton().onTrue(
         //     new ConditionalCommand(
@@ -144,6 +170,11 @@ public class RobotContainer {
         // Test snap-to-angle bindings
         // xboxDriver.getAButton().onTrue(new InstantCommand(() -> superstructure.setDesiredState(Superstructure.DesiredState.BUMP)));
         // xboxDriver.getAButton().onFalse(new InstantCommand(() -> superstructure.setDesiredState(Superstructure.DesiredState.HOME)));
+
+        xboxDriver.getAButton().onTrue(new InstantCommand(() -> superstructure.setDesiredState(Superstructure.DesiredState.HOME)));
+        xboxDriver.getBButton().onFalse(new InstantCommand(() -> superstructure.setDesiredState(Superstructure.DesiredState.READY_FOR_SHOT)));
+        xboxDriver.getYButton().onFalse(new InstantCommand(() -> superstructure.setDesiredState(Superstructure.DesiredState.SHOOTING)));
+
     }
 
     private Command followPath(Path path, boolean shouldResetPose) {

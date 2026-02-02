@@ -78,10 +78,10 @@ public class Superstructure extends SubsystemBase {
     private static final double BALLS_PER_SECOND = 12.0; // Balls per second to visualize
 
     private static final double MAX_TRANSLATIONAL_VELOCITY_DURING_SHOT_METERS_PER_SEC = 2.5;
-    private static final double SHOT_IMPACT_TOLERANCE_METERS = 0.3;
+    private static final double SHOT_IMPACT_TOLERANCE_METERS = 0.25;
     private static final double BUMP_MAX_VELOCITY_METERS_PER_SEC = 1.8;
     private static final Rotation2d BUMP_SNAP_ANGLE = Rotation2d.fromDegrees(45);
-    private static final Rotation2d SHOOT_TARGETING_OFFSET = Rotation2d.fromDegrees(98);
+    public static final Rotation2d SHOOT_TARGETING_OFFSET = Rotation2d.fromDegrees(-95);
     private LoggedNetworkNumber latencyCompensationSeconds = new LoggedNetworkNumber("Shooter/latencyCompSec");
     private double kickerEngagedTime = 0;
     private double lastBallVisualizedTime = 0;
@@ -126,6 +126,11 @@ public class Superstructure extends SubsystemBase {
                 break;
 
             case READY_FOR_SHOT:
+                // TODO: make sure this works
+                // if (currentState == CurrentState.SHOOTING && Timer.getTimestamp() - lastShotTime < SHOT_DURATION_SECONDS) {
+                //     break;
+                // }
+
                 // READY_FOR_SHOT requires mechanisms to be at setpoints
                 // Otherwise we're in PREPARING_FOR_SHOT
                 if (isReadyForShot()) {
@@ -310,8 +315,8 @@ public class Superstructure extends SubsystemBase {
         Translation3d setpointLanding = simulateShotLanding(setpointHood, setpointFlywheel);
         double impactErrorMeters = actualLanding.toTranslation2d()
             .getDistance(setpointLanding.toTranslation2d());
-        boolean shooterReady = impactErrorMeters <= SHOT_IMPACT_TOLERANCE_METERS;
-        Logger.recordOutput("Superstructure/shooterReady", shooterReady);
+        boolean impactWithinTolerance = impactErrorMeters <= SHOT_IMPACT_TOLERANCE_METERS;
+        Logger.recordOutput("Superstructure/impactWithinTolerance", impactWithinTolerance);
         Logger.recordOutput("Superstructure/actualLanding", actualLanding);
         Logger.recordOutput("Superstructure/setpointLanding", setpointLanding);
         Logger.recordOutput("Superstructure/impactErrorMeters", impactErrorMeters);
@@ -328,7 +333,7 @@ public class Superstructure extends SubsystemBase {
         
         Logger.recordOutput("Superstructure/withinShotDistance", withinShotDistance);
 
-        return swerveReady && shooterReady && kickerReady && withinShotDistance;
+        return impactWithinTolerance;
     }
 
     // Target suppliers for shooter - these calculate dynamic setpoints
@@ -346,6 +351,7 @@ public class Superstructure extends SubsystemBase {
         return shotData.flywheelRPS();
     }
 
+    // TODO: optimize calls to this
     private ShotData calculateShotData() {
         Translation3d targetLocation = FieldConstants.Hub.hubCenter;
         if (Constants.shouldFlipPath()) {
@@ -375,7 +381,7 @@ public class Superstructure extends SubsystemBase {
         
         // Get shooter offset from robot center (for omega compensation)
         Translation2d shooterOffsetFromRobotCenter = shooter.getShooterRelativePose().getTranslation().toTranslation2d();
-        Rotation2d robotHeading = robotState.getEstimatedPose().getRotation();
+        Rotation2d robotHeading = robotState.getEstimatedPose().getRotation().plus(SHOOT_TARGETING_OFFSET);
 
         return ShotCalculator.calculate(
             targetLocation,
@@ -400,7 +406,7 @@ public class Superstructure extends SubsystemBase {
                 robotState.getEstimatedPose().getY(),
                 0
             ),
-            new Rotation3d(0, 0, robotState.getEstimatedPose().getRotation().getRadians())
+            new Rotation3d(0, 0, (robotState.getEstimatedPose().getRotation().plus(SHOOT_TARGETING_OFFSET)).getRadians())
         );
         Translation3d shooterPosition =
             robotPose.plus(new Transform3d(new Pose3d(), shooter.getShooterRelativePose())).getTranslation();

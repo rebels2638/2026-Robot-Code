@@ -11,6 +11,7 @@ import edu.wpi.first.math.kinematics.ChassisSpeeds;
 import edu.wpi.first.wpilibj.Timer;
 import frc.robot.constants.FieldConstants;
 import frc.robot.lib.util.ballistics.ProjectileVisualizer;
+import frc.robot.subsystems.Superstructure;
 import frc.robot.subsystems.shooter.Shooter;
 
 public class VisualizeShot {
@@ -34,7 +35,7 @@ public class VisualizeShot {
         Rotation3d newRotation = new Rotation3d(
             0,  // roll (X)
             hoodAngleRadians,  // pitch (Y) from hood
-            currentRotation.getZ()  // yaw (Z) from robot rotation
+            currentRotation.getZ() - Superstructure.SHOOT_TARGETING_OFFSET.getRadians() // yaw (Z) from robot rotation
         );
         
         shooterPose = new Pose3d(shooterPose.getTranslation(), newRotation);

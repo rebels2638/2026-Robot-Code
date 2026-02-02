@@ -1,48 +1,18 @@
 {
   "lerpTable": [
     {
-      "distanceMeters": 1.0,
-      "hoodAngleRotations": 0.1610666667,
+      "distanceMeters": 1.12,
+      "hoodAngleRotations": 0.0694,
       "flywheelVelocityRPS": 30.0
     },
     {
-      "distanceMeters": 2.0,
-      "hoodAngleRotations": 0.1610666667,
-      "flywheelVelocityRPS": 23.0
-    },
-    {
-      "distanceMeters": 3.0,
-      "hoodAngleRotations": 0.1610666667,
-      "flywheelVelocityRPS": 25.5
-    },
-    {
-      "distanceMeters": 4.0,
-      "hoodAngleRotations": 0.1332888889,
-      "flywheelVelocityRPS": 28.5
-    },
-    {
-      "distanceMeters": 5.0,
-      "hoodAngleRotations": 0.1513444444,
-      "flywheelVelocityRPS": 31.0
-    },
-    {
-      "distanceMeters": 6.0,
-      "hoodAngleRotations": 0.1471777778,
-      "flywheelVelocityRPS": 33.5
-    },
-    {
-      "distanceMeters": 7.0,
-      "hoodAngleRotations": 0.1527333333,
-      "flywheelVelocityRPS": 36.5
-    },
-    {
-      "distanceMeters": 8.0,
-      "hoodAngleRotations": 0.1138444444,
-      "flywheelVelocityRPS": 38.5
+      "distanceMeters": 3.3,
+      "hoodAngleRotations": 0.08333333333,
+      "flywheelVelocityRPS": 50.0
     }
   ],
-  "minShotDistFromShooterMeters": 0.889,
-  "maxShotDistFromShooterMeters": 10.668,
+  "minShotDistFromShooterMeters": 1.12,
+  "maxShotDistFromShooterMeters": 3.3,
   "latencyCompensationSeconds": 0.0,
   "canBusName": "",
   "hoodCanId": 36,
@@ -70,7 +40,7 @@
   "flywheelKS": 0.15,
   "flywheelKV": 0.121,
   "flywheelKA": 0.0,
-  "flywheelKP": 0.15,
+  "flywheelKP": 0.3,
   "flywheelKI": 0.0,
   "flywheelKD": 0.0,
   "flywheelMotorToOutputShaftRatio": 1.0,
@@ -82,7 +52,7 @@
   "shooterPoseZ": 0.69,
   "shooterPoseRollDeg": 0.0,
   "shooterPosePitchDeg": 0.0,
-  "shooterPoseYawDeg": 0.0,
+  "shooterPoseYawDeg": -92.0,
   "hoodAngleToleranceRotations": 0.0055555556,
   "flywheelVelocityToleranceRPS": 3.0
 }
