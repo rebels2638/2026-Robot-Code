@@ -35,7 +35,7 @@ public class VisualizeShot {
         Rotation3d newRotation = new Rotation3d(
             0,  // roll (X)
             hoodAngleRadians,  // pitch (Y) from hood
-            currentRotation.getZ() - Superstructure.SHOOT_TARGETING_OFFSET.getRadians() // yaw (Z) from robot rotation
+            currentRotation.getZ() // yaw (Z) from robot rotation
         );
         
         shooterPose = new Pose3d(shooterPose.getTranslation(), newRotation);

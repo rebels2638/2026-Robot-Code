@@ -81,7 +81,6 @@ public class Superstructure extends SubsystemBase {
     private static final double SHOT_IMPACT_TOLERANCE_METERS = 0.25;
     private static final double BUMP_MAX_VELOCITY_METERS_PER_SEC = 1.8;
     private static final Rotation2d BUMP_SNAP_ANGLE = Rotation2d.fromDegrees(45);
-    public static final Rotation2d SHOOT_TARGETING_OFFSET = Rotation2d.fromDegrees(-95);
     private LoggedNetworkNumber latencyCompensationSeconds = new LoggedNetworkNumber("Shooter/latencyCompSec");
     private double kickerEngagedTime = 0;
     private double lastBallVisualizedTime = 0;
@@ -225,7 +224,7 @@ public class Superstructure extends SubsystemBase {
 
     private void handlePreparingForShotState() {
         ShotData shotData = calculateShotData();
-        swerveDrive.setSnapTargetAngle(shotData.targetFieldYaw().plus(SHOOT_TARGETING_OFFSET));
+        swerveDrive.setSnapTargetAngle(shotData.targetFieldYaw());
         swerveDrive.setVelocityCapMaxVelocityMetersPerSec(MAX_TRANSLATIONAL_VELOCITY_DURING_SHOT_METERS_PER_SEC);
 
         shooter.setHoodSetpoint(HoodSetpoint.DYNAMIC);
@@ -238,7 +237,7 @@ public class Superstructure extends SubsystemBase {
 
     private void handleReadyForShotState() {
         ShotData shotData = calculateShotData();
-        swerveDrive.setSnapTargetAngle(shotData.targetFieldYaw().plus(SHOOT_TARGETING_OFFSET));
+        swerveDrive.setSnapTargetAngle(shotData.targetFieldYaw().minus(shooter.getShooterRelativePose().getRotation().toRotation2d()));
         swerveDrive.setVelocityCapMaxVelocityMetersPerSec(MAX_TRANSLATIONAL_VELOCITY_DURING_SHOT_METERS_PER_SEC);
 
         shooter.setHoodSetpoint(HoodSetpoint.DYNAMIC);
@@ -251,7 +250,7 @@ public class Superstructure extends SubsystemBase {
 
     private void handleShootingState() {        
         ShotData shotData = calculateShotData();
-        swerveDrive.setSnapTargetAngle(shotData.targetFieldYaw().plus(SHOOT_TARGETING_OFFSET));
+        swerveDrive.setSnapTargetAngle(shotData.targetFieldYaw().minus(shooter.getShooterRelativePose().getRotation().toRotation2d()));
         swerveDrive.setVelocityCapMaxVelocityMetersPerSec(MAX_TRANSLATIONAL_VELOCITY_DURING_SHOT_METERS_PER_SEC);
 
         shooter.setHoodSetpoint(HoodSetpoint.DYNAMIC);
@@ -380,8 +379,8 @@ public class Superstructure extends SubsystemBase {
             rps -> shooter.calculateBackSpinRPM(rps) * 2.0 * Math.PI / 60.0;
         
         // Get shooter offset from robot center (for omega compensation)
-        Translation2d shooterOffsetFromRobotCenter = shooter.getShooterRelativePose().getTranslation().toTranslation2d();
-        Rotation2d robotHeading = robotState.getEstimatedPose().getRotation().plus(SHOOT_TARGETING_OFFSET);
+        // Translation2d shooterOffsetFromRobotCenter = shooter.getShooterRelativePose().getTranslation().toTranslation2d();
+        // Rotation2d robotHeading = robotState.getEstimatedPose().getRotation();
 
         return ShotCalculator.calculate(
             targetLocation,
@@ -390,9 +389,7 @@ public class Superstructure extends SubsystemBase {
             lerpTable,
             lcomp,
             rpsToExitVelocity,
-            rpsToSpinRateRadPerSec,
-            shooterOffsetFromRobotCenter,
-            robotHeading
+            rpsToSpinRateRadPerSec
         );
     }
 
@@ -406,7 +403,7 @@ public class Superstructure extends SubsystemBase {
                 robotState.getEstimatedPose().getY(),
                 0
             ),
-            new Rotation3d(0, 0, (robotState.getEstimatedPose().getRotation().plus(SHOOT_TARGETING_OFFSET)).getRadians())
+            new Rotation3d(0, 0, (robotState.getEstimatedPose().getRotation()).getRadians())
         );
         Translation3d shooterPosition =
             robotPose.plus(new Transform3d(new Pose3d(), shooter.getShooterRelativePose())).getTranslation();
