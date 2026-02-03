@@ -26,7 +26,7 @@ public class AutoShootingZoneManager {
 
         Logger.recordOutput("AutoShootingZone/active", true);
         Logger.recordOutput("AutoShootingZone/activeZones",
-                activeZones.stream().mapToLong(Integer::longValue).toArray());
+            activeZones.stream().mapToDouble(Integer::doubleValue).toArray());
         Logger.recordOutput("AutoShootingZone/activeZoneCount", activeZones.size());
     }
 
@@ -40,7 +40,7 @@ public class AutoShootingZoneManager {
 
         Logger.recordOutput("AutoShootingZone/active", !activeZones.isEmpty());
         Logger.recordOutput("AutoShootingZone/activeZones",
-                activeZones.stream().mapToLong(Integer::longValue).toArray());
+                activeZones.stream().mapToDouble(Integer::doubleValue).toArray());
         Logger.recordOutput("AutoShootingZone/activeZoneCount", activeZones.size());
     }
 
@@ -63,7 +63,7 @@ public class AutoShootingZoneManager {
         activeZones.clear();
 
         Logger.recordOutput("AutoShootingZone/active", false);
-        Logger.recordOutput("AutoShootingZone/activeZones", new long[0]);
+        Logger.recordOutput("AutoShootingZone/activeZones", new double[0]);
         Logger.recordOutput("AutoShootingZone/activeZoneCount", 0);
         Logger.recordOutput("AutoShootingZone/reset", true);
     }

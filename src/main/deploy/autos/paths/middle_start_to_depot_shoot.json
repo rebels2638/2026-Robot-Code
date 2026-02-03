@@ -3,12 +3,12 @@
     {
       "type": "waypoint",
       "translation_target": {
-        "x_meters": 3.7419635459817737,
-        "y_meters": 5.465041425020713,
+        "x_meters": 3.6983678541839264,
+        "y_meters": 4.9564250207125085,
         "intermediate_handoff_radius_meters": 0.25
       },
       "rotation_target": {
-        "rotation_radians": -2.408388728109846,
+        "rotation_radians": 2.488496831084017,
         "profiled_rotation": true
       }
     },
@@ -25,36 +25,36 @@
     {
       "type": "waypoint",
       "translation_target": {
-        "x_meters": 0.5272426392805076,
-        "y_meters": 5.4650414250207096,
+        "x_meters": 0.2511365912274852,
+        "y_meters": 6.5113380281690105,
         "intermediate_handoff_radius_meters": 0.3
       },
       "rotation_target": {
-        "rotation_radians": 2.1225880267303348,
+        "rotation_radians": -1.9101277800434233,
         "profiled_rotation": true
       }
     },
     {
       "type": "waypoint",
       "translation_target": {
-        "x_meters": 0.2624968775668153,
-        "y_meters": 6.104444904722449,
+        "x_meters": 0.23343308303491905,
+        "y_meters": 5.479573322286662,
         "intermediate_handoff_radius_meters": 0.28
       },
       "rotation_target": {
-        "rotation_radians": 0.9950917834394732,
+        "rotation_radians": -0.23221185544933898,
         "profiled_rotation": true
       }
     },
     {
       "type": "waypoint",
       "translation_target": {
-        "x_meters": 1.38145296704486,
-        "y_meters": 6.874635459817724,
-        "intermediate_handoff_radius_meters": 0.35
+        "x_meters": 1.2070701998534779,
+        "y_meters": 4.974128528905077,
+        "intermediate_handoff_radius_meters": 0.25
       },
       "rotation_target": {
-        "rotation_radians": -0.7841533915823613,
+        "rotation_radians": -0.3267760852994502,
         "profiled_rotation": true
       }
     }
@@ -62,12 +62,12 @@
   "constraints": {
     "max_velocity_meters_per_sec": [
       {
-        "value": 2.0,
+        "value": 2.1,
         "start_ordinal": 0,
         "end_ordinal": 1
       },
       {
-        "value": 3.2,
+        "value": 3.5,
         "start_ordinal": 2,
         "end_ordinal": 3
       }
