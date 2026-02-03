@@ -1,19 +1,13 @@
 package frc.robot;
 
-import java.io.File;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-
 import edu.wpi.first.networktables.NetworkTable;
 import edu.wpi.first.networktables.NetworkTableInstance;
 import edu.wpi.first.networktables.StringPublisher;
-import edu.wpi.first.wpilibj.Filesystem;
 import edu.wpi.first.wpilibj.smartdashboard.Field2d;
 import edu.wpi.first.wpilibj.smartdashboard.SendableBuilderImpl;
 import edu.wpi.first.wpilibj.smartdashboard.SendableChooser;
 import edu.wpi.first.wpilibj2.command.Command;
-import edu.wpi.first.wpilibj2.command.InstantCommand;
-import edu.wpi.first.wpilibj2.command.WaitUntilCommand;
+import edu.wpi.first.wpilibj2.command.InstantCommand; 
 import edu.wpi.first.util.sendable.Sendable;
 import edu.wpi.first.util.sendable.SendableBuilder;
 import frc.robot.subsystems.Superstructure;
@@ -38,8 +32,8 @@ public class Dashboard {
         NetworkTable table = inst.getTable("Dashboard");
 
         // Create publishers once
-        superstructureCurrentState = table.getStringTopic("Superstructure/Current State").publish();
-        superStructureDesiredState = table.getStringTopic("Superstructure/Desired State").publish();
+        superstructureCurrentState = table.getStringTopic("Superstructure/CurrentState").publish();
+        superStructureDesiredState = table.getStringTopic("Superstructure/DesiredState").publish();
 
         // Initialize Field2d
         NetworkTable fieldTable = table.getSubTable("Field");
@@ -93,40 +87,21 @@ public class Dashboard {
         autoChooser = new SendableChooser<Command>();
         autoChooser.setDefaultOption("None", new InstantCommand());
         
-        // Get all path files from deploy directory
-        Path pathsDir = Paths.get(
-            Filesystem.getDeployDirectory().getAbsolutePath(), "autos", "paths"
-        );             
-        File dir = pathsDir.toFile();
-        
-        File[] jsonFiles = dir.listFiles((d, name) -> name.endsWith(".json"));
-        
-        for (File file : jsonFiles) {
-            String fileName = file.getName().replace(".json", "");
-            Command autoCommand = new InstantCommand(
-                () -> swerveDrive.setDesiredSystemState(SwerveDrive.DesiredSystemState.PREPARE_FOR_AUTO)).andThen(
-                        new WaitUntilCommand(
-                                () -> swerveDrive
-                                        .getCurrentSystemState() == SwerveDrive.CurrentSystemState.READY_FOR_AUTO))
-                .andThen(
-                        new InstantCommand(
-                                () -> swerveDrive.setDesiredSystemState(SwerveDrive.DesiredSystemState.FOLLOW_PATH)));
-            autoChooser.addOption(fileName, autoCommand);
-        }
-            
-
-        // Add chooser to NetworkTables using SendableBuilder
-        NetworkTable autoTable = table.getSubTable("Auto Path Chooser");
+        NetworkTable autoTable = table.getSubTable("AutoChooser");
         autoBuilder = new SendableBuilderImpl();  // Store the builder reference
         autoBuilder.setTable(autoTable);
         autoChooser.initSendable(autoBuilder);
         autoBuilder.startListeners();
-        autoBuilder.update();  // Initial update
+        autoBuilder.update();  
 
         initialized = true;
     }
 
-    public static Command getCurrentCommand() {
+    public static void addAutoChooserOption(String key, Command command) {
+        autoChooser.addOption(key, command);
+    }
+
+    public static Command getCurrentAutoCommand() {
         return autoChooser.getSelected();
     }
 

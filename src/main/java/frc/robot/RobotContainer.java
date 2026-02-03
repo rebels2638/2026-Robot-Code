@@ -134,19 +134,17 @@ public class RobotContainer {
         // Reset shooting zone state at start of auto
         AutoShootingZoneManager.getInstance().reset();
 
-        // currentPath = new Path("bottom_start_to_output_shoot");
-        // shouldResetPose = true;
+        currentPath = new Path("bottom_start_to_output_shoot");
+        shouldResetPose = true;
 
-        // Command pathFollowingCommand = new InstantCommand(
-        //         () -> swerveDrive.setDesiredSystemState(SwerveDrive.DesiredSystemState.PREPARE_FOR_AUTO)).andThen(
-        //                 new WaitUntilCommand(
-        //                         () -> swerveDrive
-        //                                 .getCurrentSystemState() == SwerveDrive.CurrentSystemState.READY_FOR_AUTO))
-        //         .andThen(
-        //                 new InstantCommand(
-        //                         () -> swerveDrive.setDesiredSystemState(SwerveDrive.DesiredSystemState.FOLLOW_PATH)));
-
-        Command pathFollowingCommand = Dashboard.getCurrentCommand();
+        Command pathFollowingCommand = new InstantCommand(
+                () -> swerveDrive.setDesiredSystemState(SwerveDrive.DesiredSystemState.PREPARE_FOR_AUTO)).andThen(
+                        new WaitUntilCommand(
+                                () -> swerveDrive
+                                        .getCurrentSystemState() == SwerveDrive.CurrentSystemState.READY_FOR_AUTO))
+                .andThen(
+                        new InstantCommand(
+                                () -> swerveDrive.setDesiredSystemState(SwerveDrive.DesiredSystemState.FOLLOW_PATH)));
 
         return new ParallelCommandGroup(
                 new AutoShootingController(),
