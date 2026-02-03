@@ -3,6 +3,8 @@ package frc.robot;
 import edu.wpi.first.networktables.NetworkTable;
 import edu.wpi.first.networktables.NetworkTableInstance;
 import edu.wpi.first.networktables.StringPublisher;
+import edu.wpi.first.networktables.DoublePublisher;
+import edu.wpi.first.wpilibj.DriverStation;
 import edu.wpi.first.wpilibj.smartdashboard.Field2d;
 import edu.wpi.first.wpilibj.smartdashboard.SendableBuilderImpl;
 import edu.wpi.first.wpilibj.smartdashboard.SendableChooser;
@@ -19,9 +21,10 @@ public class Dashboard {
 
     private static StringPublisher superstructureCurrentState;
     private static StringPublisher superStructureDesiredState;
+    private static DoublePublisher matchTimePublisher;
     
     private static SendableChooser<Command> autoChooser;
-    private static SendableBuilderImpl autoBuilder;  // Keep reference to the builder
+    private static SendableBuilderImpl autoBuilder;
     
     private static boolean initialized = false;
 
@@ -34,6 +37,7 @@ public class Dashboard {
         // Create publishers once
         superstructureCurrentState = table.getStringTopic("Superstructure/CurrentState").publish();
         superStructureDesiredState = table.getStringTopic("Superstructure/DesiredState").publish();
+        matchTimePublisher = table.getDoubleTopic("MatchTime").publish();
 
         // Initialize Field2d
         NetworkTable fieldTable = table.getSubTable("Field");
@@ -88,7 +92,7 @@ public class Dashboard {
         autoChooser.setDefaultOption("None", new InstantCommand());
         
         NetworkTable autoTable = table.getSubTable("AutoChooser");
-        autoBuilder = new SendableBuilderImpl();  // Store the builder reference
+        autoBuilder = new SendableBuilderImpl();
         autoBuilder.setTable(autoTable);
         autoChooser.initSendable(autoBuilder);
         autoBuilder.startListeners();
@@ -106,17 +110,19 @@ public class Dashboard {
     }
 
     public static void updateData() {
-        initialize(); // Initialize on first call
+        initialize();
         
         // Superstructure state logging
         Superstructure superstructure = Superstructure.getInstance();   
         superstructureCurrentState.set(superstructure.getCurrentState().name());
         superStructureDesiredState.set(superstructure.getDesiredState().name()); 
 
+        // Update match time
+        matchTimePublisher.set(DriverStation.getMatchTime());
+
         // Update the field with current robot pose
         robotField.setRobotPose(RobotState.getInstance().getEstimatedPose());
         
-        // Update the auto chooser to publish selected value to NetworkTables
         if (autoBuilder != null) {
             autoBuilder.update();
         }
