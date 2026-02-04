@@ -8,7 +8,7 @@
   "kickerKS": 0.0,
   "kickerKV": 0.03,
   "kickerKA": 0.0,
-  "kickerKP": 0.02,
+  "kickerKP": 0.003,
   "kickerKI": 0.0,
   "kickerKD": 0.0,
   "kickerMotorToOutputShaftRatio": 5.0,
