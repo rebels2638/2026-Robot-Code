@@ -20,8 +20,10 @@ import edu.wpi.first.wpilibj.Timer;
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
 import frc.robot.RobotState;
 import frc.robot.VisualizeShot;
+import frc.robot.constants.Constants;
 import frc.robot.constants.FieldConstants;
 import frc.robot.lib.util.ballistics.BallisticsPhysics;
+import frc.robot.lib.BLine.FlippingUtil;
 import frc.robot.lib.util.ShotCalculator;
 import frc.robot.lib.util.ShotCalculator.ShotData;
 import frc.robot.subsystems.hopper.Hopper;
@@ -71,7 +73,6 @@ public class Superstructure extends SubsystemBase {
     private final SwerveDrive swerveDrive = SwerveDrive.getInstance();
     private final RobotState robotState = RobotState.getInstance();
 
-    private double lastShotTime = 0;
     private static final double SHOT_DURATION_SECONDS = .3; // Time to complete one shot
     private static final double BALLS_PER_SECOND = 12.0; // Balls per second to visualize
 
@@ -85,6 +86,9 @@ public class Superstructure extends SubsystemBase {
     private double kickerEngagedTime = 0;
     private double lastBallVisualizedTime = 0;
     private boolean hasStartedShooting = false;
+    
+    // Cached shot data - calculated once per periodic cycle
+    private ShotData cachedShotData;
 
     private Superstructure() {
         // Set up suppliers for the shooter - these provide dynamic setpoints based on shot calculation
@@ -95,6 +99,10 @@ public class Superstructure extends SubsystemBase {
 
     @Override
     public void periodic() {
+        // Calculate shot data once per cycle - all methods use this cached value
+        cachedShotData = calculateShotData();
+        Logger.recordOutput("Superstructure/shotData", cachedShotData);
+        
         handleStateTransitions();
         handleCurrentState();
     }
@@ -104,24 +112,20 @@ public class Superstructure extends SubsystemBase {
      * Handles transitions between states with proper validation.
      */
     private void handleStateTransitions() {
+        if (currentState == CurrentState.SHOOTING && Timer.getTimestamp() - kickerEngagedTime < SHOT_DURATION_SECONDS) {
+            return; // If we're shooting, don't transition to another state until the shot is complete to prevent jitter
+        }
+
         switch (desiredState) {
             case DISABLED:
                 currentState = CurrentState.DISABLED;
                 break;
 
             case HOME:
-                if (currentState == CurrentState.SHOOTING && Timer.getTimestamp() - lastShotTime < SHOT_DURATION_SECONDS) {
-                    break;
-                }
-
                 currentState = CurrentState.HOME;
                 break;
 
             case TRACKING:
-                if (currentState == CurrentState.SHOOTING && Timer.getTimestamp() - lastShotTime < SHOT_DURATION_SECONDS) {
-                    break;
-                }
-
                 currentState = CurrentState.TRACKING;
                 break;
 
@@ -130,7 +134,6 @@ public class Superstructure extends SubsystemBase {
                 // Otherwise we're in PREPARING_FOR_SHOT
                 if (isReadyForShot()) {
                     currentState = CurrentState.READY_FOR_SHOT;
-                    lastShotTime = Timer.getTimestamp();
                 } else {
                     currentState = CurrentState.PREPARING_FOR_SHOT;
                 }
@@ -141,13 +144,15 @@ public class Superstructure extends SubsystemBase {
                 if (currentState == CurrentState.READY_FOR_SHOT) {
                     currentState = CurrentState.SHOOTING;
                     kickerEngagedTime = Timer.getTimestamp();
-                    lastShotTime = kickerEngagedTime;
                     hasStartedShooting = false;
                 } else {
                     // Not ready yet, go to preparing
                     if (isReadyForShot()) {
+                        if (currentState == CurrentState.SHOOTING) {
+                            break;
+                        }
                         currentState = CurrentState.SHOOTING;
-                        lastShotTime = Timer.getTimestamp();
+                        kickerEngagedTime = Timer.getTimestamp();
                     } else {
                         currentState = CurrentState.PREPARING_FOR_SHOT;
                     }
@@ -231,7 +236,7 @@ public class Superstructure extends SubsystemBase {
         shooter.setFlywheelSetpoint(FlywheelSetpoint.DYNAMIC);
         kicker.setSetpoint(KickerSetpoint.FEEDING);
         hopper.setSetpoint(HopperSetpoint.OFF);
-        swerveDrive.setDesiredOmegaOverrideState(SwerveDrive.DesiredOmegaOverrideState.SNAPPED);
+        swerveDrive.setDesiredOmegaOverrideState(SwerveDrive.DesiredOmegaOverrideState.RANGED_ROTATION);
         swerveDrive.setDesiredTranslationOverrideState(SwerveDrive.DesiredTranslationOverrideState.CAPPED);
     }
 
@@ -244,7 +249,7 @@ public class Superstructure extends SubsystemBase {
         shooter.setFlywheelSetpoint(FlywheelSetpoint.DYNAMIC);
         kicker.setSetpoint(KickerSetpoint.FEEDING);
         hopper.setSetpoint(HopperSetpoint.OFF);
-        swerveDrive.setDesiredOmegaOverrideState(SwerveDrive.DesiredOmegaOverrideState.SNAPPED);
+        swerveDrive.setDesiredOmegaOverrideState(SwerveDrive.DesiredOmegaOverrideState.RANGED_ROTATION);
         swerveDrive.setDesiredTranslationOverrideState(SwerveDrive.DesiredTranslationOverrideState.CAPPED);
     }
 
@@ -257,7 +262,7 @@ public class Superstructure extends SubsystemBase {
         shooter.setFlywheelSetpoint(FlywheelSetpoint.DYNAMIC);
         kicker.setSetpoint(KickerSetpoint.KICKING);
         hopper.setSetpoint(HopperSetpoint.FEEDING);
-        swerveDrive.setDesiredOmegaOverrideState(SwerveDrive.DesiredOmegaOverrideState.SNAPPED);
+        swerveDrive.setDesiredOmegaOverrideState(SwerveDrive.DesiredOmegaOverrideState.RANGED_ROTATION);
         swerveDrive.setDesiredTranslationOverrideState(SwerveDrive.DesiredTranslationOverrideState.CAPPED);
 
         double now = Timer.getTimestamp();
@@ -280,7 +285,7 @@ public class Superstructure extends SubsystemBase {
     private void handleBumpState() {
         swerveDrive.setSnapTargetAngle(BUMP_SNAP_ANGLE);
         swerveDrive.setVelocityCapMaxVelocityMetersPerSec(BUMP_MAX_VELOCITY_METERS_PER_SEC);
-        swerveDrive.setDesiredOmegaOverrideState(SwerveDrive.DesiredOmegaOverrideState.SNAPPED);
+        swerveDrive.setDesiredOmegaOverrideState(SwerveDrive.DesiredOmegaOverrideState.RANGED_ROTATION);
         swerveDrive.setDesiredTranslationOverrideState(SwerveDrive.DesiredTranslationOverrideState.CAPPED);
         
         // Keep shooter in home position during bump
@@ -328,8 +333,7 @@ public class Superstructure extends SubsystemBase {
         Logger.recordOutput("Superstructure/kickerReady", kickerReady);
         
         // Check if within valid shooting distance
-        ShotData shotData = calculateShotData();
-        double distance = shotData.effectiveDistance();
+        double distance = cachedShotData.effectiveDistance();
         boolean withinShotDistance = distance >= shooter.getMinShotDistFromShooterMeters() 
                                   && distance <= shooter.getMaxShotDistFromShooterMeters();
         
@@ -343,9 +347,7 @@ public class Superstructure extends SubsystemBase {
      * This ensures the robot heading keeps the turret within its physical limits.
      */
     private void updateSwerveRotationRange() {
-        ShotData shotData = calculateShotData();
-        Logger.recordOutput("Superstructure/shotData", shotData);
-        Rotation2d targetFieldYaw = shotData.targetFieldYaw();
+        Rotation2d targetFieldYaw = cachedShotData.targetFieldYaw();
         
         // Get turret physical limits
         double turretMinDeg = shooter.getTurretMinAngleDeg();
@@ -363,29 +365,29 @@ public class Superstructure extends SubsystemBase {
         swerveDrive.setRotationRange(robotRotationMin, robotRotationMax);
     }
 
-    // Target suppliers for shooter - these calculate dynamic setpoints
+    // Target suppliers for shooter - these use cached shot data
     // Target suppliers always provide values from shot calculator
     // Shooter decides when to use them based on its state
     private Rotation2d getTargetHoodAngle() {
-        ShotData shotData = calculateShotData();
-        Logger.recordOutput("Superstructure/shotData", shotData);
-        return shotData.hoodPitch();
+        return cachedShotData.hoodPitch();
     }
 
     private Rotation2d getTargetTurretAngle() {
-        ShotData shotData = calculateShotData();
-        Logger.recordOutput("Superstructure/shotData", shotData);
-        return shotData.targetFieldYaw().minus(robotState.getEstimatedPose().getRotation());
+        return cachedShotData.targetFieldYaw().minus(robotState.getEstimatedPose().getRotation());
     }
 
     private double getTargetFlywheelRPS() {
-        ShotData shotData = calculateShotData();
-        Logger.recordOutput("Superstructure/shotData", shotData);
-        return shotData.flywheelRPS();
+        return cachedShotData.flywheelRPS();
     }
 
     private ShotData calculateShotData() {
         Translation3d targetLocation = FieldConstants.Hub.hubCenter;
+        if (Constants.shouldFlipPath()) {
+            Translation2d fieldPosition = targetLocation.toTranslation2d();
+            fieldPosition = FlippingUtil.flipFieldPosition(fieldPosition);
+
+            targetLocation = new Translation3d(fieldPosition.getX(), fieldPosition.getY(), targetLocation.getZ());
+        }
         
         // Calculate shooter position in field coordinates
         Pose3d robotPose = new Pose3d(

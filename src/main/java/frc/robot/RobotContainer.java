@@ -110,12 +110,12 @@ public class RobotContainer {
         //     })
         // );
 
-        // xboxDriver.getAButton().onTrue(
-        //     new InstantCommand(() -> superstructure.setDesiredState(DesiredState.SHOOTING))
-        // );
-        // xboxDriver.getBButton().onTrue(
-        //     new InstantCommand(() -> superstructure.setDesiredState(DesiredState.TRACKING))
-        // );
+        xboxDriver.getAButton().onTrue(
+            new InstantCommand(() -> superstructure.setDesiredState(DesiredState.SHOOTING))
+        );
+        xboxDriver.getBButton().onTrue(
+            new InstantCommand(() -> superstructure.setDesiredState(DesiredState.TRACKING))
+        );
 
         // xboxDriver.getAButton().onTrue(
         //     new ConditionalCommand(
@@ -142,8 +142,8 @@ public class RobotContainer {
         // );
 
         // Test snap-to-angle bindings
-        xboxDriver.getAButton().onTrue(new InstantCommand(() -> superstructure.setDesiredState(Superstructure.DesiredState.BUMP)));
-        xboxDriver.getAButton().onFalse(new InstantCommand(() -> superstructure.setDesiredState(Superstructure.DesiredState.HOME)));
+        // xboxDriver.getAButton().onTrue(new InstantCommand(() -> superstructure.setDesiredState(Superstructure.DesiredState.BUMP)));
+        // xboxDriver.getAButton().onFalse(new InstantCommand(() -> superstructure.setDesiredState(Superstructure.DesiredState.HOME)));
     }
 
     private Command followPath(Path path, boolean shouldResetPose) {
@@ -152,7 +152,8 @@ public class RobotContainer {
                 swerveDrive.setCurrentPath(path, shouldResetPose);
             })
             .andThen(setSwerveDriveState(SwerveDrive.DesiredSystemState.FOLLOW_PATH)).
-            andThen(new WaitUntilCommand(() -> swerveDrive.getCurrentSystemState() == SwerveDrive.CurrentSystemState.IDLE));
+            andThen(new WaitUntilCommand(
+                () -> swerveDrive.getCurrentSystemState() == SwerveDrive.CurrentSystemState.IDLE));
     }
 
     private Command setSwerveDriveState(SwerveDrive.DesiredSystemState state) {
@@ -177,6 +178,6 @@ public class RobotContainer {
     }
 
     public Command getAutonomousCommand() {
-        return null;
+        return followPath(new Path("topleftsweep"), true);
     }
 }

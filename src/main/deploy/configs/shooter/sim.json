@@ -112,7 +112,7 @@
   "flywheelKS": 0.0,
   "flywheelKV": 0.03,
   "flywheelKA": 0.0,
-  "flywheelKP": 0.02,
+  "flywheelKP": 0.003,
   "flywheelKI": 0.0,
   "flywheelKD": 0.0,
   "flywheelMotorToOutputShaftRatio": 1.0,

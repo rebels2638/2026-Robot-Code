@@ -20,18 +20,10 @@ public class Intake extends SubsystemBase {
     }
 
     public enum IntakeSetpoint {
-        OFF(0.0),
-        INTAKING(Double.NaN),
-        OUTTAKING(Double.NaN);
-
-        private final double rps;
-        IntakeSetpoint(double rps) {
-            this.rps = rps;
-        }
-
-        public double getRps() {
-            return rps;
-        }
+        STOWED,
+        DEPLOYED,
+        INTAKING,
+        OUTTAKING
     }
 
     private final IntakeIO intakeIO;
@@ -39,9 +31,11 @@ public class Intake extends SubsystemBase {
 
     private final IntakeConfig config;
 
-    private final DashboardMotorControlLoopConfigurator intakeControlLoopConfigurator;
+    private final DashboardMotorControlLoopConfigurator rollerControlLoopConfigurator;
+    private final DashboardMotorControlLoopConfigurator pivotControlLoopConfigurator;
 
-    private double intakeSetpointRPS = 0.0;
+    private double rollerSetpointRPS = 0.0;
+    private double pivotSetpointRotations = 0.0;
 
     private Intake() {
         boolean useSimulation = Constants.shouldUseSimulation(Constants.SimOnlySubsystems.INTAKE);
@@ -52,14 +46,24 @@ public class Intake extends SubsystemBase {
         );
         intakeIO = useSimulation ? new IntakeIOSim(config) : new IntakeIOTalonFX(config);
 
-        intakeControlLoopConfigurator = new DashboardMotorControlLoopConfigurator("Intake/intakeControlLoop",
+        rollerControlLoopConfigurator = new DashboardMotorControlLoopConfigurator("Intake/rollerControlLoop",
             new DashboardMotorControlLoopConfigurator.MotorControlLoopConfig(
-                config.intakeKP,
-                config.intakeKI,
-                config.intakeKD,
-                config.intakeKS,
-                config.intakeKV,
-                config.intakeKA
+                config.rollerKP,
+                config.rollerKI,
+                config.rollerKD,
+                config.rollerKS,
+                config.rollerKV,
+                config.rollerKA
+            )
+        );
+        pivotControlLoopConfigurator = new DashboardMotorControlLoopConfigurator("Intake/pivotControlLoop",
+            new DashboardMotorControlLoopConfigurator.MotorControlLoopConfig(
+                config.pivotKP,
+                config.pivotKI,
+                config.pivotKD,
+                config.pivotKS,
+                config.pivotKV,
+                config.pivotKA
             )
         );
     }
@@ -69,31 +73,81 @@ public class Intake extends SubsystemBase {
         intakeIO.updateInputs(intakeInputs);
         Logger.processInputs("Intake", intakeInputs);
 
-        if (intakeControlLoopConfigurator.hasChanged()) {
-            intakeIO.configureControlLoop(intakeControlLoopConfigurator.getConfig());
+        if (rollerControlLoopConfigurator.hasChanged()) {
+            intakeIO.configureControlLoop(rollerControlLoopConfigurator.getConfig());
+        }
+        if (pivotControlLoopConfigurator.hasChanged()) {
+            intakeIO.configurePivotControlLoop(pivotControlLoopConfigurator.getConfig());
         }
 
     }
 
-    private void setIntakeVelocity(double velocityRotationsPerSec) {
-        intakeSetpointRPS = velocityRotationsPerSec;
-        Logger.recordOutput("Intake/velocitySetpointRPS", velocityRotationsPerSec);
+    private void setRollerVelocity(double velocityRotationsPerSec) {
+        rollerSetpointRPS = velocityRotationsPerSec;
+        Logger.recordOutput("Intake/rollerVelocitySetpointRPS", velocityRotationsPerSec);
         intakeIO.setVelocity(velocityRotationsPerSec);
     }
 
+    private void setPivotAngle(double angleRotations) {
+        pivotSetpointRotations = angleRotations;
+        Logger.recordOutput("Intake/pivotAngleSetpointRotations", angleRotations);
+        intakeIO.setPivotAngle(angleRotations);
+    }
+
     public void setSetpoint(IntakeSetpoint setpoint) {
-        double targetRps = setpoint == IntakeSetpoint.INTAKING
-            ? config.intakingVelocityRPS
-            : setpoint == IntakeSetpoint.OUTTAKING ? config.outtakingVelocityRPS : setpoint.getRps();
-        setIntakeVelocity(targetRps);
+        switch (setpoint) {
+            case STOWED:
+                setPivotAngle(config.pivotUpAngleRotations);
+                setRollerVelocity(0.0);
+                break;
+            case DEPLOYED:
+                setPivotAngle(config.pivotDownAngleRotations);
+                setRollerVelocity(0.0);
+                break;
+            case INTAKING:
+                setPivotAngle(config.pivotDownAngleRotations);
+                setRollerVelocity(config.intakingVelocityRPS);
+                break;
+            case OUTTAKING:
+                setPivotAngle(config.pivotDownAngleRotations);
+                setRollerVelocity(config.outtakingVelocityRPS);
+                break;
+        }
     }
 
-    public double getIntakeVelocityRotationsPerSec() {
-        return intakeInputs.velocityRotationsPerSec;
+    public double getRollerVelocityRotationsPerSec() {
+        return intakeInputs.rollerVelocityRotationsPerSec;
     }
 
-    @AutoLogOutput(key = "Intake/isIntakeAtSetpoint")
-    public boolean isIntakeAtSetpoint() {
-        return Math.abs(intakeInputs.velocityRotationsPerSec - intakeSetpointRPS) < config.intakeVelocityToleranceRPS;
+    public double getPivotAngleRotations() {
+        return intakeInputs.pivotAngleRotations;
+    }
+
+    public void enableRollerEStop() {
+        intakeIO.enableRollerEStop();
+    }
+
+    public void disableRollerEStop() {
+        intakeIO.disableRollerEStop();
+    }
+
+    public void enablePivotEStop() {
+        intakeIO.enablePivotEStop();
+    }
+
+    public void disablePivotEStop() {
+        intakeIO.disablePivotEStop();
+    }
+
+    @AutoLogOutput(key = "Intake/isRollerAtSetpoint")
+    public boolean isRollerAtSetpoint() {
+        return Math.abs(intakeInputs.rollerVelocityRotationsPerSec - rollerSetpointRPS)
+            < config.rollerVelocityToleranceRPS;
+    }
+
+    @AutoLogOutput(key = "Intake/isPivotAtSetpoint")
+    public boolean isPivotAtSetpoint() {
+        return Math.abs(intakeInputs.pivotAngleRotations - pivotSetpointRotations)
+            < config.pivotAngleToleranceRotations;
     }
 }
