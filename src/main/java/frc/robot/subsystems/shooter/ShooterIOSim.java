@@ -43,6 +43,9 @@ public class ShooterIOSim implements ShooterIO {
     private boolean isHoodClosedLoop = true;
     private boolean isTurretClosedLoop = true;
     private boolean isFlywheelClosedLoop = true;
+    private boolean isHoodEStopped = false;
+    private boolean isTurretEStopped = false;
+    private boolean isFlywheelEStopped = false;
 
     private double desiredFlywheelVelocityRotationsPerSec = 0;
 
@@ -85,7 +88,9 @@ public class ShooterIOSim implements ShooterIO {
         double dt = Timer.getTimestamp() - lastTimeInputs;
         lastTimeInputs = Timer.getTimestamp();
 
-        if (isHoodClosedLoop) {
+        if (isHoodEStopped) {
+            hoodSim.setInputVoltage(0);
+        } else if (isHoodClosedLoop) {
             hoodSim.setInputVoltage(
                 MathUtil.clamp(
                     hoodFeedback.calculate(hoodSim.getAngularPositionRad()),
@@ -95,7 +100,9 @@ public class ShooterIOSim implements ShooterIO {
             );
         }
 
-        if (isTurretClosedLoop) {
+        if (isTurretEStopped) {
+            turretSim.setInputVoltage(0);
+        } else if (isTurretClosedLoop) {
             turretSim.setInputVoltage(
                 MathUtil.clamp(
                     turretFeedback.calculate(turretSim.getAngularPositionRad()),
@@ -105,7 +112,9 @@ public class ShooterIOSim implements ShooterIO {
             );
         }
 
-        if (isFlywheelClosedLoop) {
+        if (isFlywheelEStopped) {
+            flywheelSim.setInputVoltage(0);
+        } else if (isFlywheelClosedLoop) {
             flywheelSim.setInputVoltage(
                 MathUtil.clamp(
                     flywheelFeedforward.calculate(desiredFlywheelVelocityRotationsPerSec) +
@@ -147,6 +156,11 @@ public class ShooterIOSim implements ShooterIO {
 
     @Override
     public void setAngle(double angleRotations) {
+        if (isHoodEStopped) {
+            hoodSim.setInputVoltage(0);
+            isHoodClosedLoop = false;
+            return;
+        }
         // Clamp angle within software limits
         double clampedAngle = MathUtil.clamp(angleRotations,
             config.hoodMinAngleRotations,
@@ -157,6 +171,11 @@ public class ShooterIOSim implements ShooterIO {
 
     @Override
     public void setTurretAngle(double angleRotations) {
+        if (isTurretEStopped) {
+            turretSim.setInputVoltage(0);
+            isTurretClosedLoop = false;
+            return;
+        }
         // Clamp angle within software limits
         double minRot = config.turretMinAngleDeg / 360.0;
         double maxRot = config.turretMaxAngleDeg / 360.0;
@@ -168,6 +187,11 @@ public class ShooterIOSim implements ShooterIO {
 
     @Override
     public void setShotVelocity(double velocityRotationsPerSec) {
+        if (isFlywheelEStopped) {
+            flywheelSim.setInputVoltage(0);
+            isFlywheelClosedLoop = false;
+            return;
+        }
         flywheelFeedback.setSetpoint(velocityRotationsPerSec);
         desiredFlywheelVelocityRotationsPerSec = velocityRotationsPerSec;
         isFlywheelClosedLoop = true;
@@ -175,19 +199,19 @@ public class ShooterIOSim implements ShooterIO {
 
     @Override
     public void setHoodTorqueCurrentFOC(double torqueCurrentFOC) {
-        hoodSim.setInputVoltage(torqueCurrentFOC);
+        hoodSim.setInputVoltage(isHoodEStopped ? 0 : torqueCurrentFOC);
         isHoodClosedLoop = false;
     }
 
     @Override
     public void setTurretTorqueCurrentFOC(double torqueCurrentFOC) {
-        turretSim.setInputVoltage(torqueCurrentFOC);
+        turretSim.setInputVoltage(isTurretEStopped ? 0 : torqueCurrentFOC);
         isTurretClosedLoop = false;
     }
 
     @Override
     public void setFlywheelVoltage(double voltage) {
-        flywheelSim.setInputVoltage(voltage);
+        flywheelSim.setInputVoltage(isFlywheelEStopped ? 0 : voltage);
         isFlywheelClosedLoop = false;
     }
 
@@ -214,5 +238,41 @@ public class ShooterIOSim implements ShooterIO {
         flywheelFeedforward.setKs(config.kS());
         flywheelFeedforward.setKv(config.kV());
         flywheelFeedforward.setKa(config.kA());
+    }
+
+    @Override
+    public void enableHoodEStop() {
+        isHoodEStopped = true;
+        hoodSim.setInputVoltage(0);
+        isHoodClosedLoop = false;
+    }
+
+    @Override
+    public void disableHoodEStop() {
+        isHoodEStopped = false;
+    }
+
+    @Override
+    public void enableTurretEStop() {
+        isTurretEStopped = true;
+        turretSim.setInputVoltage(0);
+        isTurretClosedLoop = false;
+    }
+
+    @Override
+    public void disableTurretEStop() {
+        isTurretEStopped = false;
+    }
+
+    @Override
+    public void enableFlywheelEStop() {
+        isFlywheelEStopped = true;
+        flywheelSim.setInputVoltage(0);
+        isFlywheelClosedLoop = false;
+    }
+
+    @Override
+    public void disableFlywheelEStop() {
+        isFlywheelEStopped = false;
     }
 }

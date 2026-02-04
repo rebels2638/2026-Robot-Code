@@ -363,4 +363,44 @@ public class ShooterIOTalonFX implements ShooterIO {
 
         PhoenixUtil.tryUntilOk(5, () -> flywheelMotor.getConfigurator().apply(flywheelConfig, 0.25));
     }
+
+    @Override
+    public void enableHoodEStop() {
+        hoodConfig.CurrentLimits.StatorCurrentLimit = 0;
+        PhoenixUtil.tryUntilOk(5, () -> hoodMotor.getConfigurator().apply(hoodConfig, 0.25));
+    }
+
+    @Override
+    public void disableHoodEStop() {
+        hoodConfig.CurrentLimits.StatorCurrentLimit = config.hoodStatorCurrentLimit;
+        PhoenixUtil.tryUntilOk(5, () -> hoodMotor.getConfigurator().apply(hoodConfig, 0.25));
+    }
+
+    @Override
+    public void enableTurretEStop() {
+        turretConfig.CurrentLimits.StatorCurrentLimit = 0;
+        PhoenixUtil.tryUntilOk(5, () -> turretMotor.getConfigurator().apply(turretConfig, 0.25));
+    }
+
+    @Override
+    public void disableTurretEStop() {
+        turretConfig.CurrentLimits.StatorCurrentLimit = config.turretStatorCurrentLimit;
+        PhoenixUtil.tryUntilOk(5, () -> turretMotor.getConfigurator().apply(turretConfig, 0.25));
+    }
+
+    @Override
+    public void enableFlywheelEStop() {
+        flywheelConfig.CurrentLimits.StatorCurrentLimit = 0;
+        flywheelFollowerConfig.CurrentLimits.StatorCurrentLimit = 0;
+        PhoenixUtil.tryUntilOk(5, () -> flywheelMotor.getConfigurator().apply(flywheelConfig, 0.25));
+        PhoenixUtil.tryUntilOk(5, () -> flywheelFollowerMotor.getConfigurator().apply(flywheelFollowerConfig, 0.25));
+    }
+
+    @Override
+    public void disableFlywheelEStop() {
+        flywheelConfig.CurrentLimits.StatorCurrentLimit = config.flywheelStatorCurrentLimit;
+        flywheelFollowerConfig.CurrentLimits.StatorCurrentLimit = config.flywheelStatorCurrentLimit;
+        PhoenixUtil.tryUntilOk(5, () -> flywheelMotor.getConfigurator().apply(flywheelConfig, 0.25));
+        PhoenixUtil.tryUntilOk(5, () -> flywheelFollowerMotor.getConfigurator().apply(flywheelFollowerConfig, 0.25));
+    }
 }

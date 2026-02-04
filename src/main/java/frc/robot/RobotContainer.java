@@ -152,7 +152,8 @@ public class RobotContainer {
                 swerveDrive.setCurrentPath(path, shouldResetPose);
             })
             .andThen(setSwerveDriveState(SwerveDrive.DesiredSystemState.FOLLOW_PATH)).
-            andThen(new WaitUntilCommand(() -> swerveDrive.getCurrentSystemState() == SwerveDrive.CurrentSystemState.IDLE));
+            andThen(new WaitUntilCommand(
+                () -> swerveDrive.getCurrentSystemState() == SwerveDrive.CurrentSystemState.IDLE));
     }
 
     private Command setSwerveDriveState(SwerveDrive.DesiredSystemState state) {
@@ -177,6 +178,6 @@ public class RobotContainer {
     }
 
     public Command getAutonomousCommand() {
-        return null;
+        return followPath(new Path("topleftsweep"), true);
     }
 }

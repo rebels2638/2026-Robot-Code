@@ -123,6 +123,22 @@ public class Intake extends SubsystemBase {
         return intakeInputs.pivotAngleRotations;
     }
 
+    public void enableRollerEStop() {
+        intakeIO.enableRollerEStop();
+    }
+
+    public void disableRollerEStop() {
+        intakeIO.disableRollerEStop();
+    }
+
+    public void enablePivotEStop() {
+        intakeIO.enablePivotEStop();
+    }
+
+    public void disablePivotEStop() {
+        intakeIO.disablePivotEStop();
+    }
+
     @AutoLogOutput(key = "Intake/isRollerAtSetpoint")
     public boolean isRollerAtSetpoint() {
         return Math.abs(intakeInputs.rollerVelocityRotationsPerSec - rollerSetpointRPS)

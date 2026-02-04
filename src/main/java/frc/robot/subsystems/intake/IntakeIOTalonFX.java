@@ -198,4 +198,28 @@ public class IntakeIOTalonFX implements IntakeIO {
 
         PhoenixUtil.tryUntilOk(5, () -> pivotMotor.getConfigurator().apply(pivotConfig, 0.25));
     }
+
+    @Override
+    public void enableRollerEStop() {
+        rollerConfig.CurrentLimits.StatorCurrentLimit = 0;
+        PhoenixUtil.tryUntilOk(5, () -> rollerMotor.getConfigurator().apply(rollerConfig, 0.25));
+    }
+
+    @Override
+    public void disableRollerEStop() {
+        rollerConfig.CurrentLimits.StatorCurrentLimit = config.rollerStatorCurrentLimit;
+        PhoenixUtil.tryUntilOk(5, () -> rollerMotor.getConfigurator().apply(rollerConfig, 0.25));
+    }
+
+    @Override
+    public void enablePivotEStop() {
+        pivotConfig.CurrentLimits.StatorCurrentLimit = 0;
+        PhoenixUtil.tryUntilOk(5, () -> pivotMotor.getConfigurator().apply(pivotConfig, 0.25));
+    }
+
+    @Override
+    public void disablePivotEStop() {
+        pivotConfig.CurrentLimits.StatorCurrentLimit = config.pivotStatorCurrentLimit;
+        PhoenixUtil.tryUntilOk(5, () -> pivotMotor.getConfigurator().apply(pivotConfig, 0.25));
+    }
 }

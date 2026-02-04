@@ -357,4 +357,28 @@ public class ModuleIOTalonFX implements ModuleIO {
         driveMotor.setNeutralMode(isCoast ? NeutralModeValue.Coast : NeutralModeValue.Brake);
         steerMotor.setNeutralMode(isCoast ? NeutralModeValue.Coast : NeutralModeValue.Brake);
     }
+
+    @Override
+    public void enableDriveEStop() {
+        driveConfig.CurrentLimits.StatorCurrentLimit = 0;
+        PhoenixUtil.tryUntilOk(5, () -> driveMotor.getConfigurator().apply(driveConfig, 0.25));
+    }
+
+    @Override
+    public void disableDriveEStop() {
+        driveConfig.CurrentLimits.StatorCurrentLimit = generalConfig.driveStatorCurrentLimit;
+        PhoenixUtil.tryUntilOk(5, () -> driveMotor.getConfigurator().apply(driveConfig, 0.25));
+    }
+
+    @Override
+    public void enableSteerEStop() {
+        steerConfig.CurrentLimits.StatorCurrentLimit = 0;
+        PhoenixUtil.tryUntilOk(5, () -> steerMotor.getConfigurator().apply(steerConfig, 0.25));
+    }
+
+    @Override
+    public void disableSteerEStop() {
+        steerConfig.CurrentLimits.StatorCurrentLimit = generalConfig.steerStatorCurrentLimit;
+        PhoenixUtil.tryUntilOk(5, () -> steerMotor.getConfigurator().apply(steerConfig, 0.25));
+    }
 }

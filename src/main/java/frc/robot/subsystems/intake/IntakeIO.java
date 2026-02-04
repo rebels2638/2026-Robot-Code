@@ -25,4 +25,8 @@ public interface IntakeIO {
     public default void setPivotAngle(double angleRotations) {}
     public default void configureControlLoop(MotorControlLoopConfig config) {}
     public default void configurePivotControlLoop(MotorControlLoopConfig config) {}
+    public default void enableRollerEStop() {}
+    public default void disableRollerEStop() {}
+    public default void enablePivotEStop() {}
+    public default void disablePivotEStop() {}
 }

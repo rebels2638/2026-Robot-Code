@@ -233,6 +233,30 @@ public class Shooter extends SubsystemBase {
         return shooterInputs.flywheelVelocityRotationsPerSec;
     }
 
+    public void enableHoodEStop() {
+        shooterIO.enableHoodEStop();
+    }
+
+    public void disableHoodEStop() {
+        shooterIO.disableHoodEStop();
+    }
+
+    public void enableTurretEStop() {
+        shooterIO.enableTurretEStop();
+    }
+
+    public void disableTurretEStop() {
+        shooterIO.disableTurretEStop();
+    }
+
+    public void enableFlywheelEStop() {
+        shooterIO.enableFlywheelEStop();
+    }
+
+    public void disableFlywheelEStop() {
+        shooterIO.disableFlywheelEStop();
+    }
+
     /**
      * Calculate ball backspin from differential roller surface speeds.
      * Flywheel (bottom) moving faster than back roller (top) creates backspin.

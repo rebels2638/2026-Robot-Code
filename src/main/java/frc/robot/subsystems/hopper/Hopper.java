@@ -92,6 +92,14 @@ public class Hopper extends SubsystemBase {
         return hopperInputs.velocityRotationsPerSec;
     }
 
+    public void enableEStop() {
+        hopperIO.enableEStop();
+    }
+
+    public void disableEStop() {
+        hopperIO.disableEStop();
+    }
+
     @AutoLogOutput(key = "Hopper/isHopperAtSetpoint")
     public boolean isHopperAtSetpoint() {
         return Math.abs(hopperInputs.velocityRotationsPerSec - hopperSetpointRPS) < config.hopperVelocityToleranceRPS;

@@ -94,6 +94,14 @@ public class Kicker extends SubsystemBase {
         return kickerInputs.velocityRotationsPerSec;
     }
 
+    public void enableEStop() {
+        kickerIO.enableEStop();
+    }
+
+    public void disableEStop() {
+        kickerIO.disableEStop();
+    }
+
     // Setpoint check methods
     @AutoLogOutput(key = "Kicker/isKickerAtSetpoint")
     public boolean isKickerAtSetpoint() {

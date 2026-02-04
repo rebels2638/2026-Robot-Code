@@ -25,6 +25,7 @@ import frc.robot.lib.util.DashboardMotorControlLoopConfigurator.MotorControlLoop
 import frc.robot.lib.util.PhoenixUtil;
 
 public class KickerIOTalonFX implements KickerIO {
+    private final KickerConfig config;
     private final TalonFX kickerMotor;
 
     private final StatusSignal<AngularVelocity> kickerVelocityStatusSignal;
@@ -37,6 +38,7 @@ public class KickerIOTalonFX implements KickerIO {
     private final TalonFXConfiguration kickerConfig;
 
     public KickerIOTalonFX(KickerConfig config) {
+        this.config = config;
         // Kicker motor configuration (velocity control)
         kickerConfig = new TalonFXConfiguration();
 
@@ -112,6 +114,18 @@ public class KickerIOTalonFX implements KickerIO {
         kickerConfig.Slot0.kV = config.kV();
         kickerConfig.Slot0.kA = config.kA();
 
+        PhoenixUtil.tryUntilOk(5, () -> kickerMotor.getConfigurator().apply(kickerConfig, 0.25));
+    }
+
+    @Override
+    public void enableEStop() {
+        kickerConfig.CurrentLimits.StatorCurrentLimit = 0;
+        PhoenixUtil.tryUntilOk(5, () -> kickerMotor.getConfigurator().apply(kickerConfig, 0.25));
+    }
+
+    @Override
+    public void disableEStop() {
+        kickerConfig.CurrentLimits.StatorCurrentLimit = config.kickerStatorCurrentLimit;
         PhoenixUtil.tryUntilOk(5, () -> kickerMotor.getConfigurator().apply(kickerConfig, 0.25));
     }
 }

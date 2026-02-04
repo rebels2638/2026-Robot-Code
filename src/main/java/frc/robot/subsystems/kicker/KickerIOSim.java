@@ -24,6 +24,7 @@ public class KickerIOSim implements KickerIO {
 
     private boolean isKickerClosedLoop = true;
     private double desiredKickerVelocityRotationsPerSec = 0;
+    private boolean isKickerEStopped = false;
 
     private double lastTimeInputs = Timer.getTimestamp();
 
@@ -44,7 +45,9 @@ public class KickerIOSim implements KickerIO {
         double dt = Timer.getTimestamp() - lastTimeInputs;
         lastTimeInputs = Timer.getTimestamp();
 
-        if (isKickerClosedLoop) {
+        if (isKickerEStopped) {
+            kickerSim.setInputVoltage(0);
+        } else if (isKickerClosedLoop) {
             kickerSim.setInputVoltage(
                 MathUtil.clamp(
                     kickerFeedforward.calculate(desiredKickerVelocityRotationsPerSec) +
@@ -67,6 +70,11 @@ public class KickerIOSim implements KickerIO {
 
     @Override
     public void setVelocity(double velocityRotationsPerSec) {
+        if (isKickerEStopped) {
+            kickerSim.setInputVoltage(0);
+            isKickerClosedLoop = false;
+            return;
+        }
         kickerFeedback.setSetpoint(velocityRotationsPerSec);
         desiredKickerVelocityRotationsPerSec = velocityRotationsPerSec;
         isKickerClosedLoop = true;
@@ -74,7 +82,7 @@ public class KickerIOSim implements KickerIO {
 
     @Override
     public void setVoltage(double voltage) {
-        kickerSim.setInputVoltage(voltage);
+        kickerSim.setInputVoltage(isKickerEStopped ? 0 : voltage);
         isKickerClosedLoop = false;
     }
 
@@ -87,5 +95,17 @@ public class KickerIOSim implements KickerIO {
         kickerFeedforward.setKs(config.kS());
         kickerFeedforward.setKv(config.kV());
         kickerFeedforward.setKa(config.kA());
+    }
+
+    @Override
+    public void enableEStop() {
+        isKickerEStopped = true;
+        kickerSim.setInputVoltage(0);
+        isKickerClosedLoop = false;
+    }
+
+    @Override
+    public void disableEStop() {
+        isKickerEStopped = false;
     }
 }

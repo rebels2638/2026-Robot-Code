@@ -25,6 +25,7 @@ import frc.robot.lib.util.DashboardMotorControlLoopConfigurator.MotorControlLoop
 import frc.robot.lib.util.PhoenixUtil;
 
 public class HopperIOTalonFX implements HopperIO {
+    private final HopperConfig config;
     private final TalonFX hopperMotor;
 
     private final StatusSignal<AngularVelocity> hopperVelocityStatusSignal;
@@ -37,6 +38,7 @@ public class HopperIOTalonFX implements HopperIO {
     private final TalonFXConfiguration hopperConfig;
 
     public HopperIOTalonFX(HopperConfig config) {
+        this.config = config;
         hopperConfig = new TalonFXConfiguration();
 
         hopperConfig.Slot0.kP = config.hopperKP;
@@ -110,6 +112,18 @@ public class HopperIOTalonFX implements HopperIO {
         hopperConfig.Slot0.kV = config.kV();
         hopperConfig.Slot0.kA = config.kA();
 
+        PhoenixUtil.tryUntilOk(5, () -> hopperMotor.getConfigurator().apply(hopperConfig, 0.25));
+    }
+
+    @Override
+    public void enableEStop() {
+        hopperConfig.CurrentLimits.StatorCurrentLimit = 0;
+        PhoenixUtil.tryUntilOk(5, () -> hopperMotor.getConfigurator().apply(hopperConfig, 0.25));
+    }
+
+    @Override
+    public void disableEStop() {
+        hopperConfig.CurrentLimits.StatorCurrentLimit = config.hopperStatorCurrentLimit;
         PhoenixUtil.tryUntilOk(5, () -> hopperMotor.getConfigurator().apply(hopperConfig, 0.25));
     }
 }

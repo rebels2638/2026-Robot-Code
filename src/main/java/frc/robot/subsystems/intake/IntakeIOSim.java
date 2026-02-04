@@ -33,6 +33,8 @@ public class IntakeIOSim implements IntakeIO {
     private boolean isRollerClosedLoop = true;
     private boolean isPivotClosedLoop = true;
     private double desiredRollerVelocityRotationsPerSec = 0;
+    private boolean isRollerEStopped = false;
+    private boolean isPivotEStopped = false;
 
     private double lastTimeInputs = Timer.getTimestamp();
     private final IntakeConfig config;
@@ -51,7 +53,9 @@ public class IntakeIOSim implements IntakeIO {
         double dt = Timer.getTimestamp() - lastTimeInputs;
         lastTimeInputs = Timer.getTimestamp();
 
-        if (isRollerClosedLoop) {
+        if (isRollerEStopped) {
+            rollerSim.setInputVoltage(0);
+        } else if (isRollerClosedLoop) {
             rollerSim.setInputVoltage(
                 MathUtil.clamp(
                     rollerFeedforward.calculate(desiredRollerVelocityRotationsPerSec) +
@@ -62,7 +66,9 @@ public class IntakeIOSim implements IntakeIO {
             );
         }
 
-        if (isPivotClosedLoop) {
+        if (isPivotEStopped) {
+            pivotSim.setInputVoltage(0);
+        } else if (isPivotClosedLoop) {
             pivotSim.setInputVoltage(
                 MathUtil.clamp(
                     pivotFeedback.calculate(pivotSim.getAngularPositionRad()),
@@ -89,6 +95,11 @@ public class IntakeIOSim implements IntakeIO {
 
     @Override
     public void setVelocity(double velocityRotationsPerSec) {
+        if (isRollerEStopped) {
+            rollerSim.setInputVoltage(0);
+            isRollerClosedLoop = false;
+            return;
+        }
         rollerFeedback.setSetpoint(velocityRotationsPerSec);
         desiredRollerVelocityRotationsPerSec = velocityRotationsPerSec;
         isRollerClosedLoop = true;
@@ -96,12 +107,17 @@ public class IntakeIOSim implements IntakeIO {
 
     @Override
     public void setVoltage(double voltage) {
-        rollerSim.setInputVoltage(voltage);
+        rollerSim.setInputVoltage(isRollerEStopped ? 0 : voltage);
         isRollerClosedLoop = false;
     }
 
     @Override
     public void setPivotAngle(double angleRotations) {
+        if (isPivotEStopped) {
+            pivotSim.setInputVoltage(0);
+            isPivotClosedLoop = false;
+            return;
+        }
         double clampedAngle = MathUtil.clamp(angleRotations,
             config.pivotMinAngleRotations,
             config.pivotMaxAngleRotations);
@@ -125,5 +141,29 @@ public class IntakeIOSim implements IntakeIO {
         pivotFeedback.setP(config.kP());
         pivotFeedback.setI(config.kI());
         pivotFeedback.setD(config.kD());
+    }
+
+    @Override
+    public void enableRollerEStop() {
+        isRollerEStopped = true;
+        rollerSim.setInputVoltage(0);
+        isRollerClosedLoop = false;
+    }
+
+    @Override
+    public void disableRollerEStop() {
+        isRollerEStopped = false;
+    }
+
+    @Override
+    public void enablePivotEStop() {
+        isPivotEStopped = true;
+        pivotSim.setInputVoltage(0);
+        isPivotClosedLoop = false;
+    }
+
+    @Override
+    public void disablePivotEStop() {
+        isPivotEStopped = false;
     }
 }

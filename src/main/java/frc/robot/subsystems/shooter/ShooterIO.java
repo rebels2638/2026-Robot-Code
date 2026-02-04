@@ -46,4 +46,10 @@ public interface ShooterIO {
     public default void configureHoodControlLoop(MotorControlLoopConfig config) {}
     public default void configureTurretControlLoop(MotorControlLoopConfig config) {}
     public default void configureFlywheelControlLoop(MotorControlLoopConfig config) {}
+    public default void enableHoodEStop() {}
+    public default void disableHoodEStop() {}
+    public default void enableTurretEStop() {}
+    public default void disableTurretEStop() {}
+    public default void enableFlywheelEStop() {}
+    public default void disableFlywheelEStop() {}
 }

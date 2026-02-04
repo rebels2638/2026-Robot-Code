@@ -170,6 +170,11 @@ public class SwerveDrive extends SubsystemBase {
     private final GyroIO gyroIO;
     private GyroIOInputsAutoLogged gyroInputs = new GyroIOInputsAutoLogged();
 
+    private static final int FRONT_LEFT_INDEX = 0;
+    private static final int FRONT_RIGHT_INDEX = 1;
+    private static final int BACK_LEFT_INDEX = 2;
+    private static final int BACK_RIGHT_INDEX = 3;
+
     private SwerveModulePosition[] modulePositions = new SwerveModulePosition[] {
         new SwerveModulePosition(),
         new SwerveModulePosition(),
@@ -1090,6 +1095,70 @@ public class SwerveDrive extends SubsystemBase {
         for (ModuleIO module : modules) {
             module.setWheelCoast(isCoast);
         }
+    }
+
+    public void enableFrontLeftDriveEStop() {
+        modules[FRONT_LEFT_INDEX].enableDriveEStop();
+    }
+
+    public void disableFrontLeftDriveEStop() {
+        modules[FRONT_LEFT_INDEX].disableDriveEStop();
+    }
+
+    public void enableFrontLeftSteerEStop() {
+        modules[FRONT_LEFT_INDEX].enableSteerEStop();
+    }
+
+    public void disableFrontLeftSteerEStop() {
+        modules[FRONT_LEFT_INDEX].disableSteerEStop();
+    }
+
+    public void enableFrontRightDriveEStop() {
+        modules[FRONT_RIGHT_INDEX].enableDriveEStop();
+    }
+
+    public void disableFrontRightDriveEStop() {
+        modules[FRONT_RIGHT_INDEX].disableDriveEStop();
+    }
+
+    public void enableFrontRightSteerEStop() {
+        modules[FRONT_RIGHT_INDEX].enableSteerEStop();
+    }
+
+    public void disableFrontRightSteerEStop() {
+        modules[FRONT_RIGHT_INDEX].disableSteerEStop();
+    }
+
+    public void enableBackLeftDriveEStop() {
+        modules[BACK_LEFT_INDEX].enableDriveEStop();
+    }
+
+    public void disableBackLeftDriveEStop() {
+        modules[BACK_LEFT_INDEX].disableDriveEStop();
+    }
+
+    public void enableBackLeftSteerEStop() {
+        modules[BACK_LEFT_INDEX].enableSteerEStop();
+    }
+
+    public void disableBackLeftSteerEStop() {
+        modules[BACK_LEFT_INDEX].disableSteerEStop();
+    }
+
+    public void enableBackRightDriveEStop() {
+        modules[BACK_RIGHT_INDEX].enableDriveEStop();
+    }
+
+    public void disableBackRightDriveEStop() {
+        modules[BACK_RIGHT_INDEX].disableDriveEStop();
+    }
+
+    public void enableBackRightSteerEStop() {
+        modules[BACK_RIGHT_INDEX].enableSteerEStop();
+    }
+
+    public void disableBackRightSteerEStop() {
+        modules[BACK_RIGHT_INDEX].disableSteerEStop();
     }
 
     public Command getDynamicDriveCharacterizationSysIdRoutine(Direction direction) {
