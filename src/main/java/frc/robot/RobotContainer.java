@@ -51,7 +51,7 @@ public class RobotContainer {
 
     private final RobotState robotState = RobotState.getInstance();
     private final SwerveDrive swerveDrive = SwerveDrive.getInstance();
-    private final Superstructure superstructure = Superstructure.getInstance();
+    // private final Superstructure superstructure = Superstructure.getInstance();
     private final Vision vision = Vision.getInstance();
 
     @SuppressWarnings("unused")
@@ -76,7 +76,7 @@ public class RobotContainer {
         swerveDrive.setDesiredSystemState(SwerveDrive.DesiredSystemState.TELEOP);
         
         // Set default superstructure state to HOME
-        superstructure.setDesiredState(Superstructure.DesiredState.HOME);
+        // superstructure.setDesiredState(Superstructure.DesiredState.HOME);
 
 
 
@@ -171,9 +171,9 @@ public class RobotContainer {
         // xboxDriver.getAButton().onTrue(new InstantCommand(() -> superstructure.setDesiredState(Superstructure.DesiredState.BUMP)));
         // xboxDriver.getAButton().onFalse(new InstantCommand(() -> superstructure.setDesiredState(Superstructure.DesiredState.HOME)));
 
-        xboxDriver.getAButton().onTrue(new InstantCommand(() -> superstructure.setDesiredState(Superstructure.DesiredState.HOME)));
-        xboxDriver.getBButton().onFalse(new InstantCommand(() -> superstructure.setDesiredState(Superstructure.DesiredState.READY_FOR_SHOT)));
-        xboxDriver.getYButton().onFalse(new InstantCommand(() -> superstructure.setDesiredState(Superstructure.DesiredState.SHOOTING)));
+        // xboxDriver.getAButton().onTrue(new InstantCommand(() -> superstructure.setDesiredState(Superstructure.DesiredState.HOME)));
+        // xboxDriver.getBButton().onFalse(new InstantCommand(() -> superstructure.setDesiredState(Superstructure.DesiredState.READY_FOR_SHOT)));
+        // xboxDriver.getYButton().onFalse(new InstantCommand(() -> superstructure.setDesiredState(Superstructure.DesiredState.SHOOTING)));
 
     }
 
@@ -208,6 +208,6 @@ public class RobotContainer {
     }
 
     public Command getAutonomousCommand() {
-        return followPath(new Path("simple_back"), true);
+        return followPath(new Path("simple_back"), false);
     }
 }

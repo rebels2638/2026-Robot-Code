@@ -107,7 +107,7 @@
   "shooterPoseZ": 0.46,
   "shooterPoseRollDeg": 0.0,
   "shooterPosePitchDeg": 0.0,
-  "shooterPoseYawDeg": 0.0,
+  "shooterPoseYawDeg": -92.0,
   "hoodAngleToleranceRotations": 0.0055555556,
   "flywheelVelocityToleranceRPS": 3.0
 }
