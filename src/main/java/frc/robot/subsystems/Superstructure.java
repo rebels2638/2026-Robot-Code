@@ -86,6 +86,9 @@ public class Superstructure extends SubsystemBase {
     private double kickerEngagedTime = 0;
     private double lastBallVisualizedTime = 0;
     private boolean hasStartedShooting = false;
+    
+    // Cached shot data - calculated once per periodic cycle
+    private ShotData cachedShotData;
 
     private Superstructure() {
         // Set up suppliers for the shooter - these provide dynamic setpoints based on shot calculation
@@ -96,6 +99,10 @@ public class Superstructure extends SubsystemBase {
 
     @Override
     public void periodic() {
+        // Calculate shot data once per cycle - all methods use this cached value
+        cachedShotData = calculateShotData();
+        Logger.recordOutput("Superstructure/shotData", cachedShotData);
+        
         handleStateTransitions();
         handleCurrentState();
     }
@@ -326,8 +333,7 @@ public class Superstructure extends SubsystemBase {
         Logger.recordOutput("Superstructure/kickerReady", kickerReady);
         
         // Check if within valid shooting distance
-        ShotData shotData = calculateShotData();
-        double distance = shotData.effectiveDistance();
+        double distance = cachedShotData.effectiveDistance();
         boolean withinShotDistance = distance >= shooter.getMinShotDistFromShooterMeters() 
                                   && distance <= shooter.getMaxShotDistFromShooterMeters();
         
@@ -341,9 +347,7 @@ public class Superstructure extends SubsystemBase {
      * This ensures the robot heading keeps the turret within its physical limits.
      */
     private void updateSwerveRotationRange() {
-        ShotData shotData = calculateShotData();
-        Logger.recordOutput("Superstructure/shotData", shotData);
-        Rotation2d targetFieldYaw = shotData.targetFieldYaw();
+        Rotation2d targetFieldYaw = cachedShotData.targetFieldYaw();
         
         // Get turret physical limits
         double turretMinDeg = shooter.getTurretMinAngleDeg();
@@ -361,25 +365,19 @@ public class Superstructure extends SubsystemBase {
         swerveDrive.setRotationRange(robotRotationMin, robotRotationMax);
     }
 
-    // Target suppliers for shooter - these calculate dynamic setpoints
+    // Target suppliers for shooter - these use cached shot data
     // Target suppliers always provide values from shot calculator
     // Shooter decides when to use them based on its state
     private Rotation2d getTargetHoodAngle() {
-        ShotData shotData = calculateShotData();
-        Logger.recordOutput("Superstructure/shotData", shotData);
-        return shotData.hoodPitch();
+        return cachedShotData.hoodPitch();
     }
 
     private Rotation2d getTargetTurretAngle() {
-        ShotData shotData = calculateShotData();
-        Logger.recordOutput("Superstructure/shotData", shotData);
-        return shotData.targetFieldYaw().minus(robotState.getEstimatedPose().getRotation());
+        return cachedShotData.targetFieldYaw().minus(robotState.getEstimatedPose().getRotation());
     }
 
     private double getTargetFlywheelRPS() {
-        ShotData shotData = calculateShotData();
-        Logger.recordOutput("Superstructure/shotData", shotData);
-        return shotData.flywheelRPS();
+        return cachedShotData.flywheelRPS();
     }
 
     private ShotData calculateShotData() {
