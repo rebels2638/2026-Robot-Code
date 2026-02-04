@@ -73,7 +73,6 @@ public class Superstructure extends SubsystemBase {
     private final SwerveDrive swerveDrive = SwerveDrive.getInstance();
     private final RobotState robotState = RobotState.getInstance();
 
-    private double lastShotTime = 0;
     private static final double SHOT_DURATION_SECONDS = .3; // Time to complete one shot
     private static final double BALLS_PER_SECOND = 12.0; // Balls per second to visualize
 
@@ -106,24 +105,20 @@ public class Superstructure extends SubsystemBase {
      * Handles transitions between states with proper validation.
      */
     private void handleStateTransitions() {
+        if (currentState == CurrentState.SHOOTING && Timer.getTimestamp() - kickerEngagedTime < SHOT_DURATION_SECONDS) {
+            return; // If we're shooting, don't transition to another state until the shot is complete to prevent jitter
+        }
+
         switch (desiredState) {
             case DISABLED:
                 currentState = CurrentState.DISABLED;
                 break;
 
             case HOME:
-                if (currentState == CurrentState.SHOOTING && Timer.getTimestamp() - lastShotTime < SHOT_DURATION_SECONDS) {
-                    break;
-                }
-
                 currentState = CurrentState.HOME;
                 break;
 
             case TRACKING:
-                if (currentState == CurrentState.SHOOTING && Timer.getTimestamp() - lastShotTime < SHOT_DURATION_SECONDS) {
-                    break;
-                }
-
                 currentState = CurrentState.TRACKING;
                 break;
 
@@ -132,7 +127,6 @@ public class Superstructure extends SubsystemBase {
                 // Otherwise we're in PREPARING_FOR_SHOT
                 if (isReadyForShot()) {
                     currentState = CurrentState.READY_FOR_SHOT;
-                    lastShotTime = Timer.getTimestamp();
                 } else {
                     currentState = CurrentState.PREPARING_FOR_SHOT;
                 }
@@ -143,13 +137,15 @@ public class Superstructure extends SubsystemBase {
                 if (currentState == CurrentState.READY_FOR_SHOT) {
                     currentState = CurrentState.SHOOTING;
                     kickerEngagedTime = Timer.getTimestamp();
-                    lastShotTime = kickerEngagedTime;
                     hasStartedShooting = false;
                 } else {
                     // Not ready yet, go to preparing
                     if (isReadyForShot()) {
+                        if (currentState == CurrentState.SHOOTING) {
+                            break;
+                        }
                         currentState = CurrentState.SHOOTING;
-                        lastShotTime = Timer.getTimestamp();
+                        kickerEngagedTime = Timer.getTimestamp();
                     } else {
                         currentState = CurrentState.PREPARING_FOR_SHOT;
                     }
