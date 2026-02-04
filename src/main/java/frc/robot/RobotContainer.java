@@ -7,14 +7,10 @@ import edu.wpi.first.math.geometry.Pose2d;
 import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.InstantCommand;
-import edu.wpi.first.wpilibj2.command.ParallelCommandGroup;
-import edu.wpi.first.wpilibj2.command.WaitUntilCommand;
-import frc.robot.commands.autos.AutoShootingController;
-import frc.robot.commands.autos.AutoShootingZoneManager;
-import frc.robot.commands.autos.tower.ScoreL1;
+import frc.robot.commands.autos.AutoChooser;
+import frc.robot.commands.autos.shooting.AutoShootingZoneManager;
 import frc.robot.constants.Constants;
 import frc.robot.lib.BLine.FollowPath;
-import frc.robot.lib.BLine.Path;
 import frc.robot.lib.input.XboxController;
 import frc.robot.subsystems.swerve.SwerveDrive;
 // import frc.robot.subsystems.vision.Vision;
@@ -39,10 +35,7 @@ public class RobotContainer {
     private final SwerveDrive swerveDrive = SwerveDrive.getInstance();
     // private final Superstructure superstructure = Superstructure.getInstance();
     private final Vision vision = Vision.getInstance();
-
-    // Path for follow path state
-    private Path currentPath = null;
-    private boolean shouldResetPose = false;
+    private final AutoChooser autoChooser = AutoChooser.getInstance();
 
     private RobotContainer() {
         registerEventTriggers();
@@ -57,9 +50,6 @@ public class RobotContainer {
                 () -> -MathUtil.applyDeadband(xboxDriver.getLeftY(), Constants.OperatorConstants.LEFT_Y_DEADBAND),
                 () -> -MathUtil.applyDeadband(xboxDriver.getLeftX(), Constants.OperatorConstants.LEFT_X_DEADBAND),
                 () -> -MathUtil.applyDeadband(xboxDriver.getRightX(), Constants.OperatorConstants.RIGHT_X_DEADBAND));
-
-        // Set up path supplier for SwerveDrive
-        swerveDrive.setPathSupplier(() -> currentPath, () -> shouldResetPose);
 
         // Set default state to TELEOP
         swerveDrive.setDesiredSystemState(SwerveDrive.DesiredSystemState.TELEOP);
@@ -109,8 +99,6 @@ public class RobotContainer {
     }
 
     public void teleopInit() {
-        shouldResetPose = false;
-
         // Ensure we're in teleop state
         swerveDrive.setDesiredSystemState(SwerveDrive.DesiredSystemState.TELEOP);
         // superstructure.setDesiredState(Superstructure.DesiredState.HOME);
@@ -128,26 +116,7 @@ public class RobotContainer {
     }
 
     public Command getAutonomousCommand() {
-        Logger.recordOutput("TRIGGER1", false);
-        Logger.recordOutput("TRIGGER2", false);
-
-        // Reset shooting zone state at start of auto
-        AutoShootingZoneManager.getInstance().reset();
-
-        currentPath = new Path("bottom_start_to_output_shoot");
-        shouldResetPose = true;
-
-        Command pathFollowingCommand = new InstantCommand(
-                () -> swerveDrive.setDesiredSystemState(SwerveDrive.DesiredSystemState.PREPARE_FOR_AUTO)).andThen(
-                        new WaitUntilCommand(
-                                () -> swerveDrive
-                                        .getCurrentSystemState() == SwerveDrive.CurrentSystemState.READY_FOR_AUTO))
-                .andThen(
-                        new InstantCommand(
-                                () -> swerveDrive.setDesiredSystemState(SwerveDrive.DesiredSystemState.FOLLOW_PATH)));
-
-        return new ParallelCommandGroup(
-                new AutoShootingController(),
-                pathFollowingCommand);
+        // Use AutoChooser for dashboard-based auto selection
+        return autoChooser.getSelectedAuto();
     }
 }

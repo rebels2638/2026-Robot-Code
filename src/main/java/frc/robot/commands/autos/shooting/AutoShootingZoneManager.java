@@ -1,4 +1,4 @@
-package frc.robot.commands.autos;
+package frc.robot.commands.autos.shooting;
 
 import java.util.HashSet;
 import java.util.Set;
