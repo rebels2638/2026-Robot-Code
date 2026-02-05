@@ -27,10 +27,10 @@
     "followPathTranslationKP": 5.3,
     "followPathTranslationKI": 0.0,
     "followPathTranslationKD": 0.0,
-    "followPathRotationKP": 7.0,
+    "followPathRotationKP": 7.0, 
     "followPathRotationKI": 0.0,
     "followPathRotationKD": 0.2,
-    "followPathCrossTrackKP": 3.0,
+    "followPathCrossTrackKP": 1.0,
     "followPathCrossTrackKI": 0.0,
     "followPathCrossTrackKD": 0.0
   },
