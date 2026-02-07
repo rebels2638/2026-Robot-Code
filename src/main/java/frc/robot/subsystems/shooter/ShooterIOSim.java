@@ -18,21 +18,16 @@ public class ShooterIOSim implements ShooterIO {
     // 2 motors for flywheel with 1:1 gearing
     private final DCMotor flywheelMotorModel = DCMotor.getKrakenX60Foc(2);
 
-    private final DCMotorSim hoodSim =
-        new DCMotorSim(
-            LinearSystemId.createDCMotorSystem(hoodMotorModel, 0.00015, 21.428), // magic number because hood is not important
-            hoodMotorModel
-        );
-    private final DCMotorSim turretSim =
-        new DCMotorSim(
+    private final DCMotorSim hoodSim = new DCMotorSim(
+            LinearSystemId.createDCMotorSystem(hoodMotorModel, 0.00015, 21.428), // magic number because hood is not
+                                                                                 // important
+            hoodMotorModel);
+    private final DCMotorSim turretSim = new DCMotorSim(
             LinearSystemId.createDCMotorSystem(turretMotorModel, 0.00015, 21.428),
-            turretMotorModel
-        );
-    private final DCMotorSim flywheelSim =
-        new DCMotorSim(
+            turretMotorModel);
+    private final DCMotorSim flywheelSim = new DCMotorSim(
             LinearSystemId.createDCMotorSystem(flywheelMotorModel, 0.00015, 1.53),
-            flywheelMotorModel
-        );
+            flywheelMotorModel);
 
     private PIDController hoodFeedback;
     private ProfiledPIDController turretFeedback;
@@ -62,13 +57,11 @@ public class ShooterIOSim implements ShooterIO {
         // Turret uses a profiled PID controller in radians with trapezoidal constraints
         double turretMaxVelRadPerSec = Math.toRadians(config.turretMaxVelocityDegPerSec);
         double turretMaxAccelRadPerSec2 = Math.toRadians(config.turretMaxAccelerationDegPerSec2);
-        turretFeedback =
-            new ProfiledPIDController(
+        turretFeedback = new ProfiledPIDController(
                 config.turretKP,
                 config.turretKI,
                 config.turretKD,
-                new TrapezoidProfile.Constraints(turretMaxVelRadPerSec, turretMaxAccelRadPerSec2)
-            );
+                new TrapezoidProfile.Constraints(turretMaxVelRadPerSec, turretMaxAccelRadPerSec2));
 
         flywheelFeedback = new PIDController(config.flywheelKP, config.flywheelKI, config.flywheelKD);
 
@@ -92,37 +85,31 @@ public class ShooterIOSim implements ShooterIO {
             hoodSim.setInputVoltage(0);
         } else if (isHoodClosedLoop) {
             hoodSim.setInputVoltage(
-                MathUtil.clamp(
-                    hoodFeedback.calculate(hoodSim.getAngularPositionRad()),
-                    -12,
-                    12
-                )
-            );
+                    MathUtil.clamp(
+                            hoodFeedback.calculate(hoodSim.getAngularPositionRad()),
+                            -12,
+                            12));
         }
 
         if (isTurretEStopped) {
             turretSim.setInputVoltage(0);
         } else if (isTurretClosedLoop) {
             turretSim.setInputVoltage(
-                MathUtil.clamp(
-                    turretFeedback.calculate(turretSim.getAngularPositionRad()),
-                    -12,
-                    12
-                )
-            );
+                    MathUtil.clamp(
+                            turretFeedback.calculate(turretSim.getAngularPositionRad()),
+                            -12,
+                            12));
         }
 
         if (isFlywheelEStopped) {
             flywheelSim.setInputVoltage(0);
         } else if (isFlywheelClosedLoop) {
             flywheelSim.setInputVoltage(
-                MathUtil.clamp(
-                    flywheelFeedforward.calculate(desiredFlywheelVelocityRotationsPerSec) +
-                    flywheelFeedback.calculate(flywheelSim.getAngularVelocityRadPerSec()),
-                    -12,
-                    12
-                )
-            );
+                    MathUtil.clamp(
+                            flywheelFeedforward.calculate(desiredFlywheelVelocityRotationsPerSec) +
+                                    flywheelFeedback.calculate(flywheelSim.getAngularVelocityRadPerSec()),
+                            -12,
+                            12));
         }
 
         hoodSim.update(dt);
@@ -163,8 +150,8 @@ public class ShooterIOSim implements ShooterIO {
         }
         // Clamp angle within software limits
         double clampedAngle = MathUtil.clamp(angleRotations,
-            config.hoodMinAngleRotations,
-            config.hoodMaxAngleRotations);
+                config.hoodMinAngleRotations,
+                config.hoodMaxAngleRotations);
         hoodFeedback.setSetpoint(clampedAngle * (2 * Math.PI));
         isHoodClosedLoop = true;
     }
@@ -274,5 +261,17 @@ public class ShooterIOSim implements ShooterIO {
     @Override
     public void disableFlywheelEStop() {
         isFlywheelEStopped = false;
+    }
+
+    @Override
+    public void stop() {
+        hoodSim.setInputVoltage(0);
+        isHoodClosedLoop = false;
+
+        turretSim.setInputVoltage(0);
+        isTurretClosedLoop = false;
+
+        flywheelSim.setInputVoltage(0);
+        isFlywheelClosedLoop = false;
     }
 }

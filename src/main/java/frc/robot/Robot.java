@@ -87,8 +87,8 @@ public class Robot extends LoggedRobot {
                     DriverStationSim.notifyNewData();
                 }
 
-                break;     
-                          
+                break;
+
             case REPLAY:
                 // Replaying a log, set up replay source
                 setUseTiming(false); // Run as fast as possible
@@ -128,6 +128,7 @@ public class Robot extends LoggedRobot {
         // robot's periodic
         // block in order for anything in the Command-based framework to work.
         CommandScheduler.getInstance().run();
+        Dashboard.updateData();
     }
 
     /** This function is called once each time the robot enters Disabled mode. */
@@ -161,7 +162,7 @@ public class Robot extends LoggedRobot {
             Logger.recordOutput(pair.getFirst(), pair.getSecond());
         });
     }
-    
+
     /**
      * This autonomous runs the autonomous command selected by your
      * {@link RobotContainer} class.
@@ -169,7 +170,7 @@ public class Robot extends LoggedRobot {
     @Override
     public void autonomousInit() {
         m_robotContainer.autonomousInit();
-        
+
         if (Constants.agentMode) {
             m_autonomousCommand = null;
         } else {

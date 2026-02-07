@@ -35,21 +35,54 @@ public interface ShooterIO {
         public double flywheelFollowerTemperatureFahrenheit = 0;
     }
 
-    public default void updateInputs(ShooterIOInputs inputs) {}
-    public default void setAngle(double angleRotations) {}
-    public default void setTurretAngle(double angleRotations) {}
-    public default void setShotVelocity(double velocityRotationsPerSec) {}
-    public default void setHoodTorqueCurrentFOC(double torqueCurrentFOC) {}
-    public default void setTurretTorqueCurrentFOC(double torqueCurrentFOC) {}
-    public default void setFlywheelVoltage(double voltage) {}
+    public default void updateInputs(ShooterIOInputs inputs) {
+    }
 
-    public default void configureHoodControlLoop(MotorControlLoopConfig config) {}
-    public default void configureTurretControlLoop(MotorControlLoopConfig config) {}
-    public default void configureFlywheelControlLoop(MotorControlLoopConfig config) {}
-    public default void enableHoodEStop() {}
-    public default void disableHoodEStop() {}
-    public default void enableTurretEStop() {}
-    public default void disableTurretEStop() {}
-    public default void enableFlywheelEStop() {}
-    public default void disableFlywheelEStop() {}
+    public default void setAngle(double angleRotations) {
+    }
+
+    public default void setTurretAngle(double angleRotations) {
+    }
+
+    public default void setShotVelocity(double velocityRotationsPerSec) {
+    }
+
+    public default void setHoodTorqueCurrentFOC(double torqueCurrentFOC) {
+    }
+
+    public default void setTurretTorqueCurrentFOC(double torqueCurrentFOC) {
+    }
+
+    public default void setFlywheelVoltage(double voltage) {
+    }
+
+    public default void configureHoodControlLoop(MotorControlLoopConfig config) {
+    }
+
+    public default void configureTurretControlLoop(MotorControlLoopConfig config) {
+    }
+
+    public default void configureFlywheelControlLoop(MotorControlLoopConfig config) {
+    }
+
+    public default void enableHoodEStop() {
+    }
+
+    public default void disableHoodEStop() {
+    }
+
+    public default void enableTurretEStop() {
+    }
+
+    public default void disableTurretEStop() {
+    }
+
+    public default void enableFlywheelEStop() {
+    }
+
+    public default void disableFlywheelEStop() {
+    }
+
+    public default void stop() {
+    }
 }
