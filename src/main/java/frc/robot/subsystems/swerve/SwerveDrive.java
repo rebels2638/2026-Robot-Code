@@ -169,6 +169,10 @@ public class SwerveDrive extends SubsystemBase {
             new ModuleIOInputsAutoLogged()
     };
 
+    public ModuleIOInputsAutoLogged[] getModuleInputs() {
+        return moduleInputs;
+    }
+
     private final GyroIO gyroIO;
     private GyroIOInputsAutoLogged gyroInputs = new GyroIOInputsAutoLogged();
 
