@@ -28,6 +28,14 @@ public class Dashboard {
     
     private static boolean initialized = false;
 
+    public static void addAutoChooserOption(String key, Command command) {
+        autoChooser.addOption(key, command);
+    }
+
+    public static Command getCurrentAutoCommand() { 
+        return autoChooser.getSelected();
+    }
+
     private static void initialize() {
         if (initialized) return;
         
@@ -99,14 +107,6 @@ public class Dashboard {
         autoBuilder.update();  
 
         initialized = true;
-    }
-
-    public static void addAutoChooserOption(String key, Command command) {
-        autoChooser.addOption(key, command);
-    }
-
-    public static Command getCurrentAutoCommand() {
-        return autoChooser.getSelected();
     }
 
     public static void updateData() {
