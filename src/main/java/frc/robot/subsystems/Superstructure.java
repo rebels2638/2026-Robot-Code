@@ -234,7 +234,7 @@ public class Superstructure extends SubsystemBase {
         shooter.setHoodSetpoint(HoodSetpoint.DYNAMIC);
         shooter.setTurretSetpoint(TurretSetpoint.DYNAMIC);
         shooter.setFlywheelSetpoint(FlywheelSetpoint.DYNAMIC);
-        kicker.setSetpoint(KickerSetpoint.REVERSE);
+        kicker.setSetpoint(KickerSetpoint.OFF);
         hopper.setSetpoint(HopperSetpoint.OFF);
         swerveDrive.setDesiredOmegaOverrideState(SwerveDrive.DesiredOmegaOverrideState.RANGED_ROTATION);
         swerveDrive.setDesiredTranslationOverrideState(SwerveDrive.DesiredTranslationOverrideState.CAPPED);
@@ -247,7 +247,7 @@ public class Superstructure extends SubsystemBase {
         shooter.setHoodSetpoint(HoodSetpoint.DYNAMIC);
         shooter.setTurretSetpoint(TurretSetpoint.DYNAMIC);
         shooter.setFlywheelSetpoint(FlywheelSetpoint.DYNAMIC);
-        kicker.setSetpoint(KickerSetpoint.REVERSE);
+        kicker.setSetpoint(KickerSetpoint.OFF);
         hopper.setSetpoint(HopperSetpoint.OFF);
         swerveDrive.setDesiredOmegaOverrideState(SwerveDrive.DesiredOmegaOverrideState.RANGED_ROTATION);
         swerveDrive.setDesiredTranslationOverrideState(SwerveDrive.DesiredTranslationOverrideState.CAPPED);
