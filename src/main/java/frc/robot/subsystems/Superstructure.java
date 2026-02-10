@@ -406,10 +406,6 @@ public class Superstructure extends SubsystemBase {
         DoubleUnaryOperator rpsToExitVelocity = shooter::calculateShotExitVelocityMetersPerSec;
         DoubleUnaryOperator rpsToSpinRateRadPerSec =
             rps -> shooter.calculateBackSpinRPM(rps) * 2.0 * Math.PI / 60.0;
-        
-        // Get shooter offset from robot center (for omega compensation)
-        Translation2d shooterOffsetFromRobotCenter = shooter.getShooterRelativePose().getTranslation().toTranslation2d();
-        Rotation2d robotHeading = robotState.getEstimatedPose().getRotation();
 
         return ShotCalculator.calculate(
             targetLocation,
@@ -418,9 +414,7 @@ public class Superstructure extends SubsystemBase {
             lerpTable,
             lcomp,
             rpsToExitVelocity,
-            rpsToSpinRateRadPerSec,
-            shooterOffsetFromRobotCenter,
-            robotHeading
+            rpsToSpinRateRadPerSec
         );
     }
 

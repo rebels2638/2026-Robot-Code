@@ -76,7 +76,7 @@ public class Kicker extends SubsystemBase {
 
     }
 
-    private void setKickerVelocity(double velocityRotationsPerSec) {
+    public void setKickerVelocity(double velocityRotationsPerSec) {
         kickerSetpointRPS = velocityRotationsPerSec;
         Logger.recordOutput("Kicker/velocitySetpointRPS", velocityRotationsPerSec);
         kickerIO.setVelocity(velocityRotationsPerSec);
