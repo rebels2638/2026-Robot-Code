@@ -1,0 +1,28 @@
+---
+description: WPILib Agent Tools core sandbox workflow
+alwaysApply: true
+---
+
+# WPILib Agent Tools Core Rule
+
+## Required workflow
+
+- Run code iteration in sandboxes, not directly in the workspace.
+- Start with `wpilib-agent-tools sandbox create --name <id> --source workspace`.
+- Execute iterative commands through `wpilib-agent-tools sandbox run --name <id> -- <command>`.
+- Generate final changes with `wpilib-agent-tools sandbox patch --name <id> --output <file>`.
+- Apply reviewed patch output to workspace only after explicit approval.
+- Clean completed sandboxes with `wpilib-agent-tools sandbox clean --name <id>` unless the user asks to keep them.
+
+## Execution safety
+
+- Before launching a new run, stop existing tool/sim processes so only one instance is active.
+- Use `wpilib-agent-tools sandbox status` and `wpilib-agent-tools sandbox stop --name <id>` to manage active jobs.
+- If needed, use `agent/scripts/cleanup_instances.sh` before starting another run.
+- Prefer bounded runs and machine-consumable output (`--json`) whenever possible.
+
+## Robot mode alignment
+
+- Before proposing or applying robot-code behavior changes, identify the current mode/switching pattern (simulation vs IRL, compile-time flags, runtime toggles).
+- Check common mode locations first (for example `Constants.java`, mode enums, `RobotContainer`, or sim/real selection logic) and align changes with the active pattern.
+- Avoid introducing parallel mode-switch systems unless explicitly requested.
