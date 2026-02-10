@@ -234,7 +234,7 @@ public class Superstructure extends SubsystemBase {
         shooter.setHoodSetpoint(HoodSetpoint.DYNAMIC);
         shooter.setTurretSetpoint(TurretSetpoint.DYNAMIC);
         shooter.setFlywheelSetpoint(FlywheelSetpoint.DYNAMIC);
-        kicker.setSetpoint(KickerSetpoint.FEEDING);
+        kicker.setSetpoint(KickerSetpoint.REVERSE);
         hopper.setSetpoint(HopperSetpoint.OFF);
         swerveDrive.setDesiredOmegaOverrideState(SwerveDrive.DesiredOmegaOverrideState.RANGED_ROTATION);
         swerveDrive.setDesiredTranslationOverrideState(SwerveDrive.DesiredTranslationOverrideState.CAPPED);
@@ -247,7 +247,7 @@ public class Superstructure extends SubsystemBase {
         shooter.setHoodSetpoint(HoodSetpoint.DYNAMIC);
         shooter.setTurretSetpoint(TurretSetpoint.DYNAMIC);
         shooter.setFlywheelSetpoint(FlywheelSetpoint.DYNAMIC);
-        kicker.setSetpoint(KickerSetpoint.FEEDING);
+        kicker.setSetpoint(KickerSetpoint.REVERSE);
         hopper.setSetpoint(HopperSetpoint.OFF);
         swerveDrive.setDesiredOmegaOverrideState(SwerveDrive.DesiredOmegaOverrideState.RANGED_ROTATION);
         swerveDrive.setDesiredTranslationOverrideState(SwerveDrive.DesiredTranslationOverrideState.CAPPED);
@@ -406,6 +406,10 @@ public class Superstructure extends SubsystemBase {
         DoubleUnaryOperator rpsToExitVelocity = shooter::calculateShotExitVelocityMetersPerSec;
         DoubleUnaryOperator rpsToSpinRateRadPerSec =
             rps -> shooter.calculateBackSpinRPM(rps) * 2.0 * Math.PI / 60.0;
+        
+        // Get shooter offset from robot center (for omega compensation)
+        Translation2d shooterOffsetFromRobotCenter = shooter.getShooterRelativePose().getTranslation().toTranslation2d();
+        Rotation2d robotHeading = robotState.getEstimatedPose().getRotation();
 
         return ShotCalculator.calculate(
             targetLocation,
@@ -414,7 +418,9 @@ public class Superstructure extends SubsystemBase {
             lerpTable,
             lcomp,
             rpsToExitVelocity,
-            rpsToSpinRateRadPerSec
+            rpsToSpinRateRadPerSec,
+            shooterOffsetFromRobotCenter,
+            robotHeading
         );
     }
 

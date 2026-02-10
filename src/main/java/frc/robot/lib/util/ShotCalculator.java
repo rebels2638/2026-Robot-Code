@@ -30,7 +30,9 @@ public class ShotCalculator {
         InterpolatingMatrixTreeMap<Double, N2, N1> lerpTable,
         double latencyCompensationSeconds,
         DoubleUnaryOperator rpsToExitVelocity,
-        DoubleUnaryOperator rpsToSpinRateRadPerSec
+        DoubleUnaryOperator rpsToSpinRateRadPerSec,
+        Translation2d shooterOffsetFromRobotCenter,
+        Rotation2d robotHeading
     ) {
         // Total shooter velocity in field frame (linear only)
         double shooterVxField = fieldRelativeSpeeds.vxMetersPerSecond;
