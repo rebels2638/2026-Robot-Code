@@ -5,24 +5,27 @@ alwaysApply: true
 
 # WPILib Agent Tools Core Rule
 
-## Required workflow
+## Sandbox workflow
 
-- Run code iteration in sandboxes, not directly in the workspace.
-- Start with `wpilib-agent-tools sandbox create --name <id> --source workspace`.
-- Execute iterative commands through `wpilib-agent-tools sandbox run --name <id> -- <command>`.
-- Generate final changes with `wpilib-agent-tools sandbox patch --name <id> --output <file>`.
-- Apply reviewed patch output to workspace only after explicit approval.
-- Clean completed sandboxes with `wpilib-agent-tools sandbox clean --name <id>` unless the user asks to keep them.
+- Use sandboxes for iterative testing and simulation runs — not required for simple, non-iterative changes.
+- When using a sandbox:
+  1. `wpilib-agent-tools sandbox create --name <id> --source workspace`
+  2. Execute commands via `wpilib-agent-tools sandbox run --name <id> -- <command>`
+  3. Generate a patch with `wpilib-agent-tools sandbox patch --name <id> --output <file>`
+  4. Apply reviewed patch to workspace only after explicit approval.
+  5. Clean up with `wpilib-agent-tools sandbox clean --name <id>` unless the user asks to keep it.
 
 ## Execution safety
 
-- Before launching a new run, stop existing tool/sim processes so only one instance is active.
-- Use `wpilib-agent-tools sandbox status` and `wpilib-agent-tools sandbox stop --name <id>` to manage active jobs.
-- If needed, use `agent/scripts/cleanup_instances.sh` before starting another run.
+- Use `wpilib-agent-tools sandbox status` and `sandbox stop --name <id>` to manage your own sandbox jobs.
 - Prefer bounded runs and machine-consumable output (`--json`) whenever possible.
 
 ## Robot mode alignment
 
-- Before proposing or applying robot-code behavior changes, identify the current mode/switching pattern (simulation vs IRL, compile-time flags, runtime toggles).
-- Check common mode locations first (for example `Constants.java`, mode enums, `RobotContainer`, or sim/real selection logic) and align changes with the active pattern.
-- Avoid introducing parallel mode-switch systems unless explicitly requested.
+- Before running simulation, identify the current mode/switching pattern (simulation vs IRL, etc.).
+- Check `Constants.java` first, then other mode-routing code (mode enums, `RobotContainer` wiring, build flags) to ensure the correct mode is active for simulation and change if needed.
+- Change if needed. 
+
+## CLI reference
+
+- Run `wpilib-agent-tools --help` or `wpilib-agent-tools <command> --help` for full command and option details.
