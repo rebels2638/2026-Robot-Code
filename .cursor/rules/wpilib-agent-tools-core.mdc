@@ -24,7 +24,13 @@ alwaysApply: true
 
 - Before running simulation, identify the current mode/switching pattern (simulation vs IRL, etc.).
 - Check `Constants.java` first, then other mode-routing code (mode enums, `RobotContainer` wiring, build flags) to ensure the correct mode is active for simulation and change if needed.
-- Change if needed. 
+- When simulation should start in autonomous mode, set this in `robotInit()`:
+  ```java
+  DriverStationSim.setAutonomous(true);
+  DriverStationSim.setEnabled(true);
+  DriverStationSim.notifyNewData();
+  ```
+- Change if needed.
 
 ## CLI reference
 
