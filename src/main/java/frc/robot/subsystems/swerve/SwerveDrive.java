@@ -79,6 +79,7 @@ public class SwerveDrive extends SubsystemBase {
     public enum DesiredOmegaOverrideState {
         NONE,
         RANGED_ROTATION,
+        CAPPED,
         SNAPPED,
     }
 
@@ -86,6 +87,7 @@ public class SwerveDrive extends SubsystemBase {
         NONE,
         RANGED_NOMINAL,
         RANGED_RETURNING,
+        CAPPED,
         SNAPPED_NOMINAL,
         SNAPPED_RETURNING,
     }
@@ -133,12 +135,16 @@ public class SwerveDrive extends SubsystemBase {
     private Rotation2d snapTargetAngle = Rotation2d.fromDegrees(0);
     private PIDController omegaOverridePIDController;
     private PIDController snappedOmegaOverridePIDController;
-    private static final double RANGED_ROTATION_MAX_VELOCITY_FACTOR = 0.6;
+    private static final double OMEGA_OVERRIDE_CONTROLLER_MAX_VELOCITY_FACTOR = 0.6;
     private static final double RANGED_ROTATION_BUFFER_RAD = Math.toRadians(15.0); // Buffer to prevent oscillation at boundaries
 
     private boolean shouldOverrideOmega = false;
     private double omegaOverride = 0.0;
     private double lastUnoverriddenOmega = 0.0;
+
+    // Rotational velocity cap (limits max angular velocity)
+    private boolean shouldOverrideOmegaVelocityCap = false;
+    private double omegaVelocityCapMaxRadiansPerSec = Double.MAX_VALUE;
 
     // Translational speed freezing (used during shooting) - only vx/vy are frozen, omega remains controlled
     private boolean shouldOverrideTranslationalSpeedsFrozen = false;
@@ -146,8 +152,8 @@ public class SwerveDrive extends SubsystemBase {
     private double frozenVyMetersPerSec = 0.0;
 
     // Shooting velocity cap (limits max translational velocity during shooting)
-    private boolean shouldOverrideVelocityCap = false;
-    private double velocityCapMaxVelocityMetersPerSec = 1.0;
+    private boolean shouldOverrideTranslationVelocityCap = false;
+    private double translationVelocityCapMaxVelocityMetersPerSec = Double.MAX_VALUE;
 
     // Alliance-based inversion
     private int invert = 1;
@@ -326,7 +332,7 @@ public class SwerveDrive extends SubsystemBase {
                 drivetrainConfig.followPathCrossTrackKI,
                 drivetrainConfig.followPathCrossTrackKD
             )
-        ).withDefaultShouldFlip();
+        ).withDefaultShouldFlip().withTRatioBasedTranslationHandoffs(true);
 
         // Configure omega override PID controllers with velocity limiting
         omegaOverridePIDController = new PIDController(
@@ -482,6 +488,9 @@ public class SwerveDrive extends SubsystemBase {
                     currentOmegaOverrideState = CurrentOmegaOverrideState.RANGED_RETURNING;
                 }
                 break;
+            case CAPPED:
+                currentOmegaOverrideState = CurrentOmegaOverrideState.CAPPED;
+                break;
             case SNAPPED:
                 if (isAtSnapTarget()) {
                     currentOmegaOverrideState = CurrentOmegaOverrideState.SNAPPED_NOMINAL;
@@ -541,6 +550,9 @@ public class SwerveDrive extends SubsystemBase {
                 break;
             case RANGED_RETURNING:
                 handleRangedRotationReturningOmegaOverrideState();
+                break;
+            case CAPPED:
+                handleCappedOmegaOverrideState();
                 break;
             case SNAPPED_NOMINAL:
                 handleSnappedNominalOmegaOverrideState();
@@ -665,13 +677,14 @@ public class SwerveDrive extends SubsystemBase {
 
     private void handleNoneOmegaOverrideState() {
         shouldOverrideOmega = false;
-        omegaOverride = 0.0;
+        shouldOverrideOmegaVelocityCap = false;
 
         previousOmegaOverrideState = CurrentOmegaOverrideState.NONE;
     }
     
     private void handleRangedRotationOmegaOverrideState() {
         shouldOverrideOmega = true;
+        shouldOverrideOmegaVelocityCap = false;
         if (isWithinRotationRange(RANGED_ROTATION_BUFFER_RAD - Math.toRadians(drivetrainConfig.rangedRotationToleranceDeg))) {
             omegaOverride = limitOmegaForRange(lastUnoverriddenOmega); // TODO: BAD FIX
         } else {
@@ -691,6 +704,7 @@ public class SwerveDrive extends SubsystemBase {
 
     private void handleSnappedOmegaOverrideState() {
         shouldOverrideOmega = true;
+        shouldOverrideOmegaVelocityCap = false;
         omegaOverride = calculateSnapOmega();
     }
 
@@ -704,8 +718,15 @@ public class SwerveDrive extends SubsystemBase {
         previousOmegaOverrideState = CurrentOmegaOverrideState.SNAPPED_RETURNING;
     }
 
+    private void handleCappedOmegaOverrideState() {
+        shouldOverrideOmega = false;
+        shouldOverrideOmegaVelocityCap = true;
+
+        previousOmegaOverrideState = CurrentOmegaOverrideState.CAPPED;
+    }
+
     private void handleNoneTranslationOverrideState() {
-        shouldOverrideVelocityCap = false;
+        shouldOverrideTranslationVelocityCap = false;
         shouldOverrideTranslationalSpeedsFrozen = false;
 
         previousTranslationOverrideState = CurrentTranslationOverrideState.NONE;
@@ -713,7 +734,7 @@ public class SwerveDrive extends SubsystemBase {
 
     private void handleFrozenTranslationOverrideState() {
         shouldOverrideTranslationalSpeedsFrozen = true;
-        shouldOverrideVelocityCap = false;
+        shouldOverrideTranslationVelocityCap = false;
 
         if (previousTranslationOverrideState != CurrentTranslationOverrideState.FROZEN) {
             frozenVxMetersPerSec = RobotState.getInstance().getFieldRelativeSpeeds().vxMetersPerSecond;
@@ -724,7 +745,7 @@ public class SwerveDrive extends SubsystemBase {
     }
 
     private void handleCappedTranslationOverrideState() {
-        shouldOverrideVelocityCap = true;
+        shouldOverrideTranslationVelocityCap = true;
         shouldOverrideTranslationalSpeedsFrozen = false;
 
         previousTranslationOverrideState = CurrentTranslationOverrideState.CAPPED;
@@ -861,7 +882,7 @@ public class SwerveDrive extends SubsystemBase {
         double pidOutput = omegaOverridePIDController.calculate(current);
         
         // Apply velocity limit (0.6 of max omega)
-        double maxOmega = drivetrainConfig.maxAngularVelocityRadiansPerSec * RANGED_ROTATION_MAX_VELOCITY_FACTOR;
+        double maxOmega = drivetrainConfig.maxAngularVelocityRadiansPerSec * OMEGA_OVERRIDE_CONTROLLER_MAX_VELOCITY_FACTOR;
 
         
         return MathUtil.clamp(pidOutput, -maxOmega, maxOmega);
@@ -875,7 +896,7 @@ public class SwerveDrive extends SubsystemBase {
         snappedOmegaOverridePIDController.setSetpoint(target);
         double pidOutput = snappedOmegaOverridePIDController.calculate(current);
 
-        double maxOmega = drivetrainConfig.maxAngularVelocityRadiansPerSec;
+        double maxOmega = drivetrainConfig.maxAngularVelocityRadiansPerSec * OMEGA_OVERRIDE_CONTROLLER_MAX_VELOCITY_FACTOR;
         return MathUtil.clamp(pidOutput, -maxOmega, maxOmega);
     }
 
@@ -917,8 +938,12 @@ public class SwerveDrive extends SubsystemBase {
         Logger.recordOutput("SwerveDrive/snapTargetAngle", angle);
     }
 
-    public void setVelocityCapMaxVelocityMetersPerSec(double maxVelocity) {
-        this.velocityCapMaxVelocityMetersPerSec = maxVelocity;
+    public void setTranslationVelocityCapMaxVelocityMetersPerSec(double maxVelocity) {
+        this.translationVelocityCapMaxVelocityMetersPerSec = maxVelocity;
+    }
+
+    public void setOmegaVelocityCapMaxRadiansPerSec(double maxOmegaVelocity) {
+        this.omegaVelocityCapMaxRadiansPerSec = maxOmegaVelocity;
     }
 
     // System State getters/setters
@@ -1020,8 +1045,20 @@ public class SwerveDrive extends SubsystemBase {
             );
         }
 
-        if (shouldOverrideVelocityCap) {
-            double maxVelocity = velocityCapMaxVelocityMetersPerSec;
+        if (shouldOverrideOmegaVelocityCap) {
+            desiredRobotRelativeSpeeds = new ChassisSpeeds(
+                desiredRobotRelativeSpeeds.vxMetersPerSecond,
+                desiredRobotRelativeSpeeds.vyMetersPerSecond,
+                MathUtil.clamp(
+                    desiredRobotRelativeSpeeds.omegaRadiansPerSecond,
+                    -omegaVelocityCapMaxRadiansPerSec,
+                    omegaVelocityCapMaxRadiansPerSec
+                )
+            );
+        }
+
+        if (shouldOverrideTranslationVelocityCap) {
+            double maxVelocity = translationVelocityCapMaxVelocityMetersPerSec;
             double currentMagnitude = Math.hypot(desiredRobotRelativeSpeeds.vxMetersPerSecond, desiredRobotRelativeSpeeds.vyMetersPerSecond);
             if (currentMagnitude > maxVelocity && currentMagnitude > 0) {
                 double scale = maxVelocity / currentMagnitude;

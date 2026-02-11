@@ -87,59 +87,12 @@ public class RobotContainer {
     }
 
     private void configureBindings() {
-        // Path toClimb = new Path(new Waypoint(1,3, new Rotation2d(0)));
-        // xboxDriver.getXButton().onTrue(
-        //     new InstantCommand(() -> currentPath = toClimb).andThen(
-        //         new InstantCommand(() -> swerveDrive.setDesiredSystemState(SwerveDrive.DesiredSystemState.FOLLOW_PATH)).andThen(
-        //             new WaitUntilCommand(() -> swerveDrive.getCurrentSystemState() == SwerveDrive.CurrentSystemState.IDLE)).andThen(
-        //                 new InstantCommand(() -> swerveDrive.setDesiredSystemState(SwerveDrive.DesiredSystemState.TELEOP))
-        //             )
-        //         )
-        // );
-
-        // xboxDriver.getXButton().onFalse(new InstantCommand(() -> robotState.resetPose(new Pose2d(0,0, new Rotation2d(0)))));
-
-        // xboxDriver.getAButton().onTrue(new InstantCommand(() -> {
-        //         ProjectileVisualizer.addProjectile(
-        //             0, // vx
-        //             0, // vy
-        //             10, // exitVelocity
-        //             new Pose3d(0, 0, 2, new Rotation3d(0, Math.PI/4, 0)), // position & rotation
-        //             3 // hub height
-        //         );
-        //     })
-        // );
-
         xboxDriver.getAButton().onTrue(
             new InstantCommand(() -> superstructure.setDesiredState(DesiredState.SHOOTING))
         );
         xboxDriver.getBButton().onTrue(
             new InstantCommand(() -> superstructure.setDesiredState(DesiredState.TRACKING))
         );
-
-        // xboxDriver.getAButton().onTrue(
-        //     new ConditionalCommand(
-        //         new SequentialCommandGroup(
-        //             followPath(
-        //                 new Path(
-        //                     new PathConstraints()
-        //                         .setMaxVelocityMetersPerSec(AlignmentConstants.Tower.INTERMEDIARY_MAX_VELOCITY_METERS_PER_SEC)
-        //                         .setEndTranslationToleranceMeters(AlignmentConstants.Tower.INTERMEDIARY_TRANSLATION_TOLERANCE_METERS)
-        //                         .setEndRotationToleranceDeg(AlignmentConstants.Tower.INTERMEDIARY_ROTATION_TOLERANCE_DEG),
-        //                     new Waypoint(AlignmentConstants.Tower.Left.INTERMEDIATE_WAYPOINT)),
-        //                 false
-        //             ),
-        //             followPath(
-        //                 new Path(
-        //                     new PathConstraints().setMaxVelocityMetersPerSec(AlignmentConstants.Tower.APPROACH_MAX_VELOCITY_METERS_PER_SEC),
-        //                     new Waypoint(AlignmentConstants.Tower.Left.FINAL_WAYPOINT)),
-        //                 false
-        //             )                
-        //         ),
-        //         new InstantCommand(() -> {}),
-        //         () -> AlignmentConstants.Tower.isWithinBounds(robotState.getEstimatedPose(), AlignmentConstants.Tower.Left.BOUNDS)
-        //     )
-        // );
 
         // Test snap-to-angle bindings
         // xboxDriver.getAButton().onTrue(new InstantCommand(() -> superstructure.setDesiredState(Superstructure.DesiredState.BUMP)));

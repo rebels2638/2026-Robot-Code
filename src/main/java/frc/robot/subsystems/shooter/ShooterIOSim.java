@@ -176,7 +176,6 @@ public class ShooterIOSim implements ShooterIO {
             isTurretClosedLoop = false;
             return;
         }
-        // Clamp angle within software limits
         double minRot = config.turretMinAngleDeg / 360.0;
         double maxRot = config.turretMaxAngleDeg / 360.0;
         double clampedAngle = MathUtil.clamp(angleRotations, minRot, maxRot);

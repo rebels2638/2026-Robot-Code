@@ -87,6 +87,8 @@ public class Shooter extends SubsystemBase {
     private double hoodSetpointRotations = 0.0;
     private double turretSetpointRotations = 0.0;
     private double flywheelSetpointRPS = 0.0;
+    private double turretResolvedSetpointDeg = 0.0;
+    private boolean turretUsedUnwindFallback = false;
 
     private Shooter() {
         boolean useSimulation = Constants.shouldUseSimulation(Constants.SimOnlySubsystems.SHOOTER);
@@ -175,8 +177,8 @@ public class Shooter extends SubsystemBase {
         setShotVelocity(target);
     }
 
-    // Direct setters for mechanism control (now private, used internally by state handlers)
-    private void setHoodAngle(Rotation2d angle) {
+    // Direct setters for mechanism control (exposed for tuning/overrides in RobotContainer)
+    public void setHoodAngle(Rotation2d angle) {
         double clampedAngle = MathUtil.clamp(angle.getRotations(), config.hoodMinAngleRotations, config.hoodMaxAngleRotations); 
 
         hoodSetpointRotations = clampedAngle;
@@ -187,34 +189,59 @@ public class Shooter extends SubsystemBase {
     }
 
     private void setTurretAngle(Rotation2d angle) {
-        Logger.recordOutput("Shooter/unclampedTurretAngleRotations", angle.getRotations());
-
-        double initAngle = angle.getDegrees();
+        double requestedDeg = angle.getDegrees();
+        double currentDeg = shooterInputs.turretAngleRotations * 360.0;
         double minDeg = config.turretMinAngleDeg;
         double maxDeg = config.turretMaxAngleDeg;
-        
+
+        Logger.recordOutput("Shooter/unclampedTurretAngleRotations", angle.getRotations());
+        Logger.recordOutput("Shooter/turretRequestedAngleDeg", requestedDeg);
+        Logger.recordOutput("Shooter/turretCurrentAngleDeg", currentDeg);
+
         double targetAngleDeg;
-        
-        // Check if the angle (or wrapped equivalents) are within the valid range
-        if (initAngle >= minDeg && initAngle <= maxDeg) {
-            targetAngleDeg = initAngle;
-        } else if (initAngle + 360.0 >= minDeg && initAngle + 360.0 <= maxDeg) {
-            targetAngleDeg = initAngle + 360.0;
-        } else if (initAngle - 360.0 >= minDeg && initAngle - 360.0 <= maxDeg) {
-            targetAngleDeg = initAngle - 360.0;
+        boolean usedUnwindFallback;
+        double unwindTargetDeg = Double.NaN;
+
+        // Find all wrapped equivalents requestedDeg + k*360 within turret limits.
+        int minK = (int) Math.ceil((minDeg - requestedDeg) / 360.0);
+        int maxK = (int) Math.floor((maxDeg - requestedDeg) / 360.0);
+
+        if (minK <= maxK) {
+            double bestAngleDeg = requestedDeg + (minK * 360.0);
+            double bestDistanceDeg = Math.abs(bestAngleDeg - currentDeg);
+
+            for (int k = minK + 1; k <= maxK; k++) {
+                double candidateDeg = requestedDeg + (k * 360.0);
+                double candidateDistanceDeg = Math.abs(candidateDeg - currentDeg);
+                if (candidateDistanceDeg < bestDistanceDeg) {
+                    bestDistanceDeg = candidateDistanceDeg;
+                    bestAngleDeg = candidateDeg;
+                }
+            }
+
+            targetAngleDeg = bestAngleDeg;
+            usedUnwindFallback = false;
         } else {
-            // None of the wrapped angles are in range, clamp to nearest bound
-            targetAngleDeg = MathUtil.clamp(initAngle, minDeg, maxDeg);
+            // No valid wrapped equivalent: unwind toward the range side closest to turret zero.
+            unwindTargetDeg = Math.abs(minDeg) <= Math.abs(maxDeg) ? minDeg : maxDeg;
+            targetAngleDeg = unwindTargetDeg;
+            usedUnwindFallback = true;
         }
 
-        double clampedAngleRotations = targetAngleDeg / 360.0;
-        turretSetpointRotations = clampedAngleRotations;
-        Logger.recordOutput("Shooter/turretAngleSetpointRotations", clampedAngleRotations);
+        double targetAngleRotations = targetAngleDeg / 360.0;
+        turretSetpointRotations = targetAngleRotations;
+        turretResolvedSetpointDeg = targetAngleDeg;
+        turretUsedUnwindFallback = usedUnwindFallback;
 
-        shooterIO.setTurretAngle(clampedAngleRotations);
+        Logger.recordOutput("Shooter/turretUsedUnwindFallback", usedUnwindFallback);
+        Logger.recordOutput("Shooter/turretUnwindTargetDeg", unwindTargetDeg);
+        Logger.recordOutput("Shooter/turretResolvedSetpointDeg", targetAngleDeg);
+        Logger.recordOutput("Shooter/turretAngleSetpointRotations", targetAngleRotations);
+
+        shooterIO.setTurretAngle(targetAngleRotations);
     }
 
-    private void setShotVelocity(double velocityRotationsPerSec) {
+    public void setShotVelocity(double velocityRotationsPerSec) {
         flywheelSetpointRPS = velocityRotationsPerSec;
         Logger.recordOutput("Shooter/shotVelocitySetpointRotationsPerSec", velocityRotationsPerSec);
         shooterIO.setShotVelocity(velocityRotationsPerSec);
@@ -293,6 +320,14 @@ public class Shooter extends SubsystemBase {
     @AutoLogOutput(key = "Shooter/isTurretAtSetpoint")
     public boolean isTurretAtSetpoint() {
         return Math.abs(shooterInputs.turretAngleRotations - turretSetpointRotations) < config.turretAngleToleranceRotations;
+    }
+
+    public double getTurretSetpointDegrees() {
+        return turretResolvedSetpointDeg;
+    }
+
+    public boolean getTurretUsedUnwindFallback() {
+        return turretUsedUnwindFallback;
     }
 
     @AutoLogOutput(key = "Shooter/isFlywheelAtSetpoint")

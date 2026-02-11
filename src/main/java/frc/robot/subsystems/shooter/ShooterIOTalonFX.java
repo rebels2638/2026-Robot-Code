@@ -299,7 +299,6 @@ public class ShooterIOTalonFX implements ShooterIO {
 
     @Override
     public void setTurretAngle(double angleRotations) {
-        // Clamp angle within software limits
         double minRot = config.turretMinAngleDeg / 360.0;
         double maxRot = config.turretMaxAngleDeg / 360.0;
         double clampedAngle = Math.max(minRot, Math.min(maxRot, angleRotations));
