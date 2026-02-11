@@ -19,6 +19,14 @@ alwaysApply: true
 
 - Use `wpilib-agent-tools sandbox status` and `sandbox stop --name <id>` to manage your own sandbox jobs.
 - Prefer bounded runs and machine-consumable output (`--json`) whenever possible.
+- Keep evidence collection bounded by default:
+  - Prefer concise/summary output and assertions over raw log dumps.
+  - Use bounded reads (`--tail`, `--max-lines`) and targeted key queries before broad scans.
+  - Avoid repeated full-file reads and repeated status/diff polling when state has not changed.
+- Keep validation runs adaptive (case-by-case):
+  - Define acceptance checks first, then collect only the evidence needed to satisfy them.
+  - Start with the minimum run set and add another run only when a check is inconclusive or failing.
+  - Before each additional run, state what new evidence it should provide.
 
 ## Robot mode alignment
 
