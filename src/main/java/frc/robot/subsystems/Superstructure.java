@@ -79,6 +79,7 @@ public class Superstructure extends SubsystemBase {
     // Margin for swerve rotation range (degrees)
     private static final double SWERVE_ROTATION_MARGIN_DEG = 20.0;
     private static final double MAX_TRANSLATIONAL_VELOCITY_DURING_SHOT_METERS_PER_SEC = 2.5;
+    private static final double MAX_ANGULAR_VELOCITY_DURING_SHOT_RAD_PER_SEC = 0.8;
     private static final double SHOT_IMPACT_TOLERANCE_METERS = 0.3;
     private static final double BUMP_MAX_VELOCITY_METERS_PER_SEC = 1.8;
     private static final Rotation2d BUMP_SNAP_ANGLE = Rotation2d.fromDegrees(45);
@@ -228,41 +229,43 @@ public class Superstructure extends SubsystemBase {
 
     private void handlePreparingForShotState() {
         updateSwerveRotationRange();
-        swerveDrive.setVelocityCapMaxVelocityMetersPerSec(MAX_TRANSLATIONAL_VELOCITY_DURING_SHOT_METERS_PER_SEC);
-
+        swerveDrive.setTranslationVelocityCapMaxVelocityMetersPerSec(MAX_TRANSLATIONAL_VELOCITY_DURING_SHOT_METERS_PER_SEC);
+        swerveDrive.setOmegaVelocityCapMaxRadiansPerSec(MAX_ANGULAR_VELOCITY_DURING_SHOT_RAD_PER_SEC);
 
         shooter.setHoodSetpoint(HoodSetpoint.DYNAMIC);
         shooter.setTurretSetpoint(TurretSetpoint.DYNAMIC);
         shooter.setFlywheelSetpoint(FlywheelSetpoint.DYNAMIC);
         kicker.setSetpoint(KickerSetpoint.OFF);
         hopper.setSetpoint(HopperSetpoint.OFF);
-        swerveDrive.setDesiredOmegaOverrideState(SwerveDrive.DesiredOmegaOverrideState.RANGED_ROTATION);
+        swerveDrive.setDesiredOmegaOverrideState(SwerveDrive.DesiredOmegaOverrideState.CAPPED);
         swerveDrive.setDesiredTranslationOverrideState(SwerveDrive.DesiredTranslationOverrideState.CAPPED);
     }
 
     private void handleReadyForShotState() {
         updateSwerveRotationRange();
-        swerveDrive.setVelocityCapMaxVelocityMetersPerSec(MAX_TRANSLATIONAL_VELOCITY_DURING_SHOT_METERS_PER_SEC);
+        swerveDrive.setTranslationVelocityCapMaxVelocityMetersPerSec(MAX_TRANSLATIONAL_VELOCITY_DURING_SHOT_METERS_PER_SEC);
+        swerveDrive.setOmegaVelocityCapMaxRadiansPerSec(MAX_ANGULAR_VELOCITY_DURING_SHOT_RAD_PER_SEC);
 
         shooter.setHoodSetpoint(HoodSetpoint.DYNAMIC);
         shooter.setTurretSetpoint(TurretSetpoint.DYNAMIC);
         shooter.setFlywheelSetpoint(FlywheelSetpoint.DYNAMIC);
         kicker.setSetpoint(KickerSetpoint.OFF);
         hopper.setSetpoint(HopperSetpoint.OFF);
-        swerveDrive.setDesiredOmegaOverrideState(SwerveDrive.DesiredOmegaOverrideState.RANGED_ROTATION);
+        swerveDrive.setDesiredOmegaOverrideState(SwerveDrive.DesiredOmegaOverrideState.CAPPED);
         swerveDrive.setDesiredTranslationOverrideState(SwerveDrive.DesiredTranslationOverrideState.CAPPED);
     }
 
     private void handleShootingState() {        
         updateSwerveRotationRange();
-        swerveDrive.setVelocityCapMaxVelocityMetersPerSec(MAX_TRANSLATIONAL_VELOCITY_DURING_SHOT_METERS_PER_SEC);
+        swerveDrive.setTranslationVelocityCapMaxVelocityMetersPerSec(MAX_TRANSLATIONAL_VELOCITY_DURING_SHOT_METERS_PER_SEC);
+        swerveDrive.setOmegaVelocityCapMaxRadiansPerSec(MAX_ANGULAR_VELOCITY_DURING_SHOT_RAD_PER_SEC);
 
         shooter.setHoodSetpoint(HoodSetpoint.DYNAMIC);
         shooter.setTurretSetpoint(TurretSetpoint.DYNAMIC);
         shooter.setFlywheelSetpoint(FlywheelSetpoint.DYNAMIC);
         kicker.setSetpoint(KickerSetpoint.KICKING);
         hopper.setSetpoint(HopperSetpoint.FEEDING);
-        swerveDrive.setDesiredOmegaOverrideState(SwerveDrive.DesiredOmegaOverrideState.RANGED_ROTATION);
+        swerveDrive.setDesiredOmegaOverrideState(SwerveDrive.DesiredOmegaOverrideState.CAPPED);
         swerveDrive.setDesiredTranslationOverrideState(SwerveDrive.DesiredTranslationOverrideState.CAPPED);
 
         double now = Timer.getTimestamp();
@@ -284,8 +287,8 @@ public class Superstructure extends SubsystemBase {
 
     private void handleBumpState() {
         swerveDrive.setSnapTargetAngle(BUMP_SNAP_ANGLE);
-        swerveDrive.setVelocityCapMaxVelocityMetersPerSec(BUMP_MAX_VELOCITY_METERS_PER_SEC);
-        swerveDrive.setDesiredOmegaOverrideState(SwerveDrive.DesiredOmegaOverrideState.RANGED_ROTATION);
+        swerveDrive.setTranslationVelocityCapMaxVelocityMetersPerSec(BUMP_MAX_VELOCITY_METERS_PER_SEC);
+        swerveDrive.setDesiredOmegaOverrideState(SwerveDrive.DesiredOmegaOverrideState.SNAPPED);
         swerveDrive.setDesiredTranslationOverrideState(SwerveDrive.DesiredTranslationOverrideState.CAPPED);
         
         // Keep shooter in home position during bump
@@ -301,9 +304,8 @@ public class Superstructure extends SubsystemBase {
      * kicker to be ready, and robot to be within valid shooting distance.
      */
     private boolean isReadyForShot() {
-        // Check if swerve is in a nominal ranged rotation state
         boolean swerveReady = 
-            swerveDrive.getCurrentOmegaOverrideState() == SwerveDrive.CurrentOmegaOverrideState.RANGED_NOMINAL &&
+            Math.abs(robotState.getFieldRelativeSpeeds().omegaRadiansPerSecond) < MAX_ANGULAR_VELOCITY_DURING_SHOT_RAD_PER_SEC &&
             Math.hypot(
                 robotState.getFieldRelativeSpeeds().vxMetersPerSecond,
                 robotState.getFieldRelativeSpeeds().vyMetersPerSecond

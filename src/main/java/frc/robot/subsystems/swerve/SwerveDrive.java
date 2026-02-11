@@ -144,7 +144,7 @@ public class SwerveDrive extends SubsystemBase {
 
     // Rotational velocity cap (limits max angular velocity)
     private boolean shouldOverrideOmegaVelocityCap = false;
-    private double omegaVelocityCapMaxRadiansPerSec = 1.0;
+    private double omegaVelocityCapMaxRadiansPerSec = Double.MAX_VALUE;
 
     // Translational speed freezing (used during shooting) - only vx/vy are frozen, omega remains controlled
     private boolean shouldOverrideTranslationalSpeedsFrozen = false;
@@ -152,8 +152,8 @@ public class SwerveDrive extends SubsystemBase {
     private double frozenVyMetersPerSec = 0.0;
 
     // Shooting velocity cap (limits max translational velocity during shooting)
-    private boolean shouldOverrideVelocityCap = false;
-    private double velocityCapMaxVelocityMetersPerSec = 1.0;
+    private boolean shouldOverrideTranslationVelocityCap = false;
+    private double translationVelocityCapMaxVelocityMetersPerSec = Double.MAX_VALUE;
 
     // Alliance-based inversion
     private int invert = 1;
@@ -726,7 +726,7 @@ public class SwerveDrive extends SubsystemBase {
     }
 
     private void handleNoneTranslationOverrideState() {
-        shouldOverrideVelocityCap = false;
+        shouldOverrideTranslationVelocityCap = false;
         shouldOverrideTranslationalSpeedsFrozen = false;
 
         previousTranslationOverrideState = CurrentTranslationOverrideState.NONE;
@@ -734,7 +734,7 @@ public class SwerveDrive extends SubsystemBase {
 
     private void handleFrozenTranslationOverrideState() {
         shouldOverrideTranslationalSpeedsFrozen = true;
-        shouldOverrideVelocityCap = false;
+        shouldOverrideTranslationVelocityCap = false;
 
         if (previousTranslationOverrideState != CurrentTranslationOverrideState.FROZEN) {
             frozenVxMetersPerSec = RobotState.getInstance().getFieldRelativeSpeeds().vxMetersPerSecond;
@@ -745,7 +745,7 @@ public class SwerveDrive extends SubsystemBase {
     }
 
     private void handleCappedTranslationOverrideState() {
-        shouldOverrideVelocityCap = true;
+        shouldOverrideTranslationVelocityCap = true;
         shouldOverrideTranslationalSpeedsFrozen = false;
 
         previousTranslationOverrideState = CurrentTranslationOverrideState.CAPPED;
@@ -938,8 +938,8 @@ public class SwerveDrive extends SubsystemBase {
         Logger.recordOutput("SwerveDrive/snapTargetAngle", angle);
     }
 
-    public void setVelocityCapMaxVelocityMetersPerSec(double maxVelocity) {
-        this.velocityCapMaxVelocityMetersPerSec = maxVelocity;
+    public void setTranslationVelocityCapMaxVelocityMetersPerSec(double maxVelocity) {
+        this.translationVelocityCapMaxVelocityMetersPerSec = maxVelocity;
     }
 
     public void setOmegaVelocityCapMaxRadiansPerSec(double maxOmegaVelocity) {
@@ -1057,8 +1057,8 @@ public class SwerveDrive extends SubsystemBase {
             );
         }
 
-        if (shouldOverrideVelocityCap) {
-            double maxVelocity = velocityCapMaxVelocityMetersPerSec;
+        if (shouldOverrideTranslationVelocityCap) {
+            double maxVelocity = translationVelocityCapMaxVelocityMetersPerSec;
             double currentMagnitude = Math.hypot(desiredRobotRelativeSpeeds.vxMetersPerSecond, desiredRobotRelativeSpeeds.vyMetersPerSecond);
             if (currentMagnitude > maxVelocity && currentMagnitude > 0) {
                 double scale = maxVelocity / currentMagnitude;
