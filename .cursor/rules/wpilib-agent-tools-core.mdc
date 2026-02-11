@@ -1,45 +1,90 @@
 ---
-description: WPILib Agent Tools core sandbox workflow
+description: WPILib Agent Tools — CLI for simulation, log analysis, NT4 recording, and safe robot code iteration
 alwaysApply: true
 ---
 
-# WPILib Agent Tools Core Rule
+# WPILib Agent Tools
 
-## Sandbox workflow
+`wpilib-agent-tools` is a CLI installed in this environment. **You must use it** whenever the task involves simulation, log analysis, NetworkTables data, graphing, or iterative robot-code testing. Do not attempt to replicate its functionality with manual scripts, raw Gradle invocations, or ad-hoc Python.
 
-- Use sandboxes for iterative testing and simulation runs — not required for simple, non-iterative changes.
-- When using a sandbox:
-  1. `wpilib-agent-tools sandbox create --name <id> --source workspace`
-  2. Execute commands via `wpilib-agent-tools sandbox run --name <id> -- <command>`
-  3. Generate a patch with `wpilib-agent-tools sandbox patch --name <id> --output <file>`
-  4. Apply reviewed patch to workspace only after explicit approval.
-  5. Clean up with `wpilib-agent-tools sandbox clean --name <id>` unless the user asks to keep it.
+## When to use this tool
 
-## Execution safety
+| User intent | Action |
+| --- | --- |
+| Run or test simulation | `sim` (inside a sandbox for iterative work, or `--direct-workspace` for one-off runs) |
+| Analyze `.wpilog` or recorded `.json` logs | `query`, `keys`, `logs`, `graph` — these work directly, no sandbox needed |
+| Connect to a robot / capture live NT4 data | `record` — captures live NetworkTables streams to JSON for later analysis |
+| Inspect or plot logged data | `keys` to discover available keys, `query` for metrics, `graph` for PNG plots |
+| Compute derivatives, integrals, solve equations | `math` |
+| Iterate on code and validate via simulation | Full sandbox workflow (see below) |
+| Open a log visually | `view` |
 
-- Use `wpilib-agent-tools sandbox status` and `sandbox stop --name <id>` to manage your own sandbox jobs.
-- Prefer bounded runs and machine-consumable output (`--json`) whenever possible.
-- Keep evidence collection bounded by default:
-  - Prefer concise/summary output and assertions over raw log dumps.
-  - Use bounded reads (`--tail`, `--max-lines`) and targeted key queries before broad scans.
-  - Avoid repeated full-file reads and repeated status/diff polling when state has not changed.
-- Keep validation runs adaptive (case-by-case):
-  - Define acceptance checks first, then collect only the evidence needed to satisfy them.
-  - Start with the minimum run set and add another run only when a check is inconclusive or failing.
-  - Before each additional run, state what new evidence it should provide.
+## Available commands
+
+| Command   | Purpose                                                       |
+| --------- | ------------------------------------------------------------- |
+| `sandbox` | Isolated workspaces — create, run, patch, clean               |
+| `sim`     | Bounded WPILib simulation with built-in assertions            |
+| `query`   | Log analysis — avg, stats, derivatives, thresholds, FFT, settle, etc. |
+| `graph`   | PNG plots from logged numeric series                          |
+| `keys`    | List available keys in a log file                             |
+| `logs`    | List and inspect log files                                    |
+| `record`  | Capture live NetworkTables (NT4) data to JSON                 |
+| `math`    | Symbolic / numeric math (deriv, integral, solve, simplify)    |
+| `view`    | Open a log in AdvantageScope                                  |
+
+## Direct analysis (no sandbox required)
+
+Log analysis, NT4 recording, graphing, key inspection, and math all run directly — they do not need a sandbox.
+
+```
+wpilib-agent-tools logs                                          # list available logs
+wpilib-agent-tools keys --file <log>                             # discover keys
+wpilib-agent-tools query --mode stats --key "<key>" --json       # analyze a key
+wpilib-agent-tools graph --key "<key>" --output plot.png         # plot a key
+wpilib-agent-tools record --address <ip> --duration <s>          # capture live NT4 data
+wpilib-agent-tools math --mode deriv --expr "x**3 + x" --var x  # symbolic math
+```
+
+After recording NT4 data, use `query`, `keys`, and `graph` on the resulting JSON file to analyze it.
+
+## Sandbox workflow (for iterative code changes + simulation)
+
+When the task involves **iterating on code and validating through simulation**, use a sandbox to keep the workspace clean:
+
+1. **Create**: `wpilib-agent-tools sandbox create --name <id> --source workspace`
+2. **Work** inside it:
+   - `wpilib-agent-tools sandbox run --name <id> -- sim --duration <s>`
+   - `wpilib-agent-tools sandbox run --name <id> -- query --mode <mode> --key "<key>"`
+   - `wpilib-agent-tools sandbox run --name <id> -- graph --key "<key>"`
+3. **Export** a patch: `wpilib-agent-tools sandbox patch --name <id> --output <file>`
+4. **Apply** only after **explicit user approval**.
+5. **Clean up**: `wpilib-agent-tools sandbox clean --name <id>`
+
+For straightforward, non-iterative changes a sandbox is optional unless the user requests one.
+
+## Best practices
+
+- Use `--json` for machine-readable output when parsing results programmatically.
+- Keep output bounded — prefer `--summary`, `--max-lines`, `--tail`, and `--limit` over raw dumps.
+- Use `--assert-key` and `--assert-range` on `sim` for pass/fail validation instead of manual log scanning.
+- Define acceptance criteria before simulation; start with the minimum run set and expand only when a check is failing or inconclusive.
+- Prefer targeted key queries before broad scans.
+- Manage running sandbox jobs with `sandbox status` and `sandbox stop --name <id>`.
 
 ## Robot mode alignment
 
-- Before running simulation, identify the current mode/switching pattern (simulation vs IRL, etc.).
-- Check `Constants.java` first, then other mode-routing code (mode enums, `RobotContainer` wiring, build flags) to ensure the correct mode is active for simulation and change if needed.
-- When simulation should start in autonomous mode, set this in `robotInit()`:
-  ```java
-  DriverStationSim.setAutonomous(true);
-  DriverStationSim.setEnabled(true);
-  DriverStationSim.notifyNewData();
-  ```
-- Change if needed.
+Before running simulation, confirm the repo's sim-vs-IRL mode configuration:
 
-## CLI reference
+1. Check `Constants.java` first, then mode-routing code (mode enums, `RobotContainer` wiring, build flags).
+2. Ensure the correct mode is active for simulation and change if needed.
+3. To start simulation in autonomous mode, set in `robotInit()`:
+   ```java
+   DriverStationSim.setAutonomous(true);
+   DriverStationSim.setEnabled(true);
+   DriverStationSim.notifyNewData();
+   ```
 
-- Run `wpilib-agent-tools --help` or `wpilib-agent-tools <command> --help` for full command and option details.
+## Discovering more
+
+Run `wpilib-agent-tools --help` or `wpilib-agent-tools <command> --help` for full option details and examples.
