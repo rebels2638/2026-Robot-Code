@@ -135,7 +135,7 @@ public class SwerveDrive extends SubsystemBase {
     private Rotation2d snapTargetAngle = Rotation2d.fromDegrees(0);
     private PIDController omegaOverridePIDController;
     private PIDController snappedOmegaOverridePIDController;
-    private static final double RANGED_ROTATION_MAX_VELOCITY_FACTOR = 0.6;
+    private static final double OMEGA_OVERRIDE_CONTROLLER_MAX_VELOCITY_FACTOR = 0.6;
     private static final double RANGED_ROTATION_BUFFER_RAD = Math.toRadians(15.0); // Buffer to prevent oscillation at boundaries
 
     private boolean shouldOverrideOmega = false;
@@ -882,7 +882,7 @@ public class SwerveDrive extends SubsystemBase {
         double pidOutput = omegaOverridePIDController.calculate(current);
         
         // Apply velocity limit (0.6 of max omega)
-        double maxOmega = drivetrainConfig.maxAngularVelocityRadiansPerSec * RANGED_ROTATION_MAX_VELOCITY_FACTOR;
+        double maxOmega = drivetrainConfig.maxAngularVelocityRadiansPerSec * OMEGA_OVERRIDE_CONTROLLER_MAX_VELOCITY_FACTOR;
 
         
         return MathUtil.clamp(pidOutput, -maxOmega, maxOmega);
@@ -896,7 +896,7 @@ public class SwerveDrive extends SubsystemBase {
         snappedOmegaOverridePIDController.setSetpoint(target);
         double pidOutput = snappedOmegaOverridePIDController.calculate(current);
 
-        double maxOmega = drivetrainConfig.maxAngularVelocityRadiansPerSec;
+        double maxOmega = drivetrainConfig.maxAngularVelocityRadiansPerSec * OMEGA_OVERRIDE_CONTROLLER_MAX_VELOCITY_FACTOR;
         return MathUtil.clamp(pidOutput, -maxOmega, maxOmega);
     }
 
