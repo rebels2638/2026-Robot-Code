@@ -12,8 +12,8 @@ alwaysApply: true
 | User intent | Action |
 | --- | --- |
 | Run or test simulation | `sim` (inside a sandbox for iterative work, or `--direct-workspace` for one-off runs). `sim` auto-records NT4 logs by default. |
-| Analyze `.wpilog` or recorded `.json` logs | `query`, `keys`, `logs`, `graph` — these work directly, no sandbox needed |
-| Connect to a robot / capture live NT4 data | `record` — captures live NetworkTables streams to JSON for later analysis |
+| Analyze `.wpilog` logs | `query`, `keys`, `logs`, `graph` — these work directly, no sandbox needed |
+| Connect to a robot / capture live NT4 data | `record` — captures live NetworkTables streams to WPILOG for later analysis |
 | Inspect or plot logged data | `keys` to discover available keys, `query` for metrics, `graph` for PNG plots |
 | Compute derivatives, integrals, solve equations | `math` |
 | Iterate on code and validate via simulation | Full sandbox workflow (see below) |
@@ -29,7 +29,7 @@ alwaysApply: true
 | `graph`   | PNG plots from logged numeric series                          |
 | `keys`    | List available keys in a log file                             |
 | `logs`    | List and inspect log files                                    |
-| `record`  | Capture live NetworkTables (NT4) data to JSON                 |
+| `record`  | Capture live NetworkTables (NT4) data to WPILOG               |
 | `math`    | Symbolic / numeric math (deriv, integral, solve, simplify)    |
 | `view`    | Open a log in AdvantageScope                                  |
 
@@ -46,7 +46,7 @@ wpilib-agent-tools record --address <ip> --duration <s>          # capture live 
 wpilib-agent-tools math --mode deriv --expr "x**3 + x" --var x  # symbolic math
 ```
 
-After recording NT4 data, use `query`, `keys`, and `graph` on the resulting JSON file to analyze it.
+After recording NT4 data, use `query`, `keys`, and `graph` on the resulting WPILOG file to analyze it.
 After `sim`, analyze the newly generated log in `agent/logs` with `keys`, `query`, and `graph`.
 
 ## Sandbox workflow (for iterative code changes + simulation)
