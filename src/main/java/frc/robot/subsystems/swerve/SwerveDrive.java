@@ -79,6 +79,7 @@ public class SwerveDrive extends SubsystemBase {
     public enum DesiredOmegaOverrideState {
         NONE,
         RANGED_ROTATION,
+        CAPPED,
         SNAPPED,
     }
 
@@ -86,6 +87,7 @@ public class SwerveDrive extends SubsystemBase {
         NONE,
         RANGED_NOMINAL,
         RANGED_RETURNING,
+        CAPPED,
         SNAPPED_NOMINAL,
         SNAPPED_RETURNING,
     }
@@ -139,6 +141,10 @@ public class SwerveDrive extends SubsystemBase {
     private boolean shouldOverrideOmega = false;
     private double omegaOverride = 0.0;
     private double lastUnoverriddenOmega = 0.0;
+
+    // Rotational velocity cap (limits max angular velocity)
+    private boolean shouldOverrideOmegaVelocityCap = false;
+    private double omegaVelocityCapMaxRadiansPerSec = 1.0;
 
     // Translational speed freezing (used during shooting) - only vx/vy are frozen, omega remains controlled
     private boolean shouldOverrideTranslationalSpeedsFrozen = false;
@@ -482,6 +488,9 @@ public class SwerveDrive extends SubsystemBase {
                     currentOmegaOverrideState = CurrentOmegaOverrideState.RANGED_RETURNING;
                 }
                 break;
+            case CAPPED:
+                currentOmegaOverrideState = CurrentOmegaOverrideState.CAPPED;
+                break;
             case SNAPPED:
                 if (isAtSnapTarget()) {
                     currentOmegaOverrideState = CurrentOmegaOverrideState.SNAPPED_NOMINAL;
@@ -541,6 +550,9 @@ public class SwerveDrive extends SubsystemBase {
                 break;
             case RANGED_RETURNING:
                 handleRangedRotationReturningOmegaOverrideState();
+                break;
+            case CAPPED:
+                handleCappedOmegaOverrideState();
                 break;
             case SNAPPED_NOMINAL:
                 handleSnappedNominalOmegaOverrideState();
@@ -665,13 +677,14 @@ public class SwerveDrive extends SubsystemBase {
 
     private void handleNoneOmegaOverrideState() {
         shouldOverrideOmega = false;
-        omegaOverride = 0.0;
+        shouldOverrideOmegaVelocityCap = false;
 
         previousOmegaOverrideState = CurrentOmegaOverrideState.NONE;
     }
     
     private void handleRangedRotationOmegaOverrideState() {
         shouldOverrideOmega = true;
+        shouldOverrideOmegaVelocityCap = false;
         if (isWithinRotationRange(RANGED_ROTATION_BUFFER_RAD - Math.toRadians(drivetrainConfig.rangedRotationToleranceDeg))) {
             omegaOverride = limitOmegaForRange(lastUnoverriddenOmega); // TODO: BAD FIX
         } else {
@@ -691,6 +704,7 @@ public class SwerveDrive extends SubsystemBase {
 
     private void handleSnappedOmegaOverrideState() {
         shouldOverrideOmega = true;
+        shouldOverrideOmegaVelocityCap = false;
         omegaOverride = calculateSnapOmega();
     }
 
@@ -702,6 +716,13 @@ public class SwerveDrive extends SubsystemBase {
     private void handleSnappedReturningOmegaOverrideState() {
         handleSnappedOmegaOverrideState();
         previousOmegaOverrideState = CurrentOmegaOverrideState.SNAPPED_RETURNING;
+    }
+
+    private void handleCappedOmegaOverrideState() {
+        shouldOverrideOmega = false;
+        shouldOverrideOmegaVelocityCap = true;
+
+        previousOmegaOverrideState = CurrentOmegaOverrideState.CAPPED;
     }
 
     private void handleNoneTranslationOverrideState() {
@@ -921,6 +942,10 @@ public class SwerveDrive extends SubsystemBase {
         this.velocityCapMaxVelocityMetersPerSec = maxVelocity;
     }
 
+    public void setOmegaVelocityCapMaxRadiansPerSec(double maxOmegaVelocity) {
+        this.omegaVelocityCapMaxRadiansPerSec = maxOmegaVelocity;
+    }
+
     // System State getters/setters
     @AutoLogOutput(key = "SwerveDrive/desiredSystemState")
     public DesiredSystemState getDesiredSystemState() {
@@ -1017,6 +1042,18 @@ public class SwerveDrive extends SubsystemBase {
                 desiredRobotRelativeSpeeds.vxMetersPerSecond,
                 desiredRobotRelativeSpeeds.vyMetersPerSecond,
                 omegaOverride
+            );
+        }
+
+        if (shouldOverrideOmegaVelocityCap) {
+            desiredRobotRelativeSpeeds = new ChassisSpeeds(
+                desiredRobotRelativeSpeeds.vxMetersPerSecond,
+                desiredRobotRelativeSpeeds.vyMetersPerSecond,
+                MathUtil.clamp(
+                    desiredRobotRelativeSpeeds.omegaRadiansPerSecond,
+                    -omegaVelocityCapMaxRadiansPerSec,
+                    omegaVelocityCapMaxRadiansPerSec
+                )
             );
         }
 
