@@ -74,18 +74,39 @@ For straightforward, non-iterative changes a sandbox is optional unless the user
 - Prefer targeted key queries before broad scans.
 - Manage running sandbox jobs with `sandbox status` and `sandbox stop --name <id>`.
 
-## Robot mode alignment
+## Pre-sim gate: mode and DS state (MUST)
 
-Before running simulation, confirm the repo's sim-vs-IRL mode configuration:
+**Before every `sim` run**, you MUST confirm these two things. Treat either as a blocker — do not proceed to sim execution or result analysis until both are satisfied.
 
-1. Check `Constants.java` first, then mode-routing code (mode enums, `RobotContainer` wiring, build flags).
-2. Ensure the correct mode is active for simulation and change if needed.
-3. To start simulation in autonomous mode, set in `robotInit()`:
-   ```java
-   DriverStationSim.setAutonomous(true);
-   DriverStationSim.setEnabled(true);
-   DriverStationSim.notifyNewData();
-   ```
+### 1. Sim-vs-IRL mode
+
+Check `Constants.java` first, then mode-routing code (mode enums, `RobotContainer` wiring, build flags). The repo **must** be in simulation mode. If it is not, change it before running sim.
+
+### 2. DriverStation auto-enable
+
+You MUST ensure `robotInit()` (or equivalent startup path) forces the correct DS state before the sim loop begins. Choose the calls that match the target mode:
+
+```java
+// For autonomous:
+DriverStationSim.setAutonomous(true);
+DriverStationSim.setEnabled(true);
+DriverStationSim.notifyNewData();
+
+// For teleop (default when autonomous is not set):
+DriverStationSim.setEnabled(true);
+DriverStationSim.notifyNewData();
+
+// For test mode:
+DriverStationSim.setTest(true);
+DriverStationSim.setEnabled(true);
+DriverStationSim.notifyNewData();
+```
+
+If these calls are missing or gated behind a condition that won't fire in sim, **add or fix them before running sim**. Missing DS auto-enable means the target mode code never executes, and all downstream assertions will be meaningless.
+
+### Verify after first run
+
+After the first sim run, confirm the DS mode appeared correctly in telemetry (e.g. query for a DriverStation or mode key). If the mode is wrong, fix the DS setup and re-run before analyzing results.
 
 ## Discovering more
 
