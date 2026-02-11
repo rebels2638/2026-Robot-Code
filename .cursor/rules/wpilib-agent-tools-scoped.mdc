@@ -16,3 +16,7 @@ alwaysApply: false
   ```
 - Use sandbox execution for iterative simulation testing and verification — simple, non-iterative changes can be made directly in the workspace.
 - Keep direct workspace edits for final reviewed patches only, after explicit approval.
+- For validation, prefer assertions and concise summaries over full raw logs.
+- Use bounded evidence collection (`--tail`, `--max-lines`) and key-targeted queries before broad scans.
+- Keep run count adaptive to acceptance criteria; do not assume a fixed number of sim runs.
+- Add another sim pass only when it provides distinct evidence that current results do not.
