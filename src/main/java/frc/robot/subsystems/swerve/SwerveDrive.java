@@ -236,7 +236,7 @@ public class SwerveDrive extends SubsystemBase {
                 new ModuleIO() {},
                 new ModuleIO() {}
             };
-            gyroIO = new GyroIOPigeon2();
+            gyroIO = new GyroIOPigeon2(swerveConfig.gyro);
         } else {
             modules = new ModuleIO[] {
                 new ModuleIOTalonFX(moduleGeneralConfig, swerveConfig.frontLeft),
@@ -244,7 +244,7 @@ public class SwerveDrive extends SubsystemBase {
                 new ModuleIOTalonFX(moduleGeneralConfig, swerveConfig.backLeft),
                 new ModuleIOTalonFX(moduleGeneralConfig, swerveConfig.backRight)
             };
-            gyroIO = new GyroIOPigeon2();
+            gyroIO = new GyroIOPigeon2(swerveConfig.gyro);
             PhoenixOdometryThread.getInstance().start();
         }
 

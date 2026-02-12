@@ -80,7 +80,6 @@ public class Intake extends SubsystemBase {
         if (pivotControlLoopConfigurator.hasChanged()) {
             intakeIO.configurePivotControlLoop(pivotControlLoopConfigurator.getConfig());
         }
-
     }
 
     private void setRollerVelocity(double velocityRotationsPerSec) {
