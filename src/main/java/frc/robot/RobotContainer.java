@@ -48,7 +48,7 @@ public class RobotContainer {
 
     private final RobotState robotState = RobotState.getInstance();
     private final SwerveDrive swerveDrive = SwerveDrive.getInstance();
-    private final Superstructure superstructure = Superstructure.getInstance();
+    // private final Superstructure superstructure = Superstructure.getInstance();
     // private final Vision vision = Vision.getInstance();
     @SuppressWarnings("unused")
     private final ProjectileVisualizer projectileVisualizer = ProjectileVisualizer.getInstance();
@@ -73,28 +73,33 @@ public class RobotContainer {
         swerveDrive.setDesiredSystemState(SwerveDrive.DesiredSystemState.TELEOP);
         
         // Set default superstructure state to HOME
-        superstructure.setDesiredState(Superstructure.DesiredState.HOME);
+        // superstructure.setDesiredState(Superstructure.DesiredState.HOME);
 
 
         configureBindings();
     }
 
     private void registerEventTriggers() {
-        FollowPath.registerEventTrigger("test1", new InstantCommand(() -> {
-            Logger.recordOutput("In a command", true);
-        }));
-        FollowPath.registerEventTrigger("test2", () -> {
-            System.out.println("As a runnable");
-        });
+        // FollowPath.registerEventTrigger("test1", new InstantCommand(() -> {
+        //     Logger.recordOutput("In a command", true);
+        // }));
+        // FollowPath.registerEventTrigger("test2", () -> {
+        //     System.out.println("As a runnable");
+        // });
     }
 
     private void configureBindings() {
-        xboxDriver.getAButton().onTrue(
-            new InstantCommand(() -> superstructure.setDesiredState(DesiredState.SHOOTING))
+        xboxDriver.getXButton().onTrue(
+            new InstantCommand(() -> robotState.resetPose(new Pose2d(robotState.getEstimatedPose().getTranslation(), new Rotation2d(0))))
         );
-        xboxDriver.getBButton().onTrue(
-            new InstantCommand(() -> superstructure.setDesiredState(DesiredState.TRACKING))
-        );
+        
+        // xboxDriver.getAButton().onTrue(
+        //     new InstantCommand(() -> superstructure.setDesiredState(DesiredState.SHOOTING))
+        // );
+
+        // xboxDriver.getBButton().onTrue(
+        //     new InstantCommand(() -> superstructure.setDesiredState(DesiredState.TRACKING))
+        // );
 
         // xboxDriver.getAButton().onTrue(
         //     new InstantCommand(() -> Intake.getInstance().setSetpoint(Intake.IntakeSetpoint.INTAKING))
@@ -125,21 +130,22 @@ public class RobotContainer {
     public void teleopInit() {
         // Ensure we're in teleop state
         swerveDrive.setDesiredSystemState(SwerveDrive.DesiredSystemState.TELEOP);
-        superstructure.setDesiredState(Superstructure.DesiredState.HOME);
+        // superstructure.setDesiredState(Superstructure.DesiredState.HOME);
     }
 
     public void autonomousInit() {
         // Set up for autonomous
-        superstructure.setDesiredState(DesiredState.HOME);
+        // superstructure.setDesiredState(DesiredState.HOME);
         swerveDrive.setDesiredSystemState(SwerveDrive.DesiredSystemState.IDLE);
     }
 
     public void disabledInit() {
-        superstructure.setDesiredState(Superstructure.DesiredState.DISABLED);
+        // superstructure.setDesiredState(Superstructure.DesiredState.DISABLED);
         swerveDrive.setDesiredSystemState(SwerveDrive.DesiredSystemState.DISABLED);
     }
 
     public Command getAutonomousCommand() {
-        return followPath(new Path("topleftsweep"), true);
+        // return followPath(new Path("topleftsweep"), true);
+        return null;
     }
 }

@@ -32,10 +32,10 @@ public class GyroIOPigeon2 implements GyroIO {
 
     public GyroIOPigeon2() {
         gyro = new Pigeon2(2, new CANBus("drivetrain"));
-        Pigeon2Configuration config = new Pigeon2Configuration();
+        Pigeon2Configuration config = new Pigeon2Configuration(); // TODO: make json config
         config.MountPose.MountPoseYaw = 88.42582702636719;
         config.MountPose.MountPosePitch = 0.6793335676193237;
-        config.MountPose.MountPoseRoll = -176.21868896484375;
+        config.MountPose.MountPoseRoll = 3.79;
         config.GyroTrim.GyroScalarZ = 0;
 
         PhoenixUtil.tryUntilOk(5, () -> gyro.getConfigurator().apply(config, 0.25));
