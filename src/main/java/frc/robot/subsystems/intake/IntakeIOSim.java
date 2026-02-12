@@ -2,9 +2,11 @@ package frc.robot.subsystems.intake;
 
 import edu.wpi.first.math.MathUtil;
 import edu.wpi.first.math.controller.PIDController;
+import edu.wpi.first.math.controller.ProfiledPIDController;
 import edu.wpi.first.math.controller.SimpleMotorFeedforward;
 import edu.wpi.first.math.system.plant.DCMotor;
 import edu.wpi.first.math.system.plant.LinearSystemId;
+import edu.wpi.first.math.trajectory.TrapezoidProfile;
 import edu.wpi.first.wpilibj.Timer;
 import edu.wpi.first.wpilibj.simulation.DCMotorSim;
 import frc.robot.configs.IntakeConfig;
@@ -28,7 +30,7 @@ public class IntakeIOSim implements IntakeIO {
 
     private PIDController rollerFeedback;
     private SimpleMotorFeedforward rollerFeedforward;
-    private PIDController pivotFeedback;
+    private ProfiledPIDController pivotFeedback;
 
     private boolean isRollerClosedLoop = true;
     private boolean isPivotClosedLoop = true;
@@ -43,7 +45,15 @@ public class IntakeIOSim implements IntakeIO {
         this.config = config;
         rollerFeedback = new PIDController(config.rollerKP, config.rollerKI, config.rollerKD);
         rollerFeedforward = new SimpleMotorFeedforward(config.rollerKS, config.rollerKV, config.rollerKA);
-        pivotFeedback = new PIDController(config.pivotKP, config.pivotKI, config.pivotKD);
+        double pivotMaxVelRadPerSec = config.pivotMaxVelocityRotationsPerSec * 2.0 * Math.PI;
+        double pivotMaxAccelRadPerSec2 = config.pivotMaxAccelerationRotationsPerSec2 * 2.0 * Math.PI;
+        pivotFeedback =
+            new ProfiledPIDController(
+                config.pivotKP,
+                config.pivotKI,
+                config.pivotKD,
+                new TrapezoidProfile.Constraints(pivotMaxVelRadPerSec, pivotMaxAccelRadPerSec2)
+            );
 
         pivotSim.setState(config.pivotStartingAngleRotations * 2 * Math.PI, 0);
     }
@@ -59,7 +69,7 @@ public class IntakeIOSim implements IntakeIO {
             rollerSim.setInputVoltage(
                 MathUtil.clamp(
                     rollerFeedforward.calculate(desiredRollerVelocityRotationsPerSec) +
-                    rollerFeedback.calculate(rollerSim.getAngularVelocityRadPerSec()),
+                    rollerFeedback.calculate(rollerSim.getAngularVelocityRadPerSec() / (2 * Math.PI)),
                     -12,
                     12
                 )
@@ -121,7 +131,7 @@ public class IntakeIOSim implements IntakeIO {
         double clampedAngle = MathUtil.clamp(angleRotations,
             config.pivotMinAngleRotations,
             config.pivotMaxAngleRotations);
-        pivotFeedback.setSetpoint(clampedAngle * (2 * Math.PI));
+        pivotFeedback.setGoal(clampedAngle * (2 * Math.PI));
         isPivotClosedLoop = true;
     }
 

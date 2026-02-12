@@ -44,7 +44,7 @@ public class HopperIOSim implements HopperIO {
             hopperSim.setInputVoltage(
                 MathUtil.clamp(
                     hopperFeedforward.calculate(desiredHopperVelocityRotationsPerSec) +
-                    hopperFeedback.calculate(hopperSim.getAngularVelocityRadPerSec()),
+                    hopperFeedback.calculate(hopperSim.getAngularVelocityRadPerSec() / (2 * Math.PI)),
                     -12,
                     12
                 )
@@ -53,7 +53,7 @@ public class HopperIOSim implements HopperIO {
 
         hopperSim.update(dt);
 
-        inputs.velocityRotationsPerSec = hopperSim.getAngularVelocityRadPerSec();
+        inputs.velocityRotationsPerSec = hopperSim.getAngularVelocityRadPerSec() / (2 * Math.PI);
         inputs.appliedVolts = hopperSim.getInputVoltage();
         inputs.torqueCurrent = hopperSim.getCurrentDrawAmps();
         inputs.temperatureFahrenheit = 70.0;

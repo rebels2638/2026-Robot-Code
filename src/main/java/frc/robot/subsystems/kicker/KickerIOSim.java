@@ -51,7 +51,7 @@ public class KickerIOSim implements KickerIO {
             kickerSim.setInputVoltage(
                 MathUtil.clamp(
                     kickerFeedforward.calculate(desiredKickerVelocityRotationsPerSec) +
-                    kickerFeedback.calculate(kickerSim.getAngularVelocityRadPerSec()),
+                    kickerFeedback.calculate(kickerSim.getAngularVelocityRadPerSec() / (2 * Math.PI)),
                     -12,
                     12
                 )
@@ -60,7 +60,7 @@ public class KickerIOSim implements KickerIO {
 
         kickerSim.update(dt);
 
-        inputs.velocityRotationsPerSec = kickerSim.getAngularVelocityRadPerSec();
+        inputs.velocityRotationsPerSec = kickerSim.getAngularVelocityRadPerSec() / (2 * Math.PI);
         inputs.appliedVolts = kickerSim.getInputVoltage();
         inputs.torqueCurrent = kickerSim.getCurrentDrawAmps();
 

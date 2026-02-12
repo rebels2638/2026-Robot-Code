@@ -118,7 +118,7 @@ public class ShooterIOSim implements ShooterIO {
             flywheelSim.setInputVoltage(
                 MathUtil.clamp(
                     flywheelFeedforward.calculate(desiredFlywheelVelocityRotationsPerSec) +
-                    flywheelFeedback.calculate(flywheelSim.getAngularVelocityRadPerSec()),
+                    flywheelFeedback.calculate(flywheelSim.getAngularVelocityRadPerSec() / (2 * Math.PI)),
                     -12,
                     12
                 )
@@ -137,7 +137,7 @@ public class ShooterIOSim implements ShooterIO {
         inputs.turretVelocityRotationsPerSec = turretSim.getAngularVelocityRadPerSec() / (2 * Math.PI);
         inputs.turretAppliedVolts = turretSim.getInputVoltage();
 
-        inputs.flywheelVelocityRotationsPerSec = flywheelSim.getAngularVelocityRadPerSec();
+        inputs.flywheelVelocityRotationsPerSec = flywheelSim.getAngularVelocityRadPerSec() / (2 * Math.PI);
         inputs.flywheelAppliedVolts = flywheelSim.getInputVoltage();
         inputs.flywheelTorqueCurrent = flywheelSim.getCurrentDrawAmps();
 

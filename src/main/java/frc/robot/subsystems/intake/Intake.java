@@ -20,6 +20,7 @@ public class Intake extends SubsystemBase {
     }
 
     public enum IntakeSetpoint {
+        DISABLED,
         STOWED,
         DEPLOYED,
         INTAKING,
@@ -96,6 +97,10 @@ public class Intake extends SubsystemBase {
 
     public void setSetpoint(IntakeSetpoint setpoint) {
         switch (setpoint) {
+            case DISABLED:
+                setPivotAngle(intakeInputs.pivotAngleRotations);
+                setRollerVelocity(0.0);
+                break;
             case STOWED:
                 setPivotAngle(config.pivotUpAngleRotations);
                 setRollerVelocity(0.0);

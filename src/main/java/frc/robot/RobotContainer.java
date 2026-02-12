@@ -25,11 +25,13 @@ import frc.robot.lib.input.XboxController;
 import frc.robot.lib.util.ballistics.ProjectileVisualizer;
 import frc.robot.subsystems.Superstructure;
 import frc.robot.subsystems.Superstructure.DesiredState;
+import frc.robot.subsystems.intake.Intake;
 import frc.robot.subsystems.shooter.Shooter;
 import frc.robot.subsystems.swerve.SwerveDrive;
 // import frc.robot.subsystems.vision.Vision;
 import frc.robot.subsystems.vision.Vision;
 
+//: TODO: make sure all lisences in tuner are activated
 public class RobotContainer {
     public static RobotContainer instance = null;
 
@@ -87,11 +89,18 @@ public class RobotContainer {
     }
 
     private void configureBindings() {
+        // xboxDriver.getAButton().onTrue(
+        //     new InstantCommand(() -> superstructure.setDesiredState(DesiredState.SHOOTING))
+        // );
+        // xboxDriver.getBButton().onTrue(
+        //     new InstantCommand(() -> superstructure.setDesiredState(DesiredState.TRACKING))
+        // );
+
         xboxDriver.getAButton().onTrue(
-            new InstantCommand(() -> superstructure.setDesiredState(DesiredState.SHOOTING))
+            new InstantCommand(() -> Intake.getInstance().setSetpoint(Intake.IntakeSetpoint.INTAKING))
         );
         xboxDriver.getBButton().onTrue(
-            new InstantCommand(() -> superstructure.setDesiredState(DesiredState.TRACKING))
+            new InstantCommand(() -> Intake.getInstance().setSetpoint(Intake.IntakeSetpoint.STOWED))
         );
 
         // Test snap-to-angle bindings
