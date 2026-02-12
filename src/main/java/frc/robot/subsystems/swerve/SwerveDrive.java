@@ -170,7 +170,7 @@ public class SwerveDrive extends SubsystemBase {
     };
 
     public ModuleIOInputsAutoLogged[] getModuleInputs() {
-        return moduleInputs;
+        return moduleInputs.clone();
     }
 
     private final GyroIO gyroIO;
@@ -1044,14 +1044,12 @@ public class SwerveDrive extends SubsystemBase {
                     RobotState.getInstance().getEstimatedPose().getRotation());
         }
 
+        desiredRobotRelativeSpeeds = ChassisSpeeds.discretize(desiredRobotRelativeSpeeds, dt);
+        Logger.recordOutput("SwerveDrive/desiredRobotRelativeSpeeds", desiredRobotRelativeSpeeds);
+
         ChassisSpeeds desiredFieldRelativeSpeeds = ChassisSpeeds.fromRobotRelativeSpeeds(desiredRobotRelativeSpeeds,
                 RobotState.getInstance().getEstimatedPose().getRotation());
         Logger.recordOutput("SwerveDrive/desiredFieldRelativeSpeeds", desiredFieldRelativeSpeeds);
-
-        // Discretize speeds to compensate for drift during the loop
-        desiredRobotRelativeSpeeds = ChassisSpeeds.discretize(desiredRobotRelativeSpeeds, dt);
-
-        Logger.recordOutput("SwerveDrive/desiredRobotRelativeSpeeds", desiredRobotRelativeSpeeds);
 
         // Limit acceleration to prevent sudden changes in speed
         obtainableFieldRelativeSpeeds = ChassisRateLimiter.limit(
@@ -1067,6 +1065,8 @@ public class SwerveDrive extends SubsystemBase {
 
         ChassisSpeeds obtainableRobotRelativeSpeeds = ChassisSpeeds.fromFieldRelativeSpeeds(
                 obtainableFieldRelativeSpeeds, RobotState.getInstance().getEstimatedPose().getRotation());
+
+        obtainableRobotRelativeSpeeds = ChassisSpeeds.discretize(obtainableRobotRelativeSpeeds, dt);
         Logger.recordOutput("SwerveDrive/obtainableRobotRelativeSpeeds", obtainableRobotRelativeSpeeds);
 
         SwerveModuleState[] moduleSetpoints = kinematics.toSwerveModuleStates(obtainableRobotRelativeSpeeds);
@@ -1188,10 +1188,10 @@ public class SwerveDrive extends SubsystemBase {
     }
 
     public SwerveModulePosition[] getSwerveModulePositions() {
-        return modulePositions;
+        return modulePositions.clone();
     }
 
     public SwerveModuleState[] getSwerveModuleStates() {
-        return moduleStates;
+        return moduleStates.clone();
     }
 }

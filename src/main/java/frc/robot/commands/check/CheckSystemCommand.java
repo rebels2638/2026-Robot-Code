@@ -19,7 +19,8 @@ import frc.robot.subsystems.swerve.SwerveDrive;
 import frc.robot.subsystems.swerve.module.ModuleIOInputsAutoLogged;
 
 /**
- * Checks the functionality of all subsystems on the robot.<br><br>
+ * Checks the functionality of all subsystems on the robot.<br>
+ * <br>
  * The checks are as follows:<br>
  * 1. Swerve Drive: Moves the robot forward at 1 m/s for 2 seconds and checks
  * if the drive velocity is roughly 1 m/s.<br>
@@ -44,36 +45,42 @@ public class CheckSystemCommand extends SequentialCommandGroup {
 
                 logStep("Checking Swerve Drive"),
                 new FunctionalCommand(
-                        () -> {},
                         () -> {
-                            swerve.driveRobotRelative(new ChassisSpeeds(1.0, 0.0, 0.0));
                         },
-                        (interrupted) -> {
-                            swerve.driveRobotRelative(new ChassisSpeeds());
-                        },
-                        () -> false, swerve
-                    ).withTimeout(2.0),
+                        () -> swerve.driveRobotRelative(new ChassisSpeeds(1.0, 0.0, 0.0)),
+                        (interrupted) -> swerve.driveRobotRelative(new ChassisSpeeds()),
+                        () -> false,
+                        swerve).withTimeout(2.0),
 
                 Commands.runOnce(() -> {
                     boolean allGood = true;
 
                     ModuleIOInputsAutoLogged[] inputs = swerve.getModuleInputs();
+                    double tolerance = 0.1;
+
+                    double sumAbsVel = 0.0;
                     for (int i = 0; i < 4; i++) {
                         double velocity = inputs[i].driveVelocityMetersPerSec;
+                        sumAbsVel += Math.abs(velocity);
 
-                        boolean velPass = Math.abs(velocity) > 0.5;
-
+                        boolean velPass = Math.abs(velocity - 1.0) < tolerance && velocity > 0.0;
                         check("SwerveModule" + i + "_DriveVelocity", velPass);
-                        if (!velPass)
-                            allGood = false;
+                        allGood &= velPass;
                     }
+
+                    double avgAbsVel = sumAbsVel / 4.0;
+                    boolean avgPass = Math.abs(avgAbsVel - 1.0) < tolerance;
+                    check("Swerve_AvgAbsDriveVelocity", avgPass);
+                    allGood &= avgPass;
+
                     check("Swerve_Drive_Overall", allGood);
                 }),
 
                 logStep("Checking Shooter"),
                 Commands.runOnce(() -> {
-                    shooter.setFlywheelSetpoint(FlywheelSetpoint.DYNAMIC);
                     shooter.setFlywheelRPSSupplier(() -> 40.0);
+                    shooter.setFlywheelSetpoint(FlywheelSetpoint.DYNAMIC);
+
                     shooter.setHoodSetpoint(HoodSetpoint.HOME);
                     shooter.setTurretSetpoint(TurretSetpoint.HOME);
                 }, shooter),
@@ -85,7 +92,7 @@ public class CheckSystemCommand extends SequentialCommandGroup {
                     check("Flywheel_SpinUp", velocity > 35.0);
 
                     shooter.setFlywheelSetpoint(FlywheelSetpoint.OFF);
-                }),
+                }, shooter),
 
                 logStep("Checking Hopper/Kicker"),
                 Commands.runOnce(() -> {
@@ -94,11 +101,11 @@ public class CheckSystemCommand extends SequentialCommandGroup {
                 }, hopper, kicker),
 
                 Commands.waitSeconds(1.0),
-                
+
                 Commands.runOnce(() -> {
                     hopper.setSetpoint(HopperSetpoint.OFF);
                     kicker.setSetpoint(KickerSetpoint.OFF);
-                }),
+                }, hopper, kicker),
 
                 logStep("System Check Complete"));
     }

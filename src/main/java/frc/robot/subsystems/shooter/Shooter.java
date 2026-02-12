@@ -127,6 +127,7 @@ public class Shooter extends SubsystemBase {
 
     // Coast override
     private boolean coastOverride = false;
+    private boolean prevCoastOverride = false;
 
     @Override
     public void periodic() {
@@ -144,8 +145,16 @@ public class Shooter extends SubsystemBase {
             shooterIO.configureFlywheelControlLoop(flywheelControlLoopConfigurator.getConfig());
         }
 
-        if (coastOverride) {
+        if (coastOverride && !prevCoastOverride) {
             shooterIO.stop();
+        }
+        prevCoastOverride = coastOverride;
+
+        // Continuously apply the latest requested setpoints unless coasting
+        if (!coastOverride) {
+            shooterIO.setAngle(hoodSetpointRotations);
+            shooterIO.setTurretAngle(turretSetpointRotations);
+            shooterIO.setShotVelocity(flywheelSetpointRPS);
         }
     }
 
@@ -185,16 +194,14 @@ public class Shooter extends SubsystemBase {
     // Direct setters for mechanism control (now private, used internally by state
     // handlers)
     private void setHoodAngle(Rotation2d angle) {
-        double clampedAngle = MathUtil.clamp(angle.getRotations(), config.hoodMinAngleRotations,
+        double clampedAngle = MathUtil.clamp(
+                angle.getRotations(),
+                config.hoodMinAngleRotations,
                 config.hoodMaxAngleRotations);
 
         hoodSetpointRotations = clampedAngle;
         Logger.recordOutput("Shooter/angleSetpointRotations", clampedAngle);
         Logger.recordOutput("Shooter/rawSetpointRotations", clampedAngle);
-
-        if (!coastOverride) {
-            shooterIO.setAngle(clampedAngle);
-        }
     }
 
     private void setTurretAngle(Rotation2d angle) {
@@ -221,18 +228,11 @@ public class Shooter extends SubsystemBase {
         double clampedAngleRotations = targetAngleDeg / 360.0;
         turretSetpointRotations = clampedAngleRotations;
         Logger.recordOutput("Shooter/turretAngleSetpointRotations", clampedAngleRotations);
-
-        if (!coastOverride) {
-            shooterIO.setTurretAngle(clampedAngleRotations);
-        }
     }
 
     private void setShotVelocity(double velocityRotationsPerSec) {
         flywheelSetpointRPS = velocityRotationsPerSec;
         Logger.recordOutput("Shooter/shotVelocitySetpointRotationsPerSec", velocityRotationsPerSec);
-        if (!coastOverride) {
-            shooterIO.setShotVelocity(velocityRotationsPerSec);
-        }
     }
 
     // Mechanism getters
