@@ -8,7 +8,7 @@
   "hopperKS": 0.0,
   "hopperKV": 0.189,
   "hopperKA": 0.0,
-  "hopperKP": 0.1,
+  "hopperKP": 0.005,
   "hopperKI": 0.0,
   "hopperKD": 0.0,
   "hopperMotorToOutputShaftRatio": 5.0,

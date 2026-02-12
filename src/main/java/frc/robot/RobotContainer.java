@@ -89,19 +89,19 @@ public class RobotContainer {
     }
 
     private void configureBindings() {
-        // xboxDriver.getAButton().onTrue(
-        //     new InstantCommand(() -> superstructure.setDesiredState(DesiredState.SHOOTING))
-        // );
-        // xboxDriver.getBButton().onTrue(
-        //     new InstantCommand(() -> superstructure.setDesiredState(DesiredState.TRACKING))
-        // );
-
         xboxDriver.getAButton().onTrue(
-            new InstantCommand(() -> Intake.getInstance().setSetpoint(Intake.IntakeSetpoint.INTAKING))
+            new InstantCommand(() -> superstructure.setDesiredState(DesiredState.SHOOTING))
         );
         xboxDriver.getBButton().onTrue(
-            new InstantCommand(() -> Intake.getInstance().setSetpoint(Intake.IntakeSetpoint.STOWED))
+            new InstantCommand(() -> superstructure.setDesiredState(DesiredState.TRACKING))
         );
+
+        // xboxDriver.getAButton().onTrue(
+        //     new InstantCommand(() -> Intake.getInstance().setSetpoint(Intake.IntakeSetpoint.INTAKING))
+        // );
+        // xboxDriver.getBButton().onTrue(
+        //     new InstantCommand(() -> Intake.getInstance().setSetpoint(Intake.IntakeSetpoint.STOWED))
+        // );
 
         // Test snap-to-angle bindings
         // xboxDriver.getAButton().onTrue(new InstantCommand(() -> superstructure.setDesiredState(Superstructure.DesiredState.BUMP)));
