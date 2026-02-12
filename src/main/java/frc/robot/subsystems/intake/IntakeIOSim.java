@@ -11,22 +11,22 @@ import edu.wpi.first.wpilibj.Timer;
 import edu.wpi.first.wpilibj.simulation.DCMotorSim;
 import frc.robot.configs.IntakeConfig;
 import frc.robot.lib.util.DashboardMotorControlLoopConfigurator.MotorControlLoopConfig;
+import frc.robot.subsystems.swerve.SwerveDrive;
+import org.ironmaple.simulation.IntakeSimulation;
+import org.ironmaple.simulation.drivesims.SwerveDriveSimulation;
+import static edu.wpi.first.units.Units.Meters;
 
 public class IntakeIOSim implements IntakeIO {
     private final DCMotor rollerMotorModel = DCMotor.getKrakenX60Foc(1);
     private final DCMotor pivotMotorModel = DCMotor.getKrakenX60Foc(1);
 
-    private final DCMotorSim rollerSim =
-        new DCMotorSim(
+    private final DCMotorSim rollerSim = new DCMotorSim(
             LinearSystemId.createDCMotorSystem(rollerMotorModel, 0.00015, 1.53),
-            rollerMotorModel
-        );
+            rollerMotorModel);
 
-    private final DCMotorSim pivotSim =
-        new DCMotorSim(
+    private final DCMotorSim pivotSim = new DCMotorSim(
             LinearSystemId.createDCMotorSystem(pivotMotorModel, 0.00015, 21.428),
-            pivotMotorModel
-        );
+            pivotMotorModel);
 
     private PIDController rollerFeedback;
     private SimpleMotorFeedforward rollerFeedforward;
@@ -38,6 +38,8 @@ public class IntakeIOSim implements IntakeIO {
     private boolean isRollerEStopped = false;
     private boolean isPivotEStopped = false;
 
+    private IntakeSimulation intakeSim;
+
     private double lastTimeInputs = Timer.getTimestamp();
     private final IntakeConfig config;
 
@@ -45,17 +47,29 @@ public class IntakeIOSim implements IntakeIO {
         this.config = config;
         rollerFeedback = new PIDController(config.rollerKP, config.rollerKI, config.rollerKD);
         rollerFeedforward = new SimpleMotorFeedforward(config.rollerKS, config.rollerKV, config.rollerKA);
+
         double pivotMaxVelRadPerSec = config.pivotMaxVelocityRotationsPerSec * 2.0 * Math.PI;
         double pivotMaxAccelRadPerSec2 = config.pivotMaxAccelerationRotationsPerSec2 * 2.0 * Math.PI;
-        pivotFeedback =
-            new ProfiledPIDController(
+
+        pivotFeedback = new ProfiledPIDController(
                 config.pivotKP,
                 config.pivotKI,
                 config.pivotKD,
-                new TrapezoidProfile.Constraints(pivotMaxVelRadPerSec, pivotMaxAccelRadPerSec2)
-            );
+                new TrapezoidProfile.Constraints(pivotMaxVelRadPerSec, pivotMaxAccelRadPerSec2));
 
         pivotSim.setState(config.pivotStartingAngleRotations * 2 * Math.PI, 0);
+
+        SwerveDriveSimulation driveSim = SwerveDrive.getInstance().getSimulation();
+        if (driveSim != null) {
+            this.intakeSim = IntakeSimulation.OverTheBumperIntake(
+                    "Intake",
+                    driveSim,
+                    Meters.of(0.6),
+                    Meters.of(0.3),
+                    IntakeSimulation.IntakeSide.BACK,
+                    1);
+            intakeSim.register();
+        }
     }
 
     @Override
@@ -67,25 +81,21 @@ public class IntakeIOSim implements IntakeIO {
             rollerSim.setInputVoltage(0);
         } else if (isRollerClosedLoop) {
             rollerSim.setInputVoltage(
-                MathUtil.clamp(
-                    rollerFeedforward.calculate(desiredRollerVelocityRotationsPerSec) +
-                    rollerFeedback.calculate(rollerSim.getAngularVelocityRadPerSec() / (2 * Math.PI)),
-                    -12,
-                    12
-                )
-            );
+                    MathUtil.clamp(
+                            rollerFeedforward.calculate(desiredRollerVelocityRotationsPerSec) +
+                                    rollerFeedback.calculate(rollerSim.getAngularVelocityRadPerSec() / (2 * Math.PI)),
+                            -12,
+                            12));
         }
 
         if (isPivotEStopped) {
             pivotSim.setInputVoltage(0);
         } else if (isPivotClosedLoop) {
             pivotSim.setInputVoltage(
-                MathUtil.clamp(
-                    pivotFeedback.calculate(pivotSim.getAngularPositionRad()),
-                    -12,
-                    12
-                )
-            );
+                    MathUtil.clamp(
+                            pivotFeedback.calculate(pivotSim.getAngularPositionRad()),
+                            -12,
+                            12));
         }
 
         rollerSim.update(dt);
@@ -101,6 +111,14 @@ public class IntakeIOSim implements IntakeIO {
         inputs.pivotAppliedVolts = pivotSim.getInputVoltage();
         inputs.pivotTorqueCurrent = pivotSim.getCurrentDrawAmps();
         inputs.pivotTemperatureFahrenheit = 70.0;
+
+        if (intakeSim != null) {
+            if (inputs.rollerAppliedVolts > 2.0) {
+                intakeSim.startIntake();
+            } else {
+                intakeSim.stopIntake();
+            }
+        }
     }
 
     @Override
@@ -129,8 +147,8 @@ public class IntakeIOSim implements IntakeIO {
             return;
         }
         double clampedAngle = MathUtil.clamp(angleRotations,
-            config.pivotMinAngleRotations,
-            config.pivotMaxAngleRotations);
+                config.pivotMinAngleRotations,
+                config.pivotMaxAngleRotations);
         pivotFeedback.setGoal(clampedAngle * (2 * Math.PI));
         isPivotClosedLoop = true;
     }
