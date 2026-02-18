@@ -35,6 +35,8 @@ import frc.robot.subsystems.shooter.Shooter.FlywheelSetpoint;
 import frc.robot.subsystems.shooter.Shooter.HoodSetpoint;
 import frc.robot.subsystems.shooter.Shooter.TurretSetpoint;
 import frc.robot.subsystems.swerve.SwerveDrive;
+import frc.robot.subsystems.intake.Intake;
+import frc.robot.subsystems.intake.Intake.IntakeSetpoint;
 
 public class Superstructure extends SubsystemBase {
     private static Superstructure instance;
@@ -45,7 +47,7 @@ public class Superstructure extends SubsystemBase {
         return instance;
     }
 
-    public enum CurrentState {
+    private enum BaseState {
         DISABLED,
         HOME,
         TRACKING,
@@ -55,13 +57,70 @@ public class Superstructure extends SubsystemBase {
         BUMP
     }
 
-    public enum DesiredState {
+    private enum IntakeMode {
         DISABLED,
-        HOME,
-        TRACKING,
-        READY_FOR_SHOT,
-        SHOOTING,
-        BUMP
+        STOWED,
+        DEPLOYED,
+        INTAKING,
+        ALTERNATING
+    }
+
+    public enum CurrentState {
+        DISABLED(BaseState.DISABLED, IntakeMode.DISABLED),
+        HOME(BaseState.HOME, IntakeMode.STOWED),
+        TRACKING_STOWED(BaseState.TRACKING, IntakeMode.STOWED),
+        TRACKING_DEPLOYED(BaseState.TRACKING, IntakeMode.DEPLOYED),
+        TRACKING_INTAKING(BaseState.TRACKING, IntakeMode.INTAKING),
+        PREPARING_FOR_SHOT_STOWED(BaseState.PREPARING_FOR_SHOT, IntakeMode.STOWED),
+        PREPARING_FOR_SHOT_DEPLOYED(BaseState.PREPARING_FOR_SHOT, IntakeMode.DEPLOYED),
+        PREPARING_FOR_SHOT_INTAKING(BaseState.PREPARING_FOR_SHOT, IntakeMode.INTAKING),
+        PREPARING_FOR_SHOT_ALTERNATING(BaseState.PREPARING_FOR_SHOT, IntakeMode.ALTERNATING),
+        READY_FOR_SHOT_STOWED(BaseState.READY_FOR_SHOT, IntakeMode.STOWED),
+        READY_FOR_SHOT_DEPLOYED(BaseState.READY_FOR_SHOT, IntakeMode.DEPLOYED),
+        READY_FOR_SHOT_INTAKING(BaseState.READY_FOR_SHOT, IntakeMode.INTAKING),
+        READY_FOR_SHOT_ALTERNATING(BaseState.READY_FOR_SHOT, IntakeMode.ALTERNATING),
+        SHOOTING_STOWED(BaseState.SHOOTING, IntakeMode.STOWED),
+        SHOOTING_DEPLOYED(BaseState.SHOOTING, IntakeMode.DEPLOYED),
+        SHOOTING_INTAKING(BaseState.SHOOTING, IntakeMode.INTAKING),
+        SHOOTING_ALTERNATING(BaseState.SHOOTING, IntakeMode.ALTERNATING),
+        BUMP_STOWED(BaseState.BUMP, IntakeMode.STOWED),
+        BUMP_DEPLOYED(BaseState.BUMP, IntakeMode.DEPLOYED),
+        BUMP_INTAKING(BaseState.BUMP, IntakeMode.INTAKING);
+
+        public final BaseState baseState;
+        public final IntakeMode intakeMode;
+
+        CurrentState(BaseState baseState, IntakeMode intakeMode) {
+            this.baseState = baseState;
+            this.intakeMode = intakeMode;
+        }
+    }
+
+    public enum DesiredState {
+        DISABLED(BaseState.DISABLED, IntakeMode.DISABLED),
+        HOME(BaseState.HOME, IntakeMode.STOWED),
+        TRACKING_STOWED(BaseState.TRACKING, IntakeMode.STOWED),
+        TRACKING_DEPLOYED(BaseState.TRACKING, IntakeMode.DEPLOYED),
+        TRACKING_INTAKING(BaseState.TRACKING, IntakeMode.INTAKING),
+        READY_FOR_SHOT_STOWED(BaseState.READY_FOR_SHOT, IntakeMode.STOWED),
+        READY_FOR_SHOT_DEPLOYED(BaseState.READY_FOR_SHOT, IntakeMode.DEPLOYED),
+        READY_FOR_SHOT_INTAKING(BaseState.READY_FOR_SHOT, IntakeMode.INTAKING),
+        READY_FOR_SHOT_ALTERNATING(BaseState.READY_FOR_SHOT, IntakeMode.ALTERNATING),
+        SHOOTING_STOWED(BaseState.SHOOTING, IntakeMode.STOWED),
+        SHOOTING_DEPLOYED(BaseState.SHOOTING, IntakeMode.DEPLOYED),
+        SHOOTING_INTAKING(BaseState.SHOOTING, IntakeMode.INTAKING),
+        SHOOTING_ALTERNATING(BaseState.SHOOTING, IntakeMode.ALTERNATING),
+        BUMP_STOWED(BaseState.BUMP, IntakeMode.STOWED),
+        BUMP_DEPLOYED(BaseState.BUMP, IntakeMode.DEPLOYED),
+        BUMP_INTAKING(BaseState.BUMP, IntakeMode.INTAKING);
+
+        public final BaseState baseState;
+        public final IntakeMode intakeMode;
+
+        DesiredState(BaseState baseState, IntakeMode intakeMode) {
+            this.baseState = baseState;
+            this.intakeMode = intakeMode;
+        }
     }
 
     private CurrentState currentState = CurrentState.DISABLED;
@@ -71,9 +130,11 @@ public class Superstructure extends SubsystemBase {
     private final Kicker kicker = Kicker.getInstance();
     private final Hopper hopper = Hopper.getInstance();
     private final SwerveDrive swerveDrive = SwerveDrive.getInstance();
+    private final Intake intake = Intake.getInstance();
     private final RobotState robotState = RobotState.getInstance();
 
     private static final double SHOT_DURATION_SECONDS = .3; // Time to complete one shot
+    private static final double ALTERNATING_INTAKE_TOGGLE_SECONDS = 1;
     private static final double BALLS_PER_SECOND = 12.0; // Balls per second to visualize
 
     // Margin for swerve rotation range (degrees)
@@ -87,6 +148,7 @@ public class Superstructure extends SubsystemBase {
     private double kickerEngagedTime = 0;
     private double lastBallVisualizedTime = 0;
     private boolean hasStartedShooting = false;
+    private double lastAlternatingIntakeToggleTime = 0;
     
     // Cached shot data - calculated once per periodic cycle
     private ShotData cachedShotData;
@@ -113,55 +175,63 @@ public class Superstructure extends SubsystemBase {
      * Handles transitions between states with proper validation.
      */
     private void handleStateTransitions() {
-        if (currentState == CurrentState.SHOOTING && Timer.getTimestamp() - kickerEngagedTime < SHOT_DURATION_SECONDS) {
+        if (currentState.baseState == BaseState.SHOOTING && Timer.getTimestamp() - kickerEngagedTime < SHOT_DURATION_SECONDS) {
             return; // If we're shooting, don't transition to another state until the shot is complete to prevent jitter
         }
 
-        switch (desiredState) {
+        BaseState desiredBaseState = desiredState.baseState;
+        IntakeMode desiredIntakeMode = desiredState.intakeMode;
+
+        switch (desiredBaseState) {
             case DISABLED:
-                currentState = CurrentState.DISABLED;
+                currentState = resolveCurrentState(BaseState.DISABLED, desiredIntakeMode);
                 break;
 
             case HOME:
-                currentState = CurrentState.HOME;
+                currentState = resolveCurrentState(BaseState.HOME, desiredIntakeMode);
                 break;
 
             case TRACKING:
-                currentState = CurrentState.TRACKING;
+                currentState = resolveCurrentState(BaseState.TRACKING, desiredIntakeMode);
+                break;
+
+            case PREPARING_FOR_SHOT:
+                currentState = resolveCurrentState(BaseState.PREPARING_FOR_SHOT, desiredIntakeMode);
                 break;
 
             case READY_FOR_SHOT:
                 // READY_FOR_SHOT requires mechanisms to be at setpoints
                 // Otherwise we're in PREPARING_FOR_SHOT
                 if (isReadyForShot()) {
-                    currentState = CurrentState.READY_FOR_SHOT;
+                    currentState = resolveCurrentState(BaseState.READY_FOR_SHOT, desiredIntakeMode);
                 } else {
-                    currentState = CurrentState.PREPARING_FOR_SHOT;
+                    currentState = resolveCurrentState(BaseState.PREPARING_FOR_SHOT, desiredIntakeMode);
                 }
                 break;
 
             case SHOOTING:
                 // SHOOTING only allowed when we're in READY_FOR_SHOT
-                if (currentState == CurrentState.READY_FOR_SHOT) {
-                    currentState = CurrentState.SHOOTING;
+                if (currentState.baseState == BaseState.READY_FOR_SHOT) {
+                    currentState = resolveCurrentState(BaseState.SHOOTING, desiredIntakeMode);
                     kickerEngagedTime = Timer.getTimestamp();
                     hasStartedShooting = false;
                 } else {
                     // Not ready yet, go to preparing
                     if (isReadyForShot()) {
-                        if (currentState == CurrentState.SHOOTING) {
+                        if (currentState.baseState == BaseState.SHOOTING) {
                             break;
                         }
-                        currentState = CurrentState.SHOOTING;
+                        currentState = resolveCurrentState(BaseState.SHOOTING, desiredIntakeMode);
                         kickerEngagedTime = Timer.getTimestamp();
+                        hasStartedShooting = false;
                     } else {
-                        currentState = CurrentState.PREPARING_FOR_SHOT;
+                        currentState = resolveCurrentState(BaseState.PREPARING_FOR_SHOT, desiredIntakeMode);
                     }
                 }
                 break;
 
             case BUMP:
-                currentState = CurrentState.BUMP;
+                currentState = resolveCurrentState(BaseState.BUMP, desiredIntakeMode);
                 break;
         }
 
@@ -172,7 +242,7 @@ public class Superstructure extends SubsystemBase {
      * Executes behavior for the current state and sets subsystem states.
      */
     private void handleCurrentState() {
-        switch (currentState) {
+        switch (currentState.baseState) {
             case DISABLED:
                 handleDisabledState();
                 break;
@@ -195,6 +265,8 @@ public class Superstructure extends SubsystemBase {
                 handleBumpState();
                 break;
         }
+
+        applyIntakeMode(currentState.intakeMode);
     }
 
     private void handleDisabledState() {
@@ -296,6 +368,88 @@ public class Superstructure extends SubsystemBase {
         shooter.setTurretSetpoint(TurretSetpoint.HOME);
         shooter.setFlywheelSetpoint(FlywheelSetpoint.OFF);
         kicker.setSetpoint(KickerSetpoint.OFF);
+        hopper.setSetpoint(HopperSetpoint.OFF);
+    }
+
+    private CurrentState resolveCurrentState(BaseState baseState, IntakeMode intakeMode) {
+        return switch (baseState) {
+            case DISABLED -> CurrentState.DISABLED;
+            case HOME -> CurrentState.HOME;
+            case TRACKING -> switch (intakeMode) {
+                case STOWED -> CurrentState.TRACKING_STOWED;
+                case DEPLOYED -> CurrentState.TRACKING_DEPLOYED;
+                case INTAKING -> CurrentState.TRACKING_INTAKING;
+                case DISABLED, ALTERNATING -> CurrentState.TRACKING_STOWED;
+            };
+            case PREPARING_FOR_SHOT -> switch (intakeMode) {
+                case STOWED -> CurrentState.PREPARING_FOR_SHOT_STOWED;
+                case DEPLOYED -> CurrentState.PREPARING_FOR_SHOT_DEPLOYED;
+                case INTAKING -> CurrentState.PREPARING_FOR_SHOT_INTAKING;
+                case ALTERNATING -> CurrentState.PREPARING_FOR_SHOT_ALTERNATING;
+                case DISABLED -> CurrentState.PREPARING_FOR_SHOT_STOWED;
+            };
+            case READY_FOR_SHOT -> switch (intakeMode) {
+                case STOWED -> CurrentState.READY_FOR_SHOT_STOWED;
+                case DEPLOYED -> CurrentState.READY_FOR_SHOT_DEPLOYED;
+                case INTAKING -> CurrentState.READY_FOR_SHOT_INTAKING;
+                case ALTERNATING -> CurrentState.READY_FOR_SHOT_ALTERNATING;
+                case DISABLED -> CurrentState.READY_FOR_SHOT_STOWED;
+            };
+            case SHOOTING -> switch (intakeMode) {
+                case STOWED -> CurrentState.SHOOTING_STOWED;
+                case DEPLOYED -> CurrentState.SHOOTING_DEPLOYED;
+                case INTAKING -> CurrentState.SHOOTING_INTAKING;
+                case ALTERNATING -> CurrentState.SHOOTING_ALTERNATING;
+                case DISABLED -> CurrentState.SHOOTING_STOWED;
+            };
+            case BUMP -> switch (intakeMode) {
+                case STOWED -> CurrentState.BUMP_STOWED;
+                case DEPLOYED -> CurrentState.BUMP_DEPLOYED;
+                case INTAKING -> CurrentState.BUMP_INTAKING;
+                case DISABLED, ALTERNATING -> CurrentState.BUMP_STOWED;
+            };
+        };
+    }
+
+    private void applyIntakeMode(IntakeMode intakeMode) {
+        if (intakeMode != IntakeMode.ALTERNATING) {
+            lastAlternatingIntakeToggleTime = 0;
+        }
+
+        switch (intakeMode) {
+            case DISABLED:
+                intake.setSetpoint(IntakeSetpoint.DISABLED);
+                break;
+            case STOWED:
+                intake.setSetpoint(IntakeSetpoint.STOWED);
+                break;
+            case DEPLOYED:
+                intake.setSetpoint(IntakeSetpoint.DEPLOYED);
+                break;
+            case INTAKING:
+                intake.setSetpoint(IntakeSetpoint.INTAKING);
+                break;
+            case ALTERNATING:
+                applyAlternatingIntake();
+                break;
+        }
+    }
+
+    private void applyAlternatingIntake() {
+        double now = Timer.getTimestamp();
+        if (lastAlternatingIntakeToggleTime == 0) {
+            lastAlternatingIntakeToggleTime = now;
+        }
+
+        boolean timerElapsed = now - lastAlternatingIntakeToggleTime >= ALTERNATING_INTAKE_TOGGLE_SECONDS;
+        boolean pivotSettled = intake.isPivotAtSetpoint();
+        if (timerElapsed && pivotSettled) {
+            lastAlternatingIntakeToggleTime = now;
+            intake.setSetpoint(intake.isStowed() ? IntakeSetpoint.DEPLOYED : IntakeSetpoint.STOWED);
+            return;
+        }
+
+        intake.setSetpoint(intake.isStowed() ? IntakeSetpoint.STOWED : IntakeSetpoint.DEPLOYED);
     }
 
     /**

@@ -154,4 +154,10 @@ public class Intake extends SubsystemBase {
         return Math.abs(intakeInputs.pivotAngleRotations - pivotSetpointRotations)
             < config.pivotAngleToleranceRotations;
     }
+
+    @AutoLogOutput(key = "Intake/isStowed")
+    public boolean isStowed() {
+        return Math.abs(intakeInputs.pivotAngleRotations - config.pivotUpAngleRotations)
+            < config.pivotAngleToleranceRotations;
+    }
 }
