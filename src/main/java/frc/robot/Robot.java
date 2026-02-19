@@ -4,6 +4,9 @@
 
 package frc.robot;
 
+import org.ironmaple.simulation.SimulatedArena;
+import org.ironmaple.simulation.seasonspecific.rebuilt2026.Arena2026Rebuilt;
+import org.ironmaple.simulation.seasonspecific.reefscape2025.Arena2025Reefscape;
 import org.littletonrobotics.junction.LogFileUtil;
 import org.littletonrobotics.junction.LoggedRobot;
 import org.littletonrobotics.junction.Logger;
@@ -77,8 +80,8 @@ public class Robot extends LoggedRobot {
             case SIM:
                 // Running a physics simulator, log to NT
                 Logger.addDataReceiver(new NT4Publisher());
-                break;     
-                          
+                break;
+
             case REPLAY:
                 // Replaying a log, set up replay source
                 setUseTiming(false); // Run as fast as possible
@@ -151,7 +154,7 @@ public class Robot extends LoggedRobot {
             Logger.recordOutput(pair.getFirst(), pair.getSecond());
         });
     }
-    
+
     /**
      * This autonomous runs the autonomous command selected by your
      * {@link RobotContainer} class.
@@ -175,7 +178,6 @@ public class Robot extends LoggedRobot {
 
     @Override
     public void teleopInit() {
-
 
         // This makes sure that the autonomous stops running when
         // teleop starts running. If you want the autonomous to
@@ -209,10 +211,20 @@ public class Robot extends LoggedRobot {
     /** This function is called once when the robot is first started up. */
     @Override
     public void simulationInit() {
+        // Initialize the 2025 Reefscape arena
+        Arena2026Rebuilt arena = new Arena2026Rebuilt();
+        arena.clearGamePieces();
+        arena.placeGamePiecesOnField();
+
+        SimulatedArena.overrideInstance(arena);
     }
 
-    /** This function is called periodically whilst in simulation. */
     @Override
     public void simulationPeriodic() {
+        SimulatedArena.getInstance().simulationPeriodic();
+
+        Logger.recordOutput(
+                "SimulatedArena/Fuel",
+                SimulatedArena.getInstance().getGamePiecesArrayByType("Fuel"));
     }
 }
