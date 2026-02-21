@@ -74,6 +74,9 @@ public class RobotState {
 
     private double lastYawVelocityRadPerSec = 0;
     private ChassisSpeeds lastRobotRelativeSpeeds = new ChassisSpeeds();
+    private double accumulatedYawRad = 0.0;
+    private double lastWrappedYawRad = 0.0;
+    private boolean hasYawSample = false;
 
     private final SwerveDrivetrainConfig drivetrainConfig;
     private final RobotStateConfig robotStateConfig;
@@ -174,6 +177,7 @@ public class RobotState {
         lastEstimatedPoseUpdateTime = observation.timestampsSeconds(); 
         // Add pose to buffer at timestamp
         poseBuffer.addSample(lastEstimatedPoseUpdateTime, swerveDrivePoseEstimator.getEstimatedPosition()); 
+        updateAccumulatedYawFromEstimatedPose();
     }
 
     public void addVisionObservation(VisionObservation observation) {
@@ -224,6 +228,9 @@ public class RobotState {
     public void resetPose(Pose2d initialPose) {
         SwerveDrive.getInstance().resetGyro(initialPose.getRotation());
         swerveDrivePoseEstimator.resetPosition(initialPose.getRotation(), lastWheelPositions, initialPose);
+        accumulatedYawRad = initialPose.getRotation().getRadians();
+        lastWrappedYawRad = initialPose.getRotation().getRadians();
+        hasYawSample = true;
 
         poseBuffer.clear();
     }
@@ -239,6 +246,11 @@ public class RobotState {
 
     public double getYawVelocityRadPerSec() {
         return lastYawVelocityRadPerSec;
+    }
+
+    @AutoLogOutput(key = "RobotState/accumulatedYaw")
+    public Rotation2d getAccumulatedYaw() {
+        return Rotation2d.fromRadians(accumulatedYawRad);
     }
 
     public ChassisSpeeds getRobotRelativeSpeeds() {
@@ -279,6 +291,19 @@ public class RobotState {
 
     public Pose2d getPredictedPose(double timestamp) {
         return getPredictedPose(timestamp - lastEstimatedPoseUpdateTime, timestamp - lastEstimatedPoseUpdateTime);
+    }
+
+    private void updateAccumulatedYawFromEstimatedPose() {
+        double wrappedYawRad = getEstimatedPose().getRotation().getRadians();
+        if (!hasYawSample) {
+            accumulatedYawRad = wrappedYawRad;
+            lastWrappedYawRad = wrappedYawRad;
+            hasYawSample = true;
+            return;
+        }
+
+        accumulatedYawRad += MathUtil.angleModulus(wrappedYawRad - lastWrappedYawRad);
+        lastWrappedYawRad = wrappedYawRad;
     }
 
 }

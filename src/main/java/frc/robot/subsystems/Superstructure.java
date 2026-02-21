@@ -503,7 +503,7 @@ public class Superstructure extends SubsystemBase {
      * This ensures the robot heading keeps the turret within its physical limits.
      */
     private void updateSwerveRotationRange() {
-        Rotation2d targetFieldYaw = cachedShotData.targetFieldYaw();
+        double targetFieldYawDeg = cachedShotData.targetFieldYaw().getDegrees();
         
         // Get turret physical limits
         double turretMinDeg = shooter.getTurretMinAngleDeg();
@@ -515,10 +515,10 @@ public class Superstructure extends SubsystemBase {
         // For turret to be within [turretMin, turretMax]:
         // Robot rotation must be within [targetYaw - turretMax, targetYaw - turretMin]
         // Add margin to ensure we stay well within bounds
-        Rotation2d robotRotationMin = targetFieldYaw.minus(Rotation2d.fromDegrees(turretMaxDeg - SWERVE_ROTATION_MARGIN_DEG));
-        Rotation2d robotRotationMax = targetFieldYaw.minus(Rotation2d.fromDegrees(turretMinDeg + SWERVE_ROTATION_MARGIN_DEG));
+        double robotRotationMinOffsetDeg = targetFieldYawDeg - (turretMaxDeg - SWERVE_ROTATION_MARGIN_DEG);
+        double robotRotationMaxOffsetDeg = targetFieldYawDeg - (turretMinDeg + SWERVE_ROTATION_MARGIN_DEG);
         
-        swerveDrive.setRotationRange(robotRotationMin, robotRotationMax);
+        swerveDrive.setRotationRangeOffsetDegrees(robotRotationMinOffsetDeg, robotRotationMaxOffsetDeg);
     }
 
     // Target suppliers for shooter - these use cached shot data

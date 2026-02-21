@@ -21,6 +21,7 @@ import edu.wpi.first.math.kinematics.ChassisSpeeds;
 import edu.wpi.first.math.kinematics.SwerveModulePosition;
 import edu.wpi.first.math.kinematics.SwerveModuleState;
 import edu.wpi.first.math.kinematics.SwerveDriveKinematics;
+import edu.wpi.first.wpilibj.DriverStation;
 import edu.wpi.first.wpilibj.Timer;
 import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.CommandScheduler;
@@ -130,13 +131,14 @@ public class SwerveDrive extends SubsystemBase {
     private FollowPath.Builder followPathBuilder;
 
     // Omega override rotation
-    private Rotation2d rotationRangeMin = Rotation2d.fromDegrees(-180);
-    private Rotation2d rotationRangeMax = Rotation2d.fromDegrees(180);
+    private double rotationRangeMinAbsRad = -Math.PI;
+    private double rotationRangeMaxAbsRad = Math.PI;
     private Rotation2d snapTargetAngle = Rotation2d.fromDegrees(0);
     private PIDController omegaOverridePIDController;
     private PIDController snappedOmegaOverridePIDController;
     private static final double OMEGA_OVERRIDE_CONTROLLER_MAX_VELOCITY_FACTOR = 0.6;
     private static final double RANGED_ROTATION_BUFFER_RAD = Math.toRadians(15.0); // Buffer to prevent oscillation at boundaries
+    private boolean hasWarnedInvalidBufferedRotationRange = false;
 
     private boolean shouldOverrideOmega = false;
     private double omegaOverride = 0.0;
@@ -340,7 +342,6 @@ public class SwerveDrive extends SubsystemBase {
             drivetrainConfig.omegaOverrideKI,
             drivetrainConfig.omegaOverrideKD
         );
-        omegaOverridePIDController.enableContinuousInput(-Math.PI, Math.PI);
         omegaOverridePIDController.setTolerance(Math.toRadians(drivetrainConfig.rangedRotationToleranceDeg));
 
         snappedOmegaOverridePIDController = new PIDController(
@@ -779,20 +780,23 @@ public class SwerveDrive extends SubsystemBase {
      * @param buffer The buffer in radians to constrict the range by (applied to both min and max)
      */
     private boolean isWithinRotationRange(double buffer) {
-        Rotation2d currentRotation = RobotState.getInstance().getEstimatedPose().getRotation();
-        
-        // Normalize angles to -PI to PI for comparison
-        double current = MathUtil.angleModulus(currentRotation.getRadians());
-        double min = MathUtil.angleModulus(rotationRangeMin.getRadians() + buffer);
-        double max = MathUtil.angleModulus(rotationRangeMax.getRadians() - buffer);
-        
-        // Handle wrap-around case
-        if (min <= max) {
-            return current >= min && current <= max;
-        } else {
-            // Range wraps around (e.g., min=170deg, max=-170deg)
-            return current >= min || current <= max;
+        double current = RobotState.getInstance().getAccumulatedYaw().getRadians();
+        double min = rotationRangeMinAbsRad + buffer;
+        double max = rotationRangeMaxAbsRad - buffer;
+
+        if (min > max) {
+            if (!hasWarnedInvalidBufferedRotationRange) {
+                DriverStation.reportWarning(
+                    "SwerveDrive buffered rotation range is invalid (min > max). Falling back to unbuffered range check.",
+                    false
+                );
+                hasWarnedInvalidBufferedRotationRange = true;
+            }
+            return current >= rotationRangeMinAbsRad && current <= rotationRangeMaxAbsRad;
         }
+
+        hasWarnedInvalidBufferedRotationRange = false;
+        return current >= min && current <= max;
     }
 
     /**
@@ -802,17 +806,23 @@ public class SwerveDrive extends SubsystemBase {
      * moving towards a boundary.
      */
     private double limitOmegaForRange(double desiredOmega) {
-        Rotation2d currentRotation = RobotState.getInstance().getEstimatedPose().getRotation();
+        double current = RobotState.getInstance().getAccumulatedYaw().getRadians();
         double currentOmega = RobotState.getInstance().getYawVelocityRadPerSec();
-        
-        double current = currentRotation.getRadians();
+
         // Use padded range bounds (constricted by buffer)
-        double min = rotationRangeMin.getRadians() + RANGED_ROTATION_BUFFER_RAD;
-        double max = rotationRangeMax.getRadians() - RANGED_ROTATION_BUFFER_RAD;
-        
-        // Calculate distance to padded bounds (using Rotation2d for proper wrapping)
-        double distToMin = Math.abs(MathUtil.angleModulus(current - min));
-        double distToMax = Math.abs(MathUtil.angleModulus(max - current));
+        double min = rotationRangeMinAbsRad + RANGED_ROTATION_BUFFER_RAD;
+        double max = rotationRangeMaxAbsRad - RANGED_ROTATION_BUFFER_RAD;
+
+        if (current < min) {
+            return Math.max(desiredOmega, 0);
+        }
+        if (current > max) {
+            return Math.min(desiredOmega, 0);
+        }
+
+        // Calculate distances to padded bounds in absolute yaw space
+        double distToMin = current - min;
+        double distToMax = max - current;
         
         double maxAngularAccel = drivetrainConfig.maxAngularAccelerationRadiansPerSecSec;
         
@@ -836,13 +846,6 @@ public class SwerveDrive extends SubsystemBase {
         double maxOmegaToMin = Math.sqrt(2 * maxAngularAccel * effectiveDistToMin);
         double maxOmegaToMax = Math.sqrt(2 * maxAngularAccel * effectiveDistToMax);
 
-        if (currentRotation.getRadians() < min) {
-            return Math.max(desiredOmega, 0);
-        }
-        if (currentRotation.getRadians() > max) {
-            return Math.min(desiredOmega, 0);
-        }        
-
         // Clamp omega based on direction
         if (desiredOmega > 0) {
             // Rotating towards max bound
@@ -858,15 +861,13 @@ public class SwerveDrive extends SubsystemBase {
      * Uses an internal buffer to target slightly inside the range to prevent oscillation at boundaries.
      */
     private double calculateReturnToRangeOmega() {
-        Rotation2d currentRotation = RobotState.getInstance().getEstimatedPose().getRotation();
-        
-        double current = currentRotation.getRadians();
-        double min = rotationRangeMin.getRadians();
-        double max = rotationRangeMax.getRadians();
+        double current = RobotState.getInstance().getAccumulatedYaw().getRadians();
+        double min = rotationRangeMinAbsRad;
+        double max = rotationRangeMaxAbsRad;
         
         // Find closest bound
-        double distToMin = Math.abs(MathUtil.angleModulus(current - min));
-        double distToMax = Math.abs(MathUtil.angleModulus(current - max));
+        double distToMin = Math.abs(current - min);
+        double distToMax = Math.abs(current - max);
         
         double targetAngle;
         if (distToMin < distToMax) {
@@ -926,11 +927,36 @@ public class SwerveDrive extends SubsystemBase {
     }
 
     public void setRotationRange(Rotation2d min, Rotation2d max) {
-        this.rotationRangeMin = min;
-        this.rotationRangeMax = max;
+        setRotationRangeOffsetDegrees(min.getDegrees(), max.getDegrees());
+    }
 
-        Logger.recordOutput("SwerveDrive/rotationRangeMin", min);
-        Logger.recordOutput("SwerveDrive/rotationRangeMax", max);
+    public void setRotationRangeOffsetDegrees(double minOffsetDeg, double maxOffsetDeg) {
+        if (minOffsetDeg > maxOffsetDeg) {
+            double temp = minOffsetDeg;
+            minOffsetDeg = maxOffsetDeg;
+            maxOffsetDeg = temp;
+        }
+
+        double accumulatedYawDeg = RobotState.getInstance().getAccumulatedYaw().getDegrees();
+        double turnAnchorDeg = Math.floor(accumulatedYawDeg / 360.0) * 360.0;
+
+        double baseMinDeg = turnAnchorDeg + minOffsetDeg;
+        double baseMaxDeg = turnAnchorDeg + maxOffsetDeg;
+        double midpointDeg = (baseMinDeg + baseMaxDeg) / 2.0;
+        long nearestTurnShift = Math.round((accumulatedYawDeg - midpointDeg) / 360.0);
+        double absoluteMinDeg = baseMinDeg + nearestTurnShift * 360.0;
+        double absoluteMaxDeg = baseMaxDeg + nearestTurnShift * 360.0;
+
+        rotationRangeMinAbsRad = Math.toRadians(absoluteMinDeg);
+        rotationRangeMaxAbsRad = Math.toRadians(absoluteMaxDeg);
+
+        Logger.recordOutput("SwerveDrive/rotationRange/min", Rotation2d.fromRadians(rotationRangeMinAbsRad));
+        Logger.recordOutput("SwerveDrive/rotationRange/max", Rotation2d.fromRadians(rotationRangeMaxAbsRad));
+        Logger.recordOutput("SwerveDrive/rotationRange/minOffsetDeg", minOffsetDeg);
+        Logger.recordOutput("SwerveDrive/rotationRange/maxOffsetDeg", maxOffsetDeg);
+        Logger.recordOutput("SwerveDrive/rotationRange/minAbsDeg", absoluteMinDeg);
+        Logger.recordOutput("SwerveDrive/rotationRange/maxAbsDeg", absoluteMaxDeg);
+        Logger.recordOutput("SwerveDrive/rotationRange/turnAnchorDeg", turnAnchorDeg);
     }
 
     public void setSnapTargetAngle(Rotation2d angle) {
