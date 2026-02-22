@@ -28,8 +28,6 @@ import frc.robot.lib.util.ShotCalculator;
 import frc.robot.lib.util.ShotCalculator.ShotData;
 import frc.robot.subsystems.hopper.Hopper;
 import frc.robot.subsystems.hopper.Hopper.HopperSetpoint;
-import frc.robot.subsystems.kicker.Kicker;
-import frc.robot.subsystems.kicker.Kicker.KickerSetpoint;
 import frc.robot.subsystems.shooter.Shooter;
 import frc.robot.subsystems.shooter.Shooter.FlywheelSetpoint;
 import frc.robot.subsystems.shooter.Shooter.HoodSetpoint;
@@ -127,7 +125,6 @@ public class Superstructure extends SubsystemBase {
     private DesiredState desiredState = DesiredState.DISABLED;
 
     private final Shooter shooter = Shooter.getInstance();
-    private final Kicker kicker = Kicker.getInstance();
     private final Hopper hopper = Hopper.getInstance();
     private final SwerveDrive swerveDrive = SwerveDrive.getInstance();
     private final Intake intake = Intake.getInstance();
@@ -137,15 +134,14 @@ public class Superstructure extends SubsystemBase {
     private static final double ALTERNATING_INTAKE_TOGGLE_SECONDS = 1;
     private static final double BALLS_PER_SECOND = 12.0; // Balls per second to visualize
 
-    // Margin for swerve rotation range (degrees)
-    private static final double SWERVE_ROTATION_MARGIN_DEG = 20.0;
+    private static final double SWERVE_ROTATION_MARGIN_DEG = 20.0; // Margin for swerve rotation range (degrees)
     private static final double MAX_TRANSLATIONAL_VELOCITY_DURING_SHOT_METERS_PER_SEC = 2.5;
     private static final double MAX_ANGULAR_VELOCITY_DURING_SHOT_RAD_PER_SEC = 0.8;
     private static final double SHOT_IMPACT_TOLERANCE_METERS = 0.3;
     private static final double BUMP_MAX_VELOCITY_METERS_PER_SEC = 1.8;
     private static final Rotation2d BUMP_SNAP_ANGLE = Rotation2d.fromDegrees(45);
     private LoggedNetworkNumber latencyCompensationSeconds = new LoggedNetworkNumber("Shooter/latencyCompSec");
-    private double kickerEngagedTime = 0;
+    private double shotStartTime = 0;
     private double lastBallVisualizedTime = 0;
     private boolean hasStartedShooting = false;
     private double lastAlternatingIntakeToggleTime = 0;
@@ -175,7 +171,7 @@ public class Superstructure extends SubsystemBase {
      * Handles transitions between states with proper validation.
      */
     private void handleStateTransitions() {
-        if (currentState.baseState == BaseState.SHOOTING && Timer.getTimestamp() - kickerEngagedTime < SHOT_DURATION_SECONDS) {
+        if (currentState.baseState == BaseState.SHOOTING && Timer.getTimestamp() - shotStartTime < SHOT_DURATION_SECONDS) {
             return; // If we're shooting, don't transition to another state until the shot is complete to prevent jitter
         }
 
@@ -213,7 +209,7 @@ public class Superstructure extends SubsystemBase {
                 // SHOOTING only allowed when we're in READY_FOR_SHOT
                 if (currentState.baseState == BaseState.READY_FOR_SHOT) {
                     currentState = resolveCurrentState(BaseState.SHOOTING, desiredIntakeMode);
-                    kickerEngagedTime = Timer.getTimestamp();
+                    shotStartTime = Timer.getTimestamp();
                     hasStartedShooting = false;
                 } else {
                     // Not ready yet, go to preparing
@@ -222,7 +218,7 @@ public class Superstructure extends SubsystemBase {
                             break;
                         }
                         currentState = resolveCurrentState(BaseState.SHOOTING, desiredIntakeMode);
-                        kickerEngagedTime = Timer.getTimestamp();
+                        shotStartTime = Timer.getTimestamp();
                         hasStartedShooting = false;
                     } else {
                         currentState = resolveCurrentState(BaseState.PREPARING_FOR_SHOT, desiredIntakeMode);
@@ -273,7 +269,6 @@ public class Superstructure extends SubsystemBase {
         shooter.setHoodSetpoint(HoodSetpoint.HOME);
         shooter.setTurretSetpoint(TurretSetpoint.HOME);
         shooter.setFlywheelSetpoint(FlywheelSetpoint.OFF);
-        kicker.setSetpoint(KickerSetpoint.OFF);
         hopper.setSetpoint(HopperSetpoint.OFF);
         swerveDrive.setDesiredOmegaOverrideState(SwerveDrive.DesiredOmegaOverrideState.NONE);
         swerveDrive.setDesiredTranslationOverrideState(SwerveDrive.DesiredTranslationOverrideState.NONE);
@@ -283,7 +278,6 @@ public class Superstructure extends SubsystemBase {
         shooter.setHoodSetpoint(HoodSetpoint.HOME);
         shooter.setTurretSetpoint(TurretSetpoint.HOME);
         shooter.setFlywheelSetpoint(FlywheelSetpoint.OFF);
-        kicker.setSetpoint(KickerSetpoint.OFF);
         hopper.setSetpoint(HopperSetpoint.OFF);
         swerveDrive.setDesiredOmegaOverrideState(SwerveDrive.DesiredOmegaOverrideState.NONE);
         swerveDrive.setDesiredTranslationOverrideState(SwerveDrive.DesiredTranslationOverrideState.NONE);
@@ -293,7 +287,6 @@ public class Superstructure extends SubsystemBase {
         shooter.setHoodSetpoint(HoodSetpoint.DYNAMIC);
         shooter.setTurretSetpoint(TurretSetpoint.DYNAMIC);
         shooter.setFlywheelSetpoint(FlywheelSetpoint.OFF);
-        kicker.setSetpoint(KickerSetpoint.OFF);
         hopper.setSetpoint(HopperSetpoint.OFF);
         swerveDrive.setDesiredOmegaOverrideState(SwerveDrive.DesiredOmegaOverrideState.NONE);
         swerveDrive.setDesiredTranslationOverrideState(SwerveDrive.DesiredTranslationOverrideState.NONE);
@@ -307,7 +300,6 @@ public class Superstructure extends SubsystemBase {
         shooter.setHoodSetpoint(HoodSetpoint.DYNAMIC);
         shooter.setTurretSetpoint(TurretSetpoint.DYNAMIC);
         shooter.setFlywheelSetpoint(FlywheelSetpoint.DYNAMIC);
-        kicker.setSetpoint(KickerSetpoint.OFF);
         hopper.setSetpoint(HopperSetpoint.OFF);
         swerveDrive.setDesiredOmegaOverrideState(SwerveDrive.DesiredOmegaOverrideState.CAPPED);
         swerveDrive.setDesiredTranslationOverrideState(SwerveDrive.DesiredTranslationOverrideState.CAPPED);
@@ -321,7 +313,6 @@ public class Superstructure extends SubsystemBase {
         shooter.setHoodSetpoint(HoodSetpoint.DYNAMIC);
         shooter.setTurretSetpoint(TurretSetpoint.DYNAMIC);
         shooter.setFlywheelSetpoint(FlywheelSetpoint.DYNAMIC);
-        kicker.setSetpoint(KickerSetpoint.OFF);
         hopper.setSetpoint(HopperSetpoint.OFF);
         swerveDrive.setDesiredOmegaOverrideState(SwerveDrive.DesiredOmegaOverrideState.CAPPED);
         swerveDrive.setDesiredTranslationOverrideState(SwerveDrive.DesiredTranslationOverrideState.CAPPED);
@@ -335,14 +326,13 @@ public class Superstructure extends SubsystemBase {
         shooter.setHoodSetpoint(HoodSetpoint.DYNAMIC);
         shooter.setTurretSetpoint(TurretSetpoint.DYNAMIC);
         shooter.setFlywheelSetpoint(FlywheelSetpoint.DYNAMIC);
-        kicker.setSetpoint(KickerSetpoint.KICKING);
         hopper.setSetpoint(HopperSetpoint.FEEDING);
         swerveDrive.setDesiredOmegaOverrideState(SwerveDrive.DesiredOmegaOverrideState.CAPPED);
         swerveDrive.setDesiredTranslationOverrideState(SwerveDrive.DesiredTranslationOverrideState.CAPPED);
 
         double now = Timer.getTimestamp();
-        double timeSinceKickerEngaged = now - kickerEngagedTime;
-        if (timeSinceKickerEngaged >= SHOT_DURATION_SECONDS) {
+        double timeSinceShotStart = now - shotStartTime;
+        if (timeSinceShotStart >= SHOT_DURATION_SECONDS) {
             if (!hasStartedShooting) {
                 hasStartedShooting = true;
                 lastBallVisualizedTime = now;
@@ -367,7 +357,6 @@ public class Superstructure extends SubsystemBase {
         shooter.setHoodSetpoint(HoodSetpoint.HOME);
         shooter.setTurretSetpoint(TurretSetpoint.HOME);
         shooter.setFlywheelSetpoint(FlywheelSetpoint.OFF);
-        kicker.setSetpoint(KickerSetpoint.OFF);
         hopper.setSetpoint(HopperSetpoint.OFF);
     }
 
@@ -455,7 +444,7 @@ public class Superstructure extends SubsystemBase {
     /**
      * Checks if all mechanisms are at their setpoints and ready to shoot.
      * Requires swerve to be in nominal ranged rotation, shooter to be ready,
-     * kicker to be ready, and robot to be within valid shooting distance.
+     * and robot to be within valid shooting distance.
      */
     private boolean isReadyForShot() {
         boolean swerveReady = 
@@ -484,10 +473,6 @@ public class Superstructure extends SubsystemBase {
         Logger.recordOutput("Superstructure/setpointLanding", setpointLanding);
         Logger.recordOutput("Superstructure/impactErrorMeters", impactErrorMeters);
         
-        // Check if kicker is ready (feeding and at setpoint)
-        boolean kickerReady = kicker.isKickerAtSetpoint();
-        Logger.recordOutput("Superstructure/kickerReady", kickerReady);
-        
         // Check if within valid shooting distance
         double distance = cachedShotData.effectiveDistance();
         boolean withinShotDistance = distance >= shooter.getMinShotDistFromShooterMeters() 
@@ -495,7 +480,7 @@ public class Superstructure extends SubsystemBase {
         
         Logger.recordOutput("Superstructure/withinShotDistance", withinShotDistance);
 
-        return swerveReady && shooterReady && kickerReady && withinShotDistance;
+        return swerveReady && shooterReady && withinShotDistance;
     }
 
     /**
