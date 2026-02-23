@@ -86,6 +86,23 @@ class SuperstructureShotReadinessTest {
         assertSame(mostRecentOutOfRangeFar, selected);
     }
 
+    @Test
+    void isLastInRangeShotDataValid_falseWhenTimestampIsNotFinite() {
+        assertFalse(Superstructure.isLastInRangeShotDataValid(10.0, Double.NaN, 1.0));
+        assertFalse(Superstructure.isLastInRangeShotDataValid(10.0, Double.NEGATIVE_INFINITY, 1.0));
+    }
+
+    @Test
+    void isLastInRangeShotDataValid_trueWhenShotAgeAtOrBelowMaxAge() {
+        assertTrue(Superstructure.isLastInRangeShotDataValid(10.0, 9.0, 1.0));
+        assertTrue(Superstructure.isLastInRangeShotDataValid(10.0, 9.1, 1.0));
+    }
+
+    @Test
+    void isLastInRangeShotDataValid_falseWhenShotAgeExceedsMaxAge() {
+        assertFalse(Superstructure.isLastInRangeShotDataValid(10.0, 8.9, 1.0));
+    }
+
     private static ShotData shotData(double effectiveDistanceMeters) {
         return new ShotData(
             Rotation2d.fromDegrees(0.0),

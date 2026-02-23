@@ -5,13 +5,9 @@ import org.littletonrobotics.junction.Logger;
 import org.littletonrobotics.junction.networktables.LoggedNetworkNumber;
 
 import edu.wpi.first.math.InterpolatingMatrixTreeMap;
-import edu.wpi.first.math.geometry.Pose3d;
 import edu.wpi.first.math.geometry.Rotation2d;
-import edu.wpi.first.math.geometry.Rotation3d;
-import edu.wpi.first.math.geometry.Transform3d;
 import edu.wpi.first.math.geometry.Translation2d;
 import edu.wpi.first.math.geometry.Translation3d;
-import edu.wpi.first.math.kinematics.ChassisSpeeds;
 import edu.wpi.first.math.numbers.N1;
 import edu.wpi.first.math.numbers.N3;
 import edu.wpi.first.wpilibj.Timer;
@@ -22,6 +18,7 @@ import frc.robot.constants.Constants;
 import frc.robot.constants.FieldConstants;
 import frc.robot.lib.util.ballistics.BallisticsPhysics;
 import frc.robot.lib.BLine.FlippingUtil;
+import frc.robot.lib.util.ShotKinematicsUtil;
 import frc.robot.lib.util.ShotCalculator;
 import frc.robot.lib.util.ShotCalculator.ShotData;
 import frc.robot.subsystems.hopper.Hopper;
@@ -97,6 +94,7 @@ public class Superstructure extends SubsystemBase {
     private static final double MAX_TRANSLATIONAL_VELOCITY_DURING_SHOT_METERS_PER_SEC = 2.5;
     private static final double MAX_ANGULAR_VELOCITY_DURING_SHOT_RAD_PER_SEC = 0.8;
     private static final double SHOT_IMPACT_TOLERANCE_METERS = 0.3;
+    private static final double LAST_IN_RANGE_SHOT_MAX_AGE_SECONDS = 1.0;
     private static final double BUMP_MAX_VELOCITY_METERS_PER_SEC = 1.8;
     private static final Rotation2d BUMP_SNAP_ANGLE = Rotation2d.fromDegrees(45);
     private LoggedNetworkNumber latencyCompensationSeconds = new LoggedNetworkNumber("Shooter/latencyCompSec");
@@ -111,6 +109,7 @@ public class Superstructure extends SubsystemBase {
     private ShotData mostRecentShotData;
     // Last shot calculation whose effective distance was inside configured min/max bounds.
     private ShotData lastInRangeShotData;
+    private double lastInRangeShotTimestampSeconds = Double.NEGATIVE_INFINITY;
     private ShotReadinessData cachedShotReadinessData = new ShotReadinessData(
         new Translation3d(),
         new Translation3d(),
@@ -135,6 +134,12 @@ public class Superstructure extends SubsystemBase {
         boolean readyForShot
     ) {}
 
+    private record ShotComputationContext(
+        Translation3d targetLocation,
+        ShotKinematicsUtil.ShooterKinematics shooterKinematics,
+        InterpolatingMatrixTreeMap<Double, N3, N1> lerpTable
+    ) {}
+
     private Superstructure() {
         // Set up suppliers for the shooter - these provide dynamic setpoints based on shot calculation
         shooter.setHoodAngleSupplier(this::getTargetHoodAngle);
@@ -148,20 +153,32 @@ public class Superstructure extends SubsystemBase {
 
         // Calculate raw shot data once per cycle, then apply close-shot guard for mechanism setpoints.
         mostRecentShotData = calculateShotData();
+        double nowSeconds = Timer.getTimestamp();
         double minShotDistance = shooter.getMinShotDistFromShooterMeters();
         double maxShotDistance = shooter.getMaxShotDistFromShooterMeters();
         if (isDistanceInRange(mostRecentShotData.effectiveDistance(), minShotDistance, maxShotDistance)) {
             lastInRangeShotData = mostRecentShotData;
+            lastInRangeShotTimestampSeconds = nowSeconds;
+        }
+        boolean hasValidLastInRangeShotData = isLastInRangeShotDataValid(
+            nowSeconds,
+            lastInRangeShotTimestampSeconds,
+            LAST_IN_RANGE_SHOT_MAX_AGE_SECONDS
+        );
+        if (!hasValidLastInRangeShotData) {
+            lastInRangeShotData = null;
         }
         cachedShotData = selectShotDataWithMinDistanceGuard(
             mostRecentShotData,
-            lastInRangeShotData,
+            hasValidLastInRangeShotData ? lastInRangeShotData : null,
             minShotDistance
         );
         Logger.recordOutput("Superstructure/shotData", cachedShotData);
         Logger.recordOutput("Superstructure/rawShotData", mostRecentShotData);
         Logger.recordOutput("Superstructure/usingCloseShotGuard", cachedShotData != mostRecentShotData);
-        Logger.recordOutput("Superstructure/hasLastInRangeShotData", lastInRangeShotData != null);
+        Logger.recordOutput("Superstructure/hasLastInRangeShotData", hasValidLastInRangeShotData);
+        Logger.recordOutput("Superstructure/lastInRangeShotMaxAgeSeconds", LAST_IN_RANGE_SHOT_MAX_AGE_SECONDS);
+        Logger.recordOutput("Superstructure/lastInRangeShotAgeSeconds", nowSeconds - lastInRangeShotTimestampSeconds);
         cachedShotReadinessData = calculateShotReadinessData();
         logShotReadinessData(cachedShotReadinessData);
         
@@ -285,69 +302,27 @@ public class Superstructure extends SubsystemBase {
     }
 
     private void handleDisabledState() {
-        shooter.setHoodSetpoint(HoodSetpoint.HOME);
-        shooter.setTurretSetpoint(TurretSetpoint.HOME);
-        shooter.setFlywheelSetpoint(FlywheelSetpoint.OFF);
-        hopper.setSetpoint(HopperSetpoint.OFF);
-        swerveDrive.setDesiredOmegaOverrideState(SwerveDrive.DesiredOmegaOverrideState.NONE);
-        swerveDrive.setDesiredTranslationOverrideState(SwerveDrive.DesiredTranslationOverrideState.NONE);
+        applyHomeOutputs();
     }
 
     private void handleHomeState() {
-        shooter.setHoodSetpoint(HoodSetpoint.HOME);
-        shooter.setTurretSetpoint(TurretSetpoint.HOME);
-        shooter.setFlywheelSetpoint(FlywheelSetpoint.OFF);
-        hopper.setSetpoint(HopperSetpoint.OFF);
-        swerveDrive.setDesiredOmegaOverrideState(SwerveDrive.DesiredOmegaOverrideState.NONE);
-        swerveDrive.setDesiredTranslationOverrideState(SwerveDrive.DesiredTranslationOverrideState.NONE);
+        applyHomeOutputs();
     }
 
     private void handleTrackingState() {
-        shooter.setHoodSetpoint(HoodSetpoint.DYNAMIC);
-        shooter.setTurretSetpoint(TurretSetpoint.DYNAMIC);
-        shooter.setFlywheelSetpoint(FlywheelSetpoint.OFF);
-        hopper.setSetpoint(HopperSetpoint.OFF);
-        swerveDrive.setDesiredOmegaOverrideState(SwerveDrive.DesiredOmegaOverrideState.NONE);
-        swerveDrive.setDesiredTranslationOverrideState(SwerveDrive.DesiredTranslationOverrideState.NONE);
+        applyTrackingOutputs();
     }
 
     private void handlePreparingForShotState() {
-        updateSwerveRotationRange();
-        swerveDrive.setTranslationVelocityCapMaxVelocityMetersPerSec(MAX_TRANSLATIONAL_VELOCITY_DURING_SHOT_METERS_PER_SEC);
-        swerveDrive.setOmegaVelocityCapMaxRadiansPerSec(MAX_ANGULAR_VELOCITY_DURING_SHOT_RAD_PER_SEC);
-
-        shooter.setHoodSetpoint(HoodSetpoint.DYNAMIC);
-        shooter.setTurretSetpoint(TurretSetpoint.DYNAMIC);
-        shooter.setFlywheelSetpoint(FlywheelSetpoint.DYNAMIC);
-        hopper.setSetpoint(HopperSetpoint.OFF);
-        swerveDrive.setDesiredOmegaOverrideState(SwerveDrive.DesiredOmegaOverrideState.CAPPED);
-        swerveDrive.setDesiredTranslationOverrideState(SwerveDrive.DesiredTranslationOverrideState.CAPPED);
+        applyDynamicShotOutputs(HopperSetpoint.OFF);
     }
 
     private void handleReadyForShotState() {
-        updateSwerveRotationRange();
-        swerveDrive.setTranslationVelocityCapMaxVelocityMetersPerSec(MAX_TRANSLATIONAL_VELOCITY_DURING_SHOT_METERS_PER_SEC);
-        swerveDrive.setOmegaVelocityCapMaxRadiansPerSec(MAX_ANGULAR_VELOCITY_DURING_SHOT_RAD_PER_SEC);
-
-        shooter.setHoodSetpoint(HoodSetpoint.DYNAMIC);
-        shooter.setTurretSetpoint(TurretSetpoint.DYNAMIC);
-        shooter.setFlywheelSetpoint(FlywheelSetpoint.DYNAMIC);
-        hopper.setSetpoint(HopperSetpoint.OFF);
-        swerveDrive.setDesiredOmegaOverrideState(SwerveDrive.DesiredOmegaOverrideState.CAPPED);
-        swerveDrive.setDesiredTranslationOverrideState(SwerveDrive.DesiredTranslationOverrideState.CAPPED);
+        applyDynamicShotOutputs(HopperSetpoint.OFF);
     }
 
     private void handleShootingState() {        
-        updateSwerveRotationRange();
-        swerveDrive.setTranslationVelocityCapMaxVelocityMetersPerSec(MAX_TRANSLATIONAL_VELOCITY_DURING_SHOT_METERS_PER_SEC);
-        swerveDrive.setOmegaVelocityCapMaxRadiansPerSec(MAX_ANGULAR_VELOCITY_DURING_SHOT_RAD_PER_SEC);
-
-        shooter.setHoodSetpoint(HoodSetpoint.DYNAMIC);
-        shooter.setTurretSetpoint(TurretSetpoint.DYNAMIC);
-        shooter.setFlywheelSetpoint(FlywheelSetpoint.DYNAMIC);
-        hopper.setSetpoint(HopperSetpoint.FEEDING);
-        swerveDrive.setDesiredOmegaOverrideState(SwerveDrive.DesiredOmegaOverrideState.CAPPED);
-        swerveDrive.setDesiredTranslationOverrideState(SwerveDrive.DesiredTranslationOverrideState.CAPPED);
+        applyDynamicShotOutputs(HopperSetpoint.FEEDING);
 
         double now = Timer.getTimestamp();
         double timeSinceShotStart = now - shotStartTime;
@@ -377,6 +352,58 @@ public class Superstructure extends SubsystemBase {
         shooter.setTurretSetpoint(TurretSetpoint.HOME);
         shooter.setFlywheelSetpoint(FlywheelSetpoint.OFF);
         hopper.setSetpoint(HopperSetpoint.OFF);
+    }
+
+    private void applyHomeOutputs() {
+        applyShooterAndHopperSetpoints(
+            HoodSetpoint.HOME,
+            TurretSetpoint.HOME,
+            FlywheelSetpoint.OFF,
+            HopperSetpoint.OFF
+        );
+        swerveDrive.setDesiredOmegaOverrideState(SwerveDrive.DesiredOmegaOverrideState.NONE);
+        swerveDrive.setDesiredTranslationOverrideState(SwerveDrive.DesiredTranslationOverrideState.NONE);
+    }
+
+    private void applyTrackingOutputs() {
+        applyShooterAndHopperSetpoints(
+            HoodSetpoint.DYNAMIC,
+            TurretSetpoint.DYNAMIC,
+            FlywheelSetpoint.OFF,
+            HopperSetpoint.OFF
+        );
+        swerveDrive.setDesiredOmegaOverrideState(SwerveDrive.DesiredOmegaOverrideState.NONE);
+        swerveDrive.setDesiredTranslationOverrideState(SwerveDrive.DesiredTranslationOverrideState.NONE);
+    }
+
+    private void applyDynamicShotOutputs(HopperSetpoint hopperSetpoint) {
+        updateSwerveRotationRange();
+        applyShotMotionCaps();
+        applyShooterAndHopperSetpoints(
+            HoodSetpoint.DYNAMIC,
+            TurretSetpoint.DYNAMIC,
+            FlywheelSetpoint.DYNAMIC,
+            hopperSetpoint
+        );
+        swerveDrive.setDesiredOmegaOverrideState(SwerveDrive.DesiredOmegaOverrideState.CAPPED);
+        swerveDrive.setDesiredTranslationOverrideState(SwerveDrive.DesiredTranslationOverrideState.CAPPED);
+    }
+
+    private void applyShotMotionCaps() {
+        swerveDrive.setTranslationVelocityCapMaxVelocityMetersPerSec(MAX_TRANSLATIONAL_VELOCITY_DURING_SHOT_METERS_PER_SEC);
+        swerveDrive.setOmegaVelocityCapMaxRadiansPerSec(MAX_ANGULAR_VELOCITY_DURING_SHOT_RAD_PER_SEC);
+    }
+
+    private void applyShooterAndHopperSetpoints(
+        HoodSetpoint hoodSetpoint,
+        TurretSetpoint turretSetpoint,
+        FlywheelSetpoint flywheelSetpoint,
+        HopperSetpoint hopperSetpoint
+    ) {
+        shooter.setHoodSetpoint(hoodSetpoint);
+        shooter.setTurretSetpoint(turretSetpoint);
+        shooter.setFlywheelSetpoint(flywheelSetpoint);
+        hopper.setSetpoint(hopperSetpoint);
     }
 
     private void applyIntakeState(CurrentIntakeState intakeState) {
@@ -515,6 +542,17 @@ public class Superstructure extends SubsystemBase {
         return mostRecentShotData;
     }
 
+    static boolean isLastInRangeShotDataValid(
+        double nowSeconds,
+        double lastInRangeShotTimestampSeconds,
+        double maxAgeSeconds
+    ) {
+        if (!Double.isFinite(lastInRangeShotTimestampSeconds)) {
+            return false;
+        }
+        return nowSeconds - lastInRangeShotTimestampSeconds <= maxAgeSeconds;
+    }
+
     /**
      * Updates the swerve rotation range based on turret limits and target shot angle.
      * This ensures the robot heading keeps the turret within its physical limits.
@@ -554,37 +592,33 @@ public class Superstructure extends SubsystemBase {
     }
 
     private ShotData calculateShotData() {
-        Translation3d targetLocation = getFieldTargetLocation();
-        
-        // Calculate shooter position in field coordinates
-        Pose3d robotPose = new Pose3d(
-            new Translation3d(
-                robotState.getEstimatedPose().getX(), 
-                robotState.getEstimatedPose().getY(), 
-                0
-            ),
-            new Rotation3d(0, 0, robotState.getEstimatedPose().getRotation().getRadians())
-        );
-        Translation3d shooterPosition = robotPose.plus(new Transform3d(new Pose3d(), shooter.getShooterRelativePose())).getTranslation();
-        
-        ChassisSpeeds speeds = robotState.getFieldRelativeSpeeds();
-        InterpolatingMatrixTreeMap<Double, N3, N1> lerpTable = shooter.getLerpTable();
+        ShotComputationContext context = buildShotComputationContext();
         double lcomp = latencyCompensationSeconds.get();
-        
-        // Get shooter offset from robot center (for omega compensation)
-        Translation2d shooterOffsetFromRobotCenter = shooter.getShooterRelativePose().getTranslation().toTranslation2d();
-        Rotation2d robotHeading = robotState.getEstimatedPose().getRotation();
 
         return ShotCalculator.calculate(
-            targetLocation,
-            shooterPosition,
-            speeds,
-            lerpTable,
+            context.targetLocation(),
+            context.shooterKinematics().shooterPosition(),
+            context.shooterKinematics().fieldRelativeSpeeds(),
+            context.lerpTable(),
             lcomp,
             shooter.getFlywheelVelocityRotationsPerSec(),
             shooter::calculateShotExitVelocityMetersPerSec,
-            shooterOffsetFromRobotCenter,
-            robotHeading
+            context.shooterKinematics().shooterOffsetFromRobotCenter(),
+            context.shooterKinematics().robotHeading()
+        );
+    }
+
+    private ShotComputationContext buildShotComputationContext() {
+        Translation3d targetLocation = getFieldTargetLocation();
+        ShotKinematicsUtil.ShooterKinematics shooterKinematics = ShotKinematicsUtil.calculateShooterKinematics(
+            robotState.getEstimatedPose(),
+            shooter.getShooterRelativePose(),
+            robotState.getFieldRelativeSpeeds()
+        );
+        return new ShotComputationContext(
+            targetLocation,
+            shooterKinematics,
+            shooter.getLerpTable()
         );
     }
 
@@ -602,24 +636,14 @@ public class Superstructure extends SubsystemBase {
         double turretAngleRotations,
         double flywheelRPS
     ) {
-        Pose3d robotPose = new Pose3d(
-            new Translation3d(
-                robotState.getEstimatedPose().getX(),
-                robotState.getEstimatedPose().getY(),
-                0
-            ),
-            new Rotation3d(0, 0, robotState.getEstimatedPose().getRotation().getRadians())
-        );
-        Translation3d shooterPosition =
-            robotPose.plus(new Transform3d(new Pose3d(), shooter.getShooterRelativePose())).getTranslation();
-
-        Translation3d targetLocation = getFieldTargetLocation();
+        ShotComputationContext context = buildShotComputationContext();
+        Translation3d shooterPosition = context.shooterKinematics().shooterPosition();
+        Translation3d targetLocation = context.targetLocation();
         double shooterDistanceToTarget =
             shooterPosition.toTranslation2d().getDistance(targetLocation.toTranslation2d());
-        InterpolatingMatrixTreeMap<Double, N3, N1> lerpTable = shooter.getLerpTable();
         double exitVelocity = ShotCalculator.calculateExitVelocityMetersPerSec(
             shooterDistanceToTarget,
-            lerpTable,
+            context.lerpTable(),
             flywheelRPS,
             shooter::calculateShotExitVelocityMetersPerSec
         );
@@ -627,23 +651,12 @@ public class Superstructure extends SubsystemBase {
 
         double pitch = hoodAngleRotations * 2.0 * Math.PI;
         double turretYaw = turretAngleRotations * 2.0 * Math.PI;
-        Rotation2d robotHeading = robotState.getEstimatedPose().getRotation();
+        Rotation2d robotHeading = context.shooterKinematics().robotHeading();
         double fieldYaw = turretYaw + robotHeading.getRadians();
 
         double vHorizontal = exitVelocity * Math.cos(pitch);
-        ChassisSpeeds fieldSpeeds = robotState.getFieldRelativeSpeeds();
-        Translation2d shooterOffsetFromRobotCenter = shooter.getShooterRelativePose().getTranslation().toTranslation2d();
-        double omega = fieldSpeeds.omegaRadiansPerSecond;
-        double dx = shooterOffsetFromRobotCenter.getX();
-        double dy = shooterOffsetFromRobotCenter.getY();
-        double tangentialVxRobot = -omega * dy;
-        double tangentialVyRobot = omega * dx;
-        double tangentialVxField = tangentialVxRobot * robotHeading.getCos() - tangentialVyRobot * robotHeading.getSin();
-        double tangentialVyField = tangentialVxRobot * robotHeading.getSin() + tangentialVyRobot * robotHeading.getCos();
-        double shooterVxField = fieldSpeeds.vxMetersPerSecond + tangentialVxField;
-        double shooterVyField = fieldSpeeds.vyMetersPerSecond + tangentialVyField;
-        double vx = vHorizontal * Math.cos(fieldYaw) + shooterVxField;
-        double vy = vHorizontal * Math.sin(fieldYaw) + shooterVyField;
+        double vx = vHorizontal * Math.cos(fieldYaw) + context.shooterKinematics().shooterVxField();
+        double vy = vHorizontal * Math.sin(fieldYaw) + context.shooterKinematics().shooterVyField();
         double vz = exitVelocity * Math.sin(pitch);
 
         double hubZ = FieldConstants.Hub.hubCenter.getZ();
