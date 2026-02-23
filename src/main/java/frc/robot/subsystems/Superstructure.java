@@ -82,7 +82,7 @@ public class Superstructure extends SubsystemBase {
 
     private DesiredSystemState desiredSystemState = DesiredSystemState.DISABLED;
     private CurrentSystemState currentSystemState = CurrentSystemState.DISABLED;
-    private DesiredIntakeState desiredIntakeState = DesiredIntakeState.DISABLED;
+    private DesiredIntakeState desiredIntakeState = DesiredIntakeState.STOWED;
     private CurrentIntakeState currentIntakeState = CurrentIntakeState.DISABLED;
 
     private final Shooter shooter = Shooter.getInstance();
