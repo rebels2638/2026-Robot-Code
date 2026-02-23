@@ -509,12 +509,23 @@ public class Superstructure extends SubsystemBase {
 
         double pitch = hoodAngleRotations * 2.0 * Math.PI;
         double turretYaw = turretAngleRotations * 2.0 * Math.PI;
-        double fieldYaw = turretYaw + robotState.getEstimatedPose().getRotation().getRadians();
+        Rotation2d robotHeading = robotState.getEstimatedPose().getRotation();
+        double fieldYaw = turretYaw + robotHeading.getRadians();
 
         double vHorizontal = exitVelocity * Math.cos(pitch);
         ChassisSpeeds fieldSpeeds = robotState.getFieldRelativeSpeeds();
-        double vx = vHorizontal * Math.cos(fieldYaw) + fieldSpeeds.vxMetersPerSecond;
-        double vy = vHorizontal * Math.sin(fieldYaw) + fieldSpeeds.vyMetersPerSecond;
+        Translation2d shooterOffsetFromRobotCenter = shooter.getShooterRelativePose().getTranslation().toTranslation2d();
+        double omega = fieldSpeeds.omegaRadiansPerSecond;
+        double dx = shooterOffsetFromRobotCenter.getX();
+        double dy = shooterOffsetFromRobotCenter.getY();
+        double tangentialVxRobot = -omega * dy;
+        double tangentialVyRobot = omega * dx;
+        double tangentialVxField = tangentialVxRobot * robotHeading.getCos() - tangentialVyRobot * robotHeading.getSin();
+        double tangentialVyField = tangentialVxRobot * robotHeading.getSin() + tangentialVyRobot * robotHeading.getCos();
+        double shooterVxField = fieldSpeeds.vxMetersPerSecond + tangentialVxField;
+        double shooterVyField = fieldSpeeds.vyMetersPerSecond + tangentialVyField;
+        double vx = vHorizontal * Math.cos(fieldYaw) + shooterVxField;
+        double vy = vHorizontal * Math.sin(fieldYaw) + shooterVyField;
         double vz = exitVelocity * Math.sin(pitch);
 
         double hubZ = FieldConstants.Hub.hubCenter.getZ();

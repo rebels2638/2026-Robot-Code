@@ -82,8 +82,8 @@ public class VisualizeShot {
         Logger.recordOutput("VisualizeShot/shooterVyField", shooterVyField);
 
         ProjectileVisualizer.addProjectile(
-            fieldRelativeSpeeds.vxMetersPerSecond,
-            fieldRelativeSpeeds.vyMetersPerSecond,
+            shooterVxField,
+            shooterVyField,
             exitVelocity,
             shooterPose,
             FieldConstants.Hub.hubCenter.getZ(),
