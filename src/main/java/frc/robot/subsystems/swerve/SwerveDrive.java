@@ -483,11 +483,15 @@ public class SwerveDrive extends SubsystemBase {
                 currentOmegaOverrideState = CurrentOmegaOverrideState.NONE;
                 break;
             case RANGED_ROTATION:
-                if (isWithinRotationRange()) {
-                    currentOmegaOverrideState = CurrentOmegaOverrideState.RANGED_NOMINAL;
-                } else {
-                    currentOmegaOverrideState = CurrentOmegaOverrideState.RANGED_RETURNING;
-                }
+                boolean isWithinRange = isWithinRotationRange();
+                boolean isWithinNominalRange = isWithinRotationRange(getRangedRotationNominalBufferRadians());
+                currentOmegaOverrideState = resolveRangedRotationState(
+                    previousOmegaOverrideState,
+                    isWithinRange,
+                    isWithinNominalRange
+                );
+                Logger.recordOutput("SwerveDrive/rangedRotation/isWithinRange", isWithinRange);
+                Logger.recordOutput("SwerveDrive/rangedRotation/isWithinNominalRange", isWithinNominalRange);
                 break;
             case CAPPED:
                 currentOmegaOverrideState = CurrentOmegaOverrideState.CAPPED;
@@ -683,23 +687,23 @@ public class SwerveDrive extends SubsystemBase {
         previousOmegaOverrideState = CurrentOmegaOverrideState.NONE;
     }
     
-    private void handleRangedRotationOmegaOverrideState() {
+    private void handleRangedRotationOmegaOverrideState(boolean shouldReturnToRange) {
         shouldOverrideOmega = true;
         shouldOverrideOmegaVelocityCap = false;
-        if (isWithinRotationRange(RANGED_ROTATION_BUFFER_RAD - Math.toRadians(drivetrainConfig.rangedRotationToleranceDeg))) {
-            omegaOverride = limitOmegaForRange(lastUnoverriddenOmega); // TODO: BAD FIX
-        } else {
-            omegaOverride = calculateReturnToRangeOmega();
-        }
+        omegaOverride = shouldReturnToRange
+            ? calculateReturnToRangeOmega()
+            : limitOmegaForRange(lastUnoverriddenOmega);
+        Logger.recordOutput("SwerveDrive/rangedRotation/shouldReturnToRange", shouldReturnToRange);
+        Logger.recordOutput("SwerveDrive/rangedRotation/omegaOverride", omegaOverride);
     }
 
     private void handleRangedRotationNominalOmegaOverrideState() {
-        handleRangedRotationOmegaOverrideState();
+        handleRangedRotationOmegaOverrideState(false);
         previousOmegaOverrideState = CurrentOmegaOverrideState.RANGED_NOMINAL;
     }
     
     private void handleRangedRotationReturningOmegaOverrideState() {
-        handleRangedRotationOmegaOverrideState();
+        handleRangedRotationOmegaOverrideState(true);
         previousOmegaOverrideState = CurrentOmegaOverrideState.RANGED_RETURNING;
     }
 
@@ -773,6 +777,29 @@ public class SwerveDrive extends SubsystemBase {
         Rotation2d currentRotation = RobotState.getInstance().getEstimatedPose().getRotation();
         double errorRad = MathUtil.angleModulus(snapTargetAngle.getRadians() - currentRotation.getRadians());
         return Math.abs(errorRad) <= Math.toRadians(drivetrainConfig.snappedToleranceDeg);
+    }
+
+    private double getRangedRotationNominalBufferRadians() {
+        return Math.max(
+            0.0,
+            RANGED_ROTATION_BUFFER_RAD - Math.toRadians(drivetrainConfig.rangedRotationToleranceDeg)
+        );
+    }
+
+    static CurrentOmegaOverrideState resolveRangedRotationState(
+        CurrentOmegaOverrideState previousOmegaOverrideState,
+        boolean isWithinRange,
+        boolean isWithinNominalRange
+    ) {
+        boolean wasReturning = previousOmegaOverrideState == CurrentOmegaOverrideState.RANGED_RETURNING;
+        if (wasReturning) {
+            return isWithinNominalRange
+                ? CurrentOmegaOverrideState.RANGED_NOMINAL
+                : CurrentOmegaOverrideState.RANGED_RETURNING;
+        }
+        return isWithinRange
+            ? CurrentOmegaOverrideState.RANGED_NOMINAL
+            : CurrentOmegaOverrideState.RANGED_RETURNING;
     }
 
     /**
