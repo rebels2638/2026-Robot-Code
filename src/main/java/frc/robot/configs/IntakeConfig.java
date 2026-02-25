@@ -34,6 +34,7 @@ public class IntakeConfig {
     public double pivotKS;
     public double pivotKV;
     public double pivotKA;
+    public double pivotKG;
     public double pivotKP;
     public double pivotKI;
     public double pivotKD;

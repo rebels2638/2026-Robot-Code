@@ -14,6 +14,7 @@ import com.ctre.phoenix6.controls.MotionMagicVoltage;
 import com.ctre.phoenix6.controls.VelocityVoltage;
 import com.ctre.phoenix6.controls.VoltageOut;
 import com.ctre.phoenix6.hardware.TalonFX;
+import com.ctre.phoenix6.signals.GravityTypeValue;
 import com.ctre.phoenix6.signals.InvertedValue;
 import com.ctre.phoenix6.signals.NeutralModeValue;
 import com.ctre.phoenix6.signals.StaticFeedforwardSignValue;
@@ -89,6 +90,9 @@ public class IntakeIOTalonFX implements IntakeIO {
         pivotConfig.Slot0.kS = config.pivotKS;
         pivotConfig.Slot0.kV = config.pivotKV;
         pivotConfig.Slot0.kA = config.pivotKA;
+        pivotConfig.Slot0.kG = config.pivotKG;
+        // CTRE arm gravity compensation expects 0 rotations to be horizontal.
+        pivotConfig.Slot0.GravityType = GravityTypeValue.Arm_Cosine;
         pivotConfig.Slot0.StaticFeedforwardSign = StaticFeedforwardSignValue.UseVelocitySign;
         pivotConfig.MotionMagic.MotionMagicCruiseVelocity = config.pivotMaxVelocityRotationsPerSec;
         pivotConfig.MotionMagic.MotionMagicAcceleration = config.pivotMaxAccelerationRotationsPerSec2;
@@ -198,6 +202,7 @@ public class IntakeIOTalonFX implements IntakeIO {
         pivotConfig.Slot0.kS = config.kS();
         pivotConfig.Slot0.kV = config.kV();
         pivotConfig.Slot0.kA = config.kA();
+        pivotConfig.Slot0.kG = config.kG();
 
         PhoenixUtil.tryUntilOk(5, () -> pivotMotor.getConfigurator().apply(pivotConfig, 0.25));
     }

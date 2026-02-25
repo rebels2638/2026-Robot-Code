@@ -64,7 +64,8 @@ public class Intake extends SubsystemBase {
                 config.pivotKD,
                 config.pivotKS,
                 config.pivotKV,
-                config.pivotKA
+                config.pivotKA,
+                config.pivotKG
             )
         );
     }
