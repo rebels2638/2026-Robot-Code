@@ -476,12 +476,57 @@ public class Superstructure extends SubsystemBase {
         double setpointTurret = getTargetTurretAngle().getRotations();
         double setpointFlywheel = getTargetFlywheelRPS();
 
-        Translation3d actualLanding = simulateShotLanding(actualHood, actualTurret, actualFlywheel);
-        Translation3d setpointLanding = simulateShotLanding(setpointHood, setpointTurret, setpointFlywheel);
+        ShotComputationContext context = buildShotComputationContext();
+        double effectiveDistance = cachedShotData.effectiveDistance();
+        double shooterHeight = context.shooterKinematics().shooterPosition().getZ();
+        double targetHeight = context.targetLocation().getZ();
+
+        double actualExitVelocity = cachedShotData.exitVelocity();
+        double actualSpinRateRadPerSec = ShotCalculator.calculateSpinRateRadPerSec(
+            effectiveDistance,
+            context.lerpTable(),
+            actualFlywheel,
+            shooter::calculateShotExitVelocityMetersPerSec,
+            rps -> shooter.calculateBackSpinRPM(rps) * 2.0 * Math.PI / 60.0,
+            shooterHeight,
+            targetHeight
+        );
+        double setpointExitVelocity = ShotCalculator.calculateExitVelocityMetersPerSec(
+            effectiveDistance,
+            context.lerpTable(),
+            setpointFlywheel,
+            shooter::calculateShotExitVelocityMetersPerSec,
+            rps -> shooter.calculateBackSpinRPM(rps) * 2.0 * Math.PI / 60.0,
+            shooterHeight,
+            targetHeight
+        );
+        double setpointSpinRateRadPerSec = ShotCalculator.calculateSpinRateRadPerSec(
+            effectiveDistance,
+            context.lerpTable(),
+            setpointFlywheel,
+            shooter::calculateShotExitVelocityMetersPerSec,
+            rps -> shooter.calculateBackSpinRPM(rps) * 2.0 * Math.PI / 60.0,
+            shooterHeight,
+            targetHeight
+        );
+
+        Translation3d actualLanding = simulateShotLanding(
+            context,
+            actualHood,
+            actualTurret,
+            actualExitVelocity,
+            actualSpinRateRadPerSec
+        );
+        Translation3d setpointLanding = simulateShotLanding(
+            context,
+            setpointHood,
+            setpointTurret,
+            setpointExitVelocity,
+            setpointSpinRateRadPerSec
+        );
         double impactErrorMeters = actualLanding.toTranslation2d()
             .getDistance(setpointLanding.toTranslation2d());
         boolean shooterReady = impactErrorMeters <= SHOT_IMPACT_TOLERANCE_METERS;
-        double effectiveDistance = mostRecentShotData.effectiveDistance();
         double minShotDistance = shooter.getMinShotDistFromShooterMeters();
         double maxShotDistance = shooter.getMaxShotDistFromShooterMeters();
         boolean distanceInRange = isDistanceInRange(effectiveDistance, minShotDistance, maxShotDistance);
@@ -673,6 +718,7 @@ public class Superstructure extends SubsystemBase {
             lcomp,
             shooter.getFlywheelVelocityRotationsPerSec(),
             shooter::calculateShotExitVelocityMetersPerSec,
+            rps -> shooter.calculateBackSpinRPM(rps) * 2.0 * Math.PI / 60.0,
             context.shooterKinematics().shooterOffsetFromRobotCenter(),
             context.shooterKinematics().robotHeading()
         );
@@ -702,22 +748,13 @@ public class Superstructure extends SubsystemBase {
     }
 
     private Translation3d simulateShotLanding(
+        ShotComputationContext context,
         double hoodAngleRotations,
         double turretAngleRotations,
-        double flywheelRPS
+        double exitVelocity,
+        double spinRateRadPerSec
     ) {
-        ShotComputationContext context = buildShotComputationContext();
         Translation3d shooterPosition = context.shooterKinematics().shooterPosition();
-        Translation3d targetLocation = context.targetLocation();
-        double shooterDistanceToTarget =
-            shooterPosition.toTranslation2d().getDistance(targetLocation.toTranslation2d());
-        double exitVelocity = ShotCalculator.calculateExitVelocityMetersPerSec(
-            shooterDistanceToTarget,
-            context.lerpTable(),
-            flywheelRPS,
-            shooter::calculateShotExitVelocityMetersPerSec
-        );
-        double spinRateRadPerSec = shooter.calculateBackSpinRPM(flywheelRPS) * 2.0 * Math.PI / 60.0;
 
         double pitch = hoodAngleRotations * 2.0 * Math.PI;
         double turretYaw = turretAngleRotations * 2.0 * Math.PI;

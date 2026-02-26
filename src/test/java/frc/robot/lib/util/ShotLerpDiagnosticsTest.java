@@ -18,49 +18,35 @@ import org.junit.jupiter.api.Test;
 
 class ShotLerpDiagnosticsTest {
     @Test
-    // Regression: active exit-velocity path should align with sim lerp table impact heights.
-    void simLerpTable_tofDerivedExitVelocity_vsWheelModelExitVelocity() throws IOException {
+    // Regression: solved setpoint exit velocity should reproduce lerp-table flight time under the same ballistics model.
+    void simLerpTable_currentMethodMatchesConfiguredFlightTimes() throws IOException {
         ShooterConfig config = loadShooterConfig("src/main/deploy/configs/shooter/sim.json");
         InterpolatingMatrixTreeMap<Double, N3, N1> lerpTable = config.getLerpTable();
 
         double targetHeight = FieldConstants.Hub.hubCenter.getZ();
-        double currentMethodAbsErrorSum = 0.0;
-        double tofSpeedAbsErrorSum = 0.0;
-        double wheelSpeedAbsErrorSum = 0.0;
+        double meanAbsFlightTimeErrorSeconds = 0.0;
 
         for (ShooterConfig.LerpEntry entry : config.lerpTable) {
             double angleRad = Math.toRadians(entry.hoodAngleDegrees);
             double rps = entry.flywheelVelocityRPS;
-            double spinRateRadPerSec = calculateSpinRadPerSec(rps, config);
+            double spinRateRadPerSec = ShotCalculator.calculateSpinRateRadPerSec(
+                entry.distanceMeters,
+                lerpTable,
+                rps,
+                measuredRps -> calculateShotExitVelocityMetersPerSec(measuredRps, config),
+                measuredRps -> calculateSpinRadPerSec(measuredRps, config),
+                config.shooterPoseZ,
+                targetHeight
+            );
 
-            double tofDerivedExitVelocity = entry.distanceMeters
-                / (entry.flightTimeSeconds * Math.max(0.05, Math.abs(Math.cos(angleRad))));
-            double wheelModelExitVelocity = calculateShotExitVelocityMetersPerSec(rps, config);
             double currentMethodExitVelocity = ShotCalculator.calculateExitVelocityMetersPerSec(
                 entry.distanceMeters,
                 lerpTable,
                 rps,
-                measuredRps -> calculateShotExitVelocityMetersPerSec(measuredRps, config)
-            );
-
-            TrajectoryResult tofResult = BallisticsPhysics.simulateToDistance(
-                entry.distanceMeters,
-                angleRad,
-                tofDerivedExitVelocity,
+                measuredRps -> calculateShotExitVelocityMetersPerSec(measuredRps, config),
+                measuredRps -> calculateSpinRadPerSec(measuredRps, config),
                 config.shooterPoseZ,
-                targetHeight,
-                spinRateRadPerSec,
-                0.002
-            );
-
-            TrajectoryResult wheelResult = BallisticsPhysics.simulateToDistance(
-                entry.distanceMeters,
-                angleRad,
-                wheelModelExitVelocity,
-                config.shooterPoseZ,
-                targetHeight,
-                spinRateRadPerSec,
-                0.002
+                targetHeight
             );
 
             TrajectoryResult currentResult = BallisticsPhysics.simulateToDistance(
@@ -73,16 +59,11 @@ class ShotLerpDiagnosticsTest {
                 0.002
             );
 
-            double currentHeightError = currentResult.finalHeight() - targetHeight;
-            double tofHeightError = tofResult.finalHeight() - targetHeight;
-            double wheelHeightError = wheelResult.finalHeight() - targetHeight;
-            currentMethodAbsErrorSum += Math.abs(currentHeightError);
-            tofSpeedAbsErrorSum += Math.abs(tofHeightError);
-            wheelSpeedAbsErrorSum += Math.abs(wheelHeightError);
+            meanAbsFlightTimeErrorSeconds += Math.abs(currentResult.flightTime() - entry.flightTimeSeconds);
         }
 
-        assertTrue(currentMethodAbsErrorSum / config.lerpTable.size() < 0.10);
-        assertTrue(tofSpeedAbsErrorSum > currentMethodAbsErrorSum * 10.0);
+        meanAbsFlightTimeErrorSeconds /= config.lerpTable.size();
+        assertTrue(meanAbsFlightTimeErrorSeconds < 0.02);
     }
 
     private static ShooterConfig loadShooterConfig(String path) throws IOException {

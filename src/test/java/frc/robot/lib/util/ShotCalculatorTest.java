@@ -11,6 +11,7 @@ import edu.wpi.first.math.kinematics.ChassisSpeeds;
 import edu.wpi.first.math.numbers.N1;
 import edu.wpi.first.math.numbers.N3;
 import frc.robot.lib.util.ShotCalculator.ShotData;
+import frc.robot.lib.util.ballistics.BallisticsPhysics;
 import frc.robot.testutil.TestLerpTableFactory;
 import java.util.function.DoubleUnaryOperator;
 import org.junit.jupiter.api.Test;
@@ -19,37 +20,149 @@ class ShotCalculatorTest {
     private static final double EPS = 1e-9;
 
     @Test
-    // Exit velocity should equal setpoint wheel-model speed scaled by measured/setpoint RPS ratio.
-    void calculateExitVelocityMetersPerSec_scalesByMeasuredVsSetpointExitVelocity() {
-        InterpolatingMatrixTreeMap<Double, N3, N1> table = TestLerpTableFactory.table(
-            new double[] { 3.0, 40.0, 30.0, 0.45 },
-            new double[] { 5.0, 50.0, 40.0, 0.60 }
+    // Setpoint exit velocity should be solved so model-estimated flight time matches lerp-table flight time.
+    void calculateExitVelocityMetersPerSec_matchesLerpFlightTimeWithBallisticsModel() {
+        InterpolatingMatrixTreeMap<Double, N3, N1> table = TestLerpTableFactory.constantRange(
+            0.0,
+            10.0,
+            45.0,
+            30.0,
+            0.85
         );
-        DoubleUnaryOperator wheelModel = rps -> rps * 0.2;
 
         double distance = 4.0;
-        double measuredRps = 28.0;
-        double actual = ShotCalculator.calculateExitVelocityMetersPerSec(distance, table, measuredRps, wheelModel);
-
+        double hoodAngleRad = Math.toRadians(table.get(distance).get(0, 0));
         double setpointRps = table.get(distance).get(1, 0);
-        double setpointExitVelocity = wheelModel.applyAsDouble(setpointRps);
-        double expected = setpointExitVelocity * (measuredRps / setpointRps);
+        double targetFlightTime = table.get(distance).get(2, 0);
+        double shooterHeight = 1.0;
+        double targetHeight = 2.0;
+        DoubleUnaryOperator wheelRpsToExit = rps -> rps * 0.2;
+        DoubleUnaryOperator wheelRpsToSpin = rps -> rps * 5.0;
 
-        assertEquals(expected, actual, EPS);
+        double exitVelocity = ShotCalculator.calculateExitVelocityMetersPerSec(
+            distance,
+            table,
+            setpointRps,
+            wheelRpsToExit,
+            wheelRpsToSpin,
+            shooterHeight,
+            targetHeight
+        );
+        double spinRate = ShotCalculator.calculateSpinRateRadPerSec(
+            distance,
+            table,
+            setpointRps,
+            wheelRpsToExit,
+            wheelRpsToSpin,
+            shooterHeight,
+            targetHeight
+        );
+        double estimatedFlightTime = BallisticsPhysics.estimateFlightTime(
+            distance,
+            hoodAngleRad,
+            exitVelocity,
+            shooterHeight,
+            targetHeight,
+            spinRate
+        );
+
+        assertEquals(targetFlightTime, estimatedFlightTime, 0.02);
     }
 
     @Test
-    // Exit velocity should be determined by setpoint/measurement RPS and wheel model, not hood/TOF fields.
-    void calculateExitVelocityMetersPerSec_ignoresHoodAndFlightTimeColumns() {
+    // Measured flywheel RPS should still scale solved setpoint exit velocity by measured/setpoint.
+    void calculateExitVelocityMetersPerSec_scalesByMeasuredVsSetpointRps() {
         InterpolatingMatrixTreeMap<Double, N3, N1> table = TestLerpTableFactory.table(
-            new double[] { 2.0, -20.0, 25.0, 0.01 },
-            new double[] { 4.0, 85.0, 25.0, 5.00 }
+            new double[] { 3.0, 40.0, 30.0, 0.75 },
+            new double[] { 5.0, 50.0, 40.0, 0.90 }
         );
 
-        double atTwoMeters = ShotCalculator.calculateExitVelocityMetersPerSec(2.0, table, 20.0, rps -> rps * 0.5);
-        double atFourMeters = ShotCalculator.calculateExitVelocityMetersPerSec(4.0, table, 20.0, rps -> rps * 0.5);
+        double distance = 4.0;
+        double setpointRps = table.get(distance).get(1, 0);
+        double full = ShotCalculator.calculateExitVelocityMetersPerSec(
+            distance,
+            table,
+            setpointRps,
+            rps -> rps * 0.2,
+            rps -> rps * 5.0,
+            1.0,
+            2.0
+        );
+        double half = ShotCalculator.calculateExitVelocityMetersPerSec(
+            distance,
+            table,
+            setpointRps * 0.5,
+            rps -> rps * 0.2,
+            rps -> rps * 5.0,
+            1.0,
+            2.0
+        );
 
-        assertEquals(atTwoMeters, atFourMeters, EPS);
+        assertEquals(0.5, half / full, 1e-6);
+    }
+
+    @Test
+    // Spin should be scaled by the same exit-velocity ratio and measured/setpoint ratio as the solved shot.
+    void calculateSpinRateRadPerSec_scalesWithSolvedExitVelocityRatio() {
+        InterpolatingMatrixTreeMap<Double, N3, N1> table = TestLerpTableFactory.table(
+            new double[] { 3.0, 42.0, 30.0, 0.78 },
+            new double[] { 5.0, 52.0, 40.0, 0.93 }
+        );
+
+        double distance = 4.0;
+        double measuredRps = 32.0;
+        double correctedExit = ShotCalculator.calculateExitVelocityMetersPerSec(
+            distance,
+            table,
+            measuredRps,
+            rps -> rps * 0.2,
+            rps -> rps * 5.0,
+            1.0,
+            2.0
+        );
+        double correctedSpin = ShotCalculator.calculateSpinRateRadPerSec(
+            distance,
+            table,
+            measuredRps,
+            rps -> rps * 0.2,
+            rps -> rps * 5.0,
+            1.0,
+            2.0
+        );
+
+        double rawMeasuredSpin = measuredRps * 5.0;
+        double wheelModelMeasuredExit = measuredRps * 0.2;
+        assertEquals(rawMeasuredSpin * (correctedExit / wheelModelMeasuredExit), correctedSpin, 1e-9);
+    }
+
+    @Test
+    // Exit velocity should vary with hood/TOF columns even if setpoint RPS is unchanged.
+    void calculateExitVelocityMetersPerSec_dependsOnHoodAndFlightTimeColumns() {
+        InterpolatingMatrixTreeMap<Double, N3, N1> table = TestLerpTableFactory.table(
+            new double[] { 2.0, 35.0, 25.0, 0.50 },
+            new double[] { 4.0, 60.0, 25.0, 1.10 }
+        );
+
+        double atTwoMeters = ShotCalculator.calculateExitVelocityMetersPerSec(
+            2.0,
+            table,
+            20.0,
+            rps -> rps * 0.5,
+            rps -> rps * 4.0,
+            1.0,
+            2.0
+        );
+        double atFourMeters = ShotCalculator.calculateExitVelocityMetersPerSec(
+            4.0,
+            table,
+            20.0,
+            rps -> rps * 0.5,
+            rps -> rps * 4.0,
+            1.0,
+            2.0
+        );
+
+        assertTrue(Math.abs(atTwoMeters - atFourMeters) > 1e-3);
     }
 
     @Test
@@ -63,24 +176,41 @@ class ShotCalculatorTest {
             1.0
         );
 
-        double actual = ShotCalculator.calculateExitVelocityMetersPerSec(1.0, table, 20.0, rps -> rps * 0.5);
+        double actual = ShotCalculator.calculateExitVelocityMetersPerSec(
+            1.0,
+            table,
+            20.0,
+            rps -> rps * 0.5,
+            rps -> rps * 4.0,
+            1.0,
+            2.0
+        );
         assertEquals(0.0, actual, EPS);
     }
 
     @Test
-    // If wheel model reports zero setpoint exit velocity, scaled exit velocity should collapse to zero.
-    void calculateExitVelocityMetersPerSec_whenSetpointExitVelocityIsZero_returnsZero() {
+    // Degenerate TOF/cos inputs should still produce finite positive velocity estimates.
+    void calculateExitVelocityMetersPerSec_handlesDegenerateTofAndCosInputs() {
         InterpolatingMatrixTreeMap<Double, N3, N1> table = TestLerpTableFactory.constantRange(
             0.0,
             10.0,
-            45.0,
+            89.99,
             20.0,
-            0.4
+            0.0
         );
 
-        double actual = ShotCalculator.calculateExitVelocityMetersPerSec(2.0, table, 20.0, rps -> 0.0);
+        double actual = ShotCalculator.calculateExitVelocityMetersPerSec(
+            2.0,
+            table,
+            20.0,
+            rps -> rps * 0.2,
+            rps -> rps * 4.0,
+            1.0,
+            2.0
+        );
 
-        assertEquals(0.0, actual, EPS);
+        assertTrue(Double.isFinite(actual));
+        assertTrue(actual > 0.0);
     }
 
     @Test
@@ -102,6 +232,7 @@ class ShotCalculatorTest {
             0.0,
             30.0,
             rps -> rps,
+            rps -> 0.0,
             new Translation2d(),
             new Rotation2d()
         );
@@ -131,6 +262,7 @@ class ShotCalculatorTest {
             0.0,
             30.0,
             rps -> rps,
+            rps -> 0.0,
             new Translation2d(),
             new Rotation2d()
         );
@@ -159,6 +291,7 @@ class ShotCalculatorTest {
             0.0,
             30.0,
             rps -> rps,
+            rps -> 0.0,
             new Translation2d(),
             new Rotation2d()
         );
@@ -170,6 +303,7 @@ class ShotCalculatorTest {
             0.5,
             30.0,
             rps -> rps,
+            rps -> 0.0,
             new Translation2d(),
             new Rotation2d()
         );
@@ -198,6 +332,7 @@ class ShotCalculatorTest {
             0.0,
             30.0,
             rps -> rps,
+            rps -> 0.0,
             new Translation2d(1.0, 0.0),
             new Rotation2d()
         );
@@ -225,6 +360,7 @@ class ShotCalculatorTest {
             0.0,
             30.0,
             rps -> rps * 0.2,
+            rps -> rps * 5.0,
             new Translation2d(),
             new Rotation2d()
         );
@@ -236,6 +372,7 @@ class ShotCalculatorTest {
             0.0,
             15.0,
             rps -> rps * 0.2,
+            rps -> rps * 5.0,
             new Translation2d(),
             new Rotation2d()
         );

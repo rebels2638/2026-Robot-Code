@@ -10,6 +10,7 @@ import edu.wpi.first.math.geometry.Translation2d;
 import edu.wpi.first.math.kinematics.ChassisSpeeds;
 import edu.wpi.first.wpilibj.Timer;
 import frc.robot.constants.FieldConstants;
+import frc.robot.lib.util.ShotCalculator;
 import frc.robot.lib.util.ballistics.ProjectileVisualizer;
 import frc.robot.subsystems.shooter.Shooter;
 
@@ -54,7 +55,18 @@ public class VisualizeShot {
 
         double flywheelRPS = Shooter.getInstance().getFlywheelVelocityRotationsPerSec();
         double exitVelocity = launchExitVelocityMetersPerSec;
-        double backspinRPM = Shooter.getInstance().calculateBackSpinRPM(flywheelRPS);
+        double shooterDistanceToTarget =
+            shooterPose.getTranslation().toTranslation2d().getDistance(FieldConstants.Hub.hubCenter.toTranslation2d());
+        double backspinRadPerSec = ShotCalculator.calculateSpinRateRadPerSec(
+            shooterDistanceToTarget,
+            Shooter.getInstance().getLerpTable(),
+            flywheelRPS,
+            Shooter.getInstance()::calculateShotExitVelocityMetersPerSec,
+            rps -> Shooter.getInstance().calculateBackSpinRPM(rps) * 2.0 * Math.PI / 60.0,
+            shooterPose.getZ(),
+            FieldConstants.Hub.hubCenter.getZ()
+        );
+        double backspinRPM = backspinRadPerSec * 60.0 / (2.0 * Math.PI);
         
         // Include tangential velocity from robot rotation (omega cross r)
         double omega = fieldRelativeSpeeds.omegaRadiansPerSecond;

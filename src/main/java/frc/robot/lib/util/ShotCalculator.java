@@ -7,10 +7,16 @@ import edu.wpi.first.math.geometry.Translation3d;
 import edu.wpi.first.math.kinematics.ChassisSpeeds;
 import edu.wpi.first.math.numbers.N1;
 import edu.wpi.first.math.numbers.N3;
+import frc.robot.lib.util.ballistics.BallisticsPhysics;
 import java.util.function.DoubleUnaryOperator;
 
 public class ShotCalculator {
+    private static final double MIN_EFFECTIVE_COS = 0.05;
+    private static final double MIN_FLIGHT_TIME_SECONDS = 1e-3;
     private static final double MIN_EXIT_VELOCITY_DENOMINATOR = 1e-6;
+    private static final int FLIGHT_TIME_SOLVE_ITERATIONS = 3;
+
+    private record ShotKinematics(double exitVelocityMetersPerSec, double spinRateRadPerSec) {}
 
     public record ShotData(
         Rotation2d targetFieldYaw,
@@ -30,6 +36,7 @@ public class ShotCalculator {
         double latencyCompensationSeconds,
         double measuredFlywheelRps,
         DoubleUnaryOperator wheelRpsToExitVelocity,
+        DoubleUnaryOperator wheelRpsToSpinRateRadPerSec,
         Translation2d shooterOffsetFromRobotCenter,
         Rotation2d robotHeading
     ) {
@@ -86,8 +93,6 @@ public class ShotCalculator {
             }
         }
 
-
-        
         double shooterAngleToTarget = Math.atan2(targetY - shooterPosition.getY(), targetX - shooterPosition.getX());
         
         // Get final settings for this distance
@@ -95,9 +100,15 @@ public class ShotCalculator {
         double flywheelVelocityRPS = lerpTable.get(shooterLerpTableDistanceToTarget).get(1, 0);
         double finalFlightTime = lerpTable.get(shooterLerpTableDistanceToTarget).get(2, 0);
         double exitVelocity = calculateExitVelocityMetersPerSec(
+            shooterLerpTableDistanceToTarget,
+            hoodAngleDegrees,
+            finalFlightTime,
             flywheelVelocityRPS,
             measuredFlywheelRps,
-            wheelRpsToExitVelocity
+            wheelRpsToExitVelocity,
+            wheelRpsToSpinRateRadPerSec,
+            shooterPosition.getZ(),
+            targetLocation.getZ()
         );
         
         return new ShotData(
@@ -115,27 +126,201 @@ public class ShotCalculator {
         double distanceMeters,
         InterpolatingMatrixTreeMap<Double, N3, N1> lerpTable,
         double measuredFlywheelRps,
-        DoubleUnaryOperator wheelRpsToExitVelocity
+        DoubleUnaryOperator wheelRpsToExitVelocity,
+        DoubleUnaryOperator wheelRpsToSpinRateRadPerSec,
+        double shooterHeightMeters,
+        double targetHeightMeters
     ) {
+        double hoodAngleDegrees = lerpTable.get(distanceMeters).get(0, 0);
         double setpointFlywheelRps = lerpTable.get(distanceMeters).get(1, 0);
+        double flightTimeSeconds = lerpTable.get(distanceMeters).get(2, 0);
         return calculateExitVelocityMetersPerSec(
+            distanceMeters,
+            hoodAngleDegrees,
+            flightTimeSeconds,
             setpointFlywheelRps,
             measuredFlywheelRps,
-            wheelRpsToExitVelocity
+            wheelRpsToExitVelocity,
+            wheelRpsToSpinRateRadPerSec,
+            shooterHeightMeters,
+            targetHeightMeters
+        );
+    }
+
+    public static double calculateSpinRateRadPerSec(
+        double distanceMeters,
+        InterpolatingMatrixTreeMap<Double, N3, N1> lerpTable,
+        double measuredFlywheelRps,
+        DoubleUnaryOperator wheelRpsToExitVelocity,
+        DoubleUnaryOperator wheelRpsToSpinRateRadPerSec,
+        double shooterHeightMeters,
+        double targetHeightMeters
+    ) {
+        double hoodAngleDegrees = lerpTable.get(distanceMeters).get(0, 0);
+        double setpointFlywheelRps = lerpTable.get(distanceMeters).get(1, 0);
+        double flightTimeSeconds = lerpTable.get(distanceMeters).get(2, 0);
+        return calculateShotKinematics(
+            distanceMeters,
+            hoodAngleDegrees,
+            flightTimeSeconds,
+            setpointFlywheelRps,
+            measuredFlywheelRps,
+            wheelRpsToExitVelocity,
+            wheelRpsToSpinRateRadPerSec,
+            shooterHeightMeters,
+            targetHeightMeters
+        ).spinRateRadPerSec();
+    }
+
+    public static double calculateExitVelocityMetersPerSec(
+        double distanceMeters,
+        InterpolatingMatrixTreeMap<Double, N3, N1> lerpTable,
+        double measuredFlywheelRps,
+        DoubleUnaryOperator wheelRpsToExitVelocity
+    ) {
+        return calculateExitVelocityMetersPerSec(
+            distanceMeters,
+            lerpTable,
+            measuredFlywheelRps,
+            wheelRpsToExitVelocity,
+            ignoredRps -> 0.0,
+            0.0,
+            0.0
         );
     }
 
     private static double calculateExitVelocityMetersPerSec(
+        double distanceMeters,
+        double hoodAngleDegrees,
+        double flightTimeSeconds,
         double setpointFlywheelRps,
         double measuredFlywheelRps,
-        DoubleUnaryOperator wheelRpsToExitVelocity
+        DoubleUnaryOperator wheelRpsToExitVelocity,
+        DoubleUnaryOperator wheelRpsToSpinRateRadPerSec,
+        double shooterHeightMeters,
+        double targetHeightMeters
     ) {
-        double setpointExitVelocityMps = wheelRpsToExitVelocity.applyAsDouble(setpointFlywheelRps);
+        return calculateShotKinematics(
+            distanceMeters,
+            hoodAngleDegrees,
+            flightTimeSeconds,
+            setpointFlywheelRps,
+            measuredFlywheelRps,
+            wheelRpsToExitVelocity,
+            wheelRpsToSpinRateRadPerSec,
+            shooterHeightMeters,
+            targetHeightMeters
+        ).exitVelocityMetersPerSec();
+    }
+
+    private static ShotKinematics calculateShotKinematics(
+        double distanceMeters,
+        double hoodAngleDegrees,
+        double flightTimeSeconds,
+        double setpointFlywheelRps,
+        double measuredFlywheelRps,
+        DoubleUnaryOperator wheelRpsToExitVelocity,
+        DoubleUnaryOperator wheelRpsToSpinRateRadPerSec,
+        double shooterHeightMeters,
+        double targetHeightMeters
+    ) {
         double safeSetpointRps = Math.max(MIN_EXIT_VELOCITY_DENOMINATOR, Math.abs(setpointFlywheelRps));
-        if (Math.abs(setpointExitVelocityMps) < MIN_EXIT_VELOCITY_DENOMINATOR) {
-            return 0.0;
+        if (safeSetpointRps <= MIN_EXIT_VELOCITY_DENOMINATOR) {
+            return new ShotKinematics(0.0, 0.0);
         }
-        double exitVelocityScale = measuredFlywheelRps / safeSetpointRps;
-        return setpointExitVelocityMps * exitVelocityScale;
+
+        double baseExitVelocity = solveSetpointExitVelocityMetersPerSec(
+            distanceMeters,
+            hoodAngleDegrees,
+            flightTimeSeconds,
+            setpointFlywheelRps,
+            wheelRpsToExitVelocity,
+            wheelRpsToSpinRateRadPerSec,
+            shooterHeightMeters,
+            targetHeightMeters
+        );
+        double measuredScale = measuredFlywheelRps / safeSetpointRps;
+        double solvedExitVelocity = baseExitVelocity * measuredScale;
+
+        double setpointSpinRateRadPerSec = wheelRpsToSpinRateRadPerSec.applyAsDouble(setpointFlywheelRps);
+        if (!Double.isFinite(setpointSpinRateRadPerSec)) {
+            setpointSpinRateRadPerSec = 0.0;
+        }
+        double wheelModelSetpointExitVelocity = wheelRpsToExitVelocity.applyAsDouble(setpointFlywheelRps);
+        double baseSpinRateRadPerSec = scaleSpinForExitVelocity(
+            setpointSpinRateRadPerSec,
+            wheelModelSetpointExitVelocity,
+            baseExitVelocity
+        );
+        double solvedSpinRateRadPerSec = baseSpinRateRadPerSec * measuredScale;
+        return new ShotKinematics(solvedExitVelocity, solvedSpinRateRadPerSec);
+    }
+
+    private static double solveSetpointExitVelocityMetersPerSec(
+        double distanceMeters,
+        double hoodAngleDegrees,
+        double flightTimeSeconds,
+        double setpointFlywheelRps,
+        DoubleUnaryOperator wheelRpsToExitVelocity,
+        DoubleUnaryOperator wheelRpsToSpinRateRadPerSec,
+        double shooterHeightMeters,
+        double targetHeightMeters
+    ) {
+        double hoodAngleRadians = Math.toRadians(hoodAngleDegrees);
+        double effectiveCos = Math.max(MIN_EFFECTIVE_COS, Math.abs(Math.cos(hoodAngleRadians)));
+        double targetFlightTime = Math.max(MIN_FLIGHT_TIME_SECONDS, flightTimeSeconds);
+        double kinematicGuess = distanceMeters / (targetFlightTime * effectiveCos);
+        double wheelModelSetpointExitVelocity = Math.abs(wheelRpsToExitVelocity.applyAsDouble(setpointFlywheelRps));
+        double velocityGuess = Math.max(
+            MIN_EXIT_VELOCITY_DENOMINATOR,
+            Double.isFinite(wheelModelSetpointExitVelocity) && wheelModelSetpointExitVelocity > MIN_EXIT_VELOCITY_DENOMINATOR
+                ? wheelModelSetpointExitVelocity
+                : kinematicGuess
+        );
+        double setpointSpinRateRadPerSec = wheelRpsToSpinRateRadPerSec.applyAsDouble(setpointFlywheelRps);
+        if (!Double.isFinite(setpointSpinRateRadPerSec)) {
+            setpointSpinRateRadPerSec = 0.0;
+        }
+
+        for (int i = 0; i < FLIGHT_TIME_SOLVE_ITERATIONS; i++) {
+            double spinRateRadPerSec = scaleSpinForExitVelocity(
+                setpointSpinRateRadPerSec,
+                wheelModelSetpointExitVelocity,
+                velocityGuess
+            );
+            double estimatedFlightTime = BallisticsPhysics.estimateFlightTime(
+                distanceMeters,
+                hoodAngleRadians,
+                velocityGuess,
+                shooterHeightMeters,
+                targetHeightMeters,
+                spinRateRadPerSec
+            );
+            if (!Double.isFinite(estimatedFlightTime) || estimatedFlightTime <= MIN_FLIGHT_TIME_SECONDS) {
+                break;
+            }
+
+            double scale = estimatedFlightTime / targetFlightTime;
+            scale = Math.max(0.5, Math.min(2.0, scale));
+            velocityGuess = Math.max(MIN_EXIT_VELOCITY_DENOMINATOR, velocityGuess * scale);
+        }
+
+        return velocityGuess;
+    }
+
+    private static double scaleSpinForExitVelocity(
+        double setpointSpinRateRadPerSec,
+        double setpointExitVelocityMetersPerSec,
+        double recalculatedExitVelocityMetersPerSec
+    ) {
+        double safeSetpointExitVelocity = Math.abs(setpointExitVelocityMetersPerSec);
+        if (!Double.isFinite(safeSetpointExitVelocity) || safeSetpointExitVelocity < MIN_EXIT_VELOCITY_DENOMINATOR) {
+            safeSetpointExitVelocity = MIN_EXIT_VELOCITY_DENOMINATOR;
+        }
+
+        double safeRecalculatedExitVelocity = Double.isFinite(recalculatedExitVelocityMetersPerSec)
+            ? recalculatedExitVelocityMetersPerSec
+            : 0.0;
+        return setpointSpinRateRadPerSec * (safeRecalculatedExitVelocity / safeSetpointExitVelocity);
     }
 }
