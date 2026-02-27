@@ -100,6 +100,32 @@ public final class ZoneUtil {
         return minDistanceSquared > effectiveRadius * effectiveRadius;
     }
 
+    public static boolean hasLineOfSightWithRectangularBlocker(
+        Translation2d start,
+        Translation2d end,
+        RectangleZone blockerZone,
+        double blockerPaddingMeters,
+        boolean mirrorForAlliance
+    ) {
+        Translation2d checkedStart = maybeMirror(start, mirrorForAlliance);
+        Translation2d checkedEnd = maybeMirror(end, mirrorForAlliance);
+        Translation2d checkedCornerA = maybeMirror(blockerZone.cornerA(), mirrorForAlliance);
+        Translation2d checkedCornerB = maybeMirror(blockerZone.cornerB(), mirrorForAlliance);
+
+        double minX = Math.min(checkedCornerA.getX(), checkedCornerB.getX());
+        double maxX = Math.max(checkedCornerA.getX(), checkedCornerB.getX());
+        double minY = Math.min(checkedCornerA.getY(), checkedCornerB.getY());
+        double maxY = Math.max(checkedCornerA.getY(), checkedCornerB.getY());
+
+        double padding = Math.max(0.0, blockerPaddingMeters);
+        minX -= padding;
+        maxX += padding;
+        minY -= padding;
+        maxY += padding;
+
+        return !segmentIntersectsAxisAlignedRectangle(checkedStart, checkedEnd, minX, maxX, minY, maxY);
+    }
+
     private static Translation2d maybeMirror(Translation2d point, boolean mirrorForAlliance) {
         if (mirrorForAlliance && Constants.shouldFlipPath()) {
             return FlippingUtil.flipFieldPosition(point);
@@ -264,5 +290,61 @@ public final class ZoneUtil {
 
         double dot = apx * dx + apy * dy;
         return dot >= -LOS_POINT_EPSILON_METERS && dot <= segmentLengthSquared + LOS_POINT_EPSILON_METERS;
+    }
+
+    private static boolean segmentIntersectsAxisAlignedRectangle(
+        Translation2d start,
+        Translation2d end,
+        double minX,
+        double maxX,
+        double minY,
+        double maxY
+    ) {
+        double x0 = start.getX();
+        double y0 = start.getY();
+        double x1 = end.getX();
+        double y1 = end.getY();
+
+        if (x0 >= minX && x0 <= maxX && y0 >= minY && y0 <= maxY) {
+            return true;
+        }
+        if (x1 >= minX && x1 <= maxX && y1 >= minY && y1 <= maxY) {
+            return true;
+        }
+
+        double dx = x1 - x0;
+        double dy = y1 - y0;
+        double tMin = 0.0;
+        double tMax = 1.0;
+
+        double[] p = {-dx, dx, -dy, dy};
+        double[] q = {x0 - minX, maxX - x0, y0 - minY, maxY - y0};
+
+        for (int i = 0; i < 4; i++) {
+            double pi = p[i];
+            double qi = q[i];
+
+            if (Math.abs(pi) <= LOS_POINT_EPSILON_METERS) {
+                if (qi < 0.0) {
+                    return false;
+                }
+                continue;
+            }
+
+            double t = qi / pi;
+            if (pi < 0.0) {
+                if (t > tMax) {
+                    return false;
+                }
+                tMin = Math.max(tMin, t);
+            } else {
+                if (t < tMin) {
+                    return false;
+                }
+                tMax = Math.min(tMax, t);
+            }
+        }
+
+        return tMax >= tMin;
     }
 }

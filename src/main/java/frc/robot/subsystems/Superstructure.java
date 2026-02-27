@@ -16,11 +16,14 @@ import frc.robot.RobotState;
 import frc.robot.VisualizeShot;
 import frc.robot.constants.Constants;
 import frc.robot.constants.FieldConstants;
+import frc.robot.constants.ZoneConstants;
+import frc.robot.constants.ZoneConstants.RectangleZone;
 import frc.robot.lib.util.ballistics.BallisticsPhysics;
 import frc.robot.lib.BLine.FlippingUtil;
 import frc.robot.lib.util.ShotKinematicsUtil;
 import frc.robot.lib.util.ShotCalculator;
 import frc.robot.lib.util.ShotCalculator.ShotData;
+import frc.robot.lib.util.ZoneUtil;
 import frc.robot.subsystems.hopper.Hopper;
 import frc.robot.subsystems.hopper.Hopper.HopperSetpoint;
 import frc.robot.subsystems.shooter.Shooter;
@@ -75,10 +78,29 @@ public class Superstructure extends SubsystemBase {
         ALTERNATING
     }
 
+    public enum TargetState {
+        HUB,
+        PASS_ALLIANCE_TOP,
+        PASS_ALLIANCE_CENTER,
+        PASS_ALLIANCE_BOTTOM,
+        PASS_NEUTRAL_TOP,
+        PASS_NEUTRAL_CENTER,
+        PASS_NEUTRAL_BOTTOM
+    }
+
+    enum RobotFieldZone {
+        CURRENT_ALLIANCE,
+        NEUTRAL,
+        OPPOSING_ALLIANCE,
+        UNKNOWN
+    }
+
     private DesiredSystemState desiredSystemState = DesiredSystemState.DISABLED;
     private CurrentSystemState currentSystemState = CurrentSystemState.DISABLED;
     private DesiredIntakeState desiredIntakeState = DesiredIntakeState.STOWED;
     private CurrentIntakeState currentIntakeState = CurrentIntakeState.DISABLED;
+    private TargetState desiredTargetState = TargetState.HUB;
+    private TargetState currentTargetState = TargetState.HUB;
 
     private final Shooter shooter = Shooter.getInstance();
     private final Hopper hopper = Hopper.getInstance();
@@ -88,7 +110,7 @@ public class Superstructure extends SubsystemBase {
 
     private static final double SHOT_DURATION_SECONDS = .3; // Time to complete one shot
     private static final double ALTERNATING_INTAKE_TOGGLE_SECONDS = 1;
-    private static final double BALLS_PER_SECOND = 12.0; // Balls per second to visualize
+    private static final double BALLS_PER_SECOND = 9.5; // Balls per second to visualize
 
     private static final double TURRET_ROTATION_BUFFER_DEG = 20.0;
     private static final double MAX_TRANSLATIONAL_VELOCITY_DURING_SHOT_METERS_PER_SEC = 2.5;
@@ -97,7 +119,8 @@ public class Superstructure extends SubsystemBase {
     private static final double LAST_IN_RANGE_SHOT_MAX_AGE_SECONDS = 1.0;
     private static final double BUMP_MAX_VELOCITY_METERS_PER_SEC = 1.8;
     private static final Rotation2d BUMP_SNAP_ANGLE = Rotation2d.fromDegrees(45);
-    private LoggedNetworkNumber latencyCompensationSeconds = new LoggedNetworkNumber("Shooter/latencyCompSec");
+    private static final double PASS_HUB_BLOCKER_RADIUS_METERS = 0.12;
+    private LoggedNetworkNumber latencyCompensationSeconds = new LoggedNetworkNumber("Shooter/latencyCompSec"); // todo: should be in superstructure config
     private double shotStartTime = 0;
     private double lastBallVisualizedTime = 0;
     private boolean hasStartedShooting = false;
@@ -110,7 +133,9 @@ public class Superstructure extends SubsystemBase {
     private ShotData mostRecentShotData;
     // Last shot calculation whose effective distance was inside configured min/max bounds.
     private ShotData lastInRangeShotData;
+    private TargetState lastInRangeShotTargetState = TargetState.HUB;
     private double lastInRangeShotTimestampSeconds = Double.NEGATIVE_INFINITY;
+    private ShotComputationContext cachedShotComputationContext;
     private ShotReadinessData cachedShotReadinessData = new ShotReadinessData(
         new Translation3d(),
         new Translation3d(),
@@ -120,6 +145,8 @@ public class Superstructure extends SubsystemBase {
         0.0,
         false,
         false,
+        true,
+        true,
         false
     );
 
@@ -132,13 +159,21 @@ public class Superstructure extends SubsystemBase {
         double maxShotDistanceMeters,
         boolean shooterReady,
         boolean distanceInRange,
+        boolean lineOfSightClear,
+        boolean zoneAllowsTarget,
         boolean readyForShot
     ) {}
 
     private record ShotComputationContext(
+        TargetState targetState,
         Translation3d targetLocation,
         ShotKinematicsUtil.ShooterKinematics shooterKinematics,
-        InterpolatingMatrixTreeMap<Double, N3, N1> lerpTable
+        InterpolatingMatrixTreeMap<Double, N3, N1> lerpTable,
+        double minDistanceMeters,
+        double maxDistanceMeters,
+        boolean passingTarget,
+        boolean lineOfSightClear,
+        boolean zoneAllowsTarget
     ) {}
 
     record TurretRotationMargins(
@@ -164,13 +199,20 @@ public class Superstructure extends SubsystemBase {
         latencyCompensationSeconds.setDefault(shooter.getLatencyCompensationSeconds());
 
         // Calculate raw shot data once per cycle, then apply close-shot guard for mechanism setpoints.
-        mostRecentShotData = calculateShotData();
+        cachedShotComputationContext = buildShotComputationContext();
+        mostRecentShotData = calculateShotData(cachedShotComputationContext);
         double nowSeconds = Timer.getTimestamp();
-        double minShotDistance = shooter.getMinShotDistFromShooterMeters();
-        double maxShotDistance = shooter.getMaxShotDistFromShooterMeters();
+        if (cachedShotComputationContext.targetState() != lastInRangeShotTargetState) {
+            lastInRangeShotData = null;
+            lastInRangeShotTimestampSeconds = Double.NEGATIVE_INFINITY;
+            lastInRangeShotTargetState = cachedShotComputationContext.targetState();
+        }
+        double minShotDistance = cachedShotComputationContext.minDistanceMeters();
+        double maxShotDistance = cachedShotComputationContext.maxDistanceMeters();
         if (isDistanceInRange(mostRecentShotData.effectiveDistance(), minShotDistance, maxShotDistance)) {
             lastInRangeShotData = mostRecentShotData;
             lastInRangeShotTimestampSeconds = nowSeconds;
+            lastInRangeShotTargetState = cachedShotComputationContext.targetState();
         }
         boolean hasValidLastInRangeShotData = isLastInRangeShotDataValid(
             nowSeconds,
@@ -191,7 +233,7 @@ public class Superstructure extends SubsystemBase {
         Logger.recordOutput("Superstructure/hasLastInRangeShotData", hasValidLastInRangeShotData);
         Logger.recordOutput("Superstructure/lastInRangeShotMaxAgeSeconds", LAST_IN_RANGE_SHOT_MAX_AGE_SECONDS);
         Logger.recordOutput("Superstructure/lastInRangeShotAgeSeconds", nowSeconds - lastInRangeShotTimestampSeconds);
-        cachedShotReadinessData = calculateShotReadinessData();
+        cachedShotReadinessData = calculateShotReadinessData(cachedShotComputationContext);
         logShotReadinessData(cachedShotReadinessData);
         
         handleStateTransitions();
@@ -467,7 +509,7 @@ public class Superstructure extends SubsystemBase {
         return cachedShotReadinessData.readyForShot();
     }
 
-    private ShotReadinessData calculateShotReadinessData() {
+    private ShotReadinessData calculateShotReadinessData(ShotComputationContext context) {
         double actualHood = shooter.getHoodAngleRotations();
         double actualTurret = shooter.getTurretAngleRotations();
         double actualFlywheel = shooter.getFlywheelVelocityRotationsPerSec();
@@ -476,7 +518,6 @@ public class Superstructure extends SubsystemBase {
         double setpointTurret = getTargetTurretAngle().getRotations();
         double setpointFlywheel = getTargetFlywheelRPS();
 
-        ShotComputationContext context = buildShotComputationContext();
         double effectiveDistance = cachedShotData.effectiveDistance();
         double shooterHeight = context.shooterKinematics().shooterPosition().getZ();
         double targetHeight = context.targetLocation().getZ();
@@ -489,7 +530,8 @@ public class Superstructure extends SubsystemBase {
             shooter::calculateShotExitVelocityMetersPerSec,
             rps -> shooter.calculateBackSpinRPM(rps) * 2.0 * Math.PI / 60.0,
             shooterHeight,
-            targetHeight
+            targetHeight,
+            !context.passingTarget()
         );
         double setpointExitVelocity = ShotCalculator.calculateExitVelocityMetersPerSec(
             effectiveDistance,
@@ -498,7 +540,8 @@ public class Superstructure extends SubsystemBase {
             shooter::calculateShotExitVelocityMetersPerSec,
             rps -> shooter.calculateBackSpinRPM(rps) * 2.0 * Math.PI / 60.0,
             shooterHeight,
-            targetHeight
+            targetHeight,
+            !context.passingTarget()
         );
         double setpointSpinRateRadPerSec = ShotCalculator.calculateSpinRateRadPerSec(
             effectiveDistance,
@@ -507,7 +550,8 @@ public class Superstructure extends SubsystemBase {
             shooter::calculateShotExitVelocityMetersPerSec,
             rps -> shooter.calculateBackSpinRPM(rps) * 2.0 * Math.PI / 60.0,
             shooterHeight,
-            targetHeight
+            targetHeight,
+            !context.passingTarget()
         );
 
         Translation3d actualLanding = simulateShotLanding(
@@ -527,8 +571,8 @@ public class Superstructure extends SubsystemBase {
         double impactErrorMeters = actualLanding.toTranslation2d()
             .getDistance(setpointLanding.toTranslation2d());
         boolean shooterReady = impactErrorMeters <= SHOT_IMPACT_TOLERANCE_METERS;
-        double minShotDistance = shooter.getMinShotDistFromShooterMeters();
-        double maxShotDistance = shooter.getMaxShotDistFromShooterMeters();
+        double minShotDistance = context.minDistanceMeters();
+        double maxShotDistance = context.maxDistanceMeters();
         boolean distanceInRange = isDistanceInRange(effectiveDistance, minShotDistance, maxShotDistance);
         boolean readyForShot = isShotReady(
             impactErrorMeters,
@@ -536,7 +580,7 @@ public class Superstructure extends SubsystemBase {
             effectiveDistance,
             minShotDistance,
             maxShotDistance
-        );
+        ) && context.lineOfSightClear() && context.zoneAllowsTarget();
 
         return new ShotReadinessData(
             actualLanding,
@@ -547,6 +591,8 @@ public class Superstructure extends SubsystemBase {
             maxShotDistance,
             shooterReady,
             distanceInRange,
+            context.lineOfSightClear(),
+            context.zoneAllowsTarget(),
             readyForShot
         );
     }
@@ -560,6 +606,8 @@ public class Superstructure extends SubsystemBase {
         Logger.recordOutput("Superstructure/actualLanding", data.actualLanding());
         Logger.recordOutput("Superstructure/setpointLanding", data.setpointLanding());
         Logger.recordOutput("Superstructure/impactErrorMeters", data.impactErrorMeters());
+        Logger.recordOutput("Superstructure/targetLineOfSightClear", data.lineOfSightClear());
+        Logger.recordOutput("Superstructure/targetZoneAllowed", data.zoneAllowsTarget());
     }
 
     static boolean isShotReady(
@@ -706,8 +754,7 @@ public class Superstructure extends SubsystemBase {
         return cachedShotData.flywheelRPS();
     }
 
-    private ShotData calculateShotData() {
-        ShotComputationContext context = buildShotComputationContext();
+    private ShotData calculateShotData(ShotComputationContext context) {
         double lcomp = latencyCompensationSeconds.get();
 
         return ShotCalculator.calculate(
@@ -720,26 +767,135 @@ public class Superstructure extends SubsystemBase {
             shooter::calculateShotExitVelocityMetersPerSec,
             rps -> shooter.calculateBackSpinRPM(rps) * 2.0 * Math.PI / 60.0,
             context.shooterKinematics().shooterOffsetFromRobotCenter(),
-            context.shooterKinematics().robotHeading()
+            context.shooterKinematics().robotHeading(),
+            !context.passingTarget()
         );
     }
 
     private ShotComputationContext buildShotComputationContext() {
-        Translation3d targetLocation = getFieldTargetLocation();
         ShotKinematicsUtil.ShooterKinematics shooterKinematics = ShotKinematicsUtil.calculateShooterKinematics(
             robotState.getEstimatedPose(),
             shooter.getShooterRelativePose(),
             robotState.getFieldRelativeSpeeds()
         );
+        RobotFieldZone robotFieldZone = getRobotFieldZone();
+        TargetState zoneResolvedTarget = resolveTargetForZoneConstraints(desiredTargetState, robotFieldZone);
+        boolean zoneAllowsTarget = isTargetAllowedInZone(zoneResolvedTarget, robotFieldZone);
+        Translation3d targetLocation = getFieldTargetLocation(zoneResolvedTarget);
+        boolean passingTarget = isPassingTarget(zoneResolvedTarget);
+        boolean lineOfSightClear = !passingTarget
+            || isPassLineOfSightClear(
+                shooterKinematics.shooterPosition().toTranslation2d(),
+                targetLocation.toTranslation2d(),
+                ZoneConstants.Hub.EXCLUSION,
+                flipRectangleZone(ZoneConstants.Hub.EXCLUSION),
+                PASS_HUB_BLOCKER_RADIUS_METERS
+            );
+
+        currentTargetState = zoneResolvedTarget;
+
+        InterpolatingMatrixTreeMap<Double, N3, N1> lerpTable = passingTarget
+            ? shooter.getPassLerpTable()
+            : shooter.getLerpTable();
+        double minDistance = passingTarget
+            ? shooter.getMinPassDistFromShooterMeters()
+            : shooter.getMinShotDistFromShooterMeters();
+        double maxDistance = passingTarget
+            ? shooter.getMaxPassDistFromShooterMeters()
+            : shooter.getMaxShotDistFromShooterMeters();
+
+        Logger.recordOutput("Superstructure/targetStateDesired", desiredTargetState.toString());
+        Logger.recordOutput("Superstructure/targetStateCurrent", currentTargetState.toString());
+        Logger.recordOutput("Superstructure/robotFieldZone", robotFieldZone.toString());
+        Logger.recordOutput("Superstructure/targetLocation", targetLocation);
+        Logger.recordOutput("Superstructure/passingTarget", passingTarget);
+        Logger.recordOutput("Superstructure/targetZoneAllowed", zoneAllowsTarget);
+        Logger.recordOutput("Superstructure/passLineOfSightClear", lineOfSightClear);
+
         return new ShotComputationContext(
+            currentTargetState,
             targetLocation,
             shooterKinematics,
-            shooter.getLerpTable()
+            lerpTable,
+            minDistance,
+            maxDistance,
+            passingTarget,
+            lineOfSightClear,
+            zoneAllowsTarget
         );
     }
 
-    private Translation3d getFieldTargetLocation() {
-        Translation3d targetLocation = FieldConstants.Hub.hubCenter;
+    private RobotFieldZone getRobotFieldZone() {
+        if (ZoneUtil.isPoseInAnyZone(robotState.getEstimatedPose(), ZoneConstants.Alliance.COMPOSITE, true)) {
+            return RobotFieldZone.CURRENT_ALLIANCE;
+        }
+        if (ZoneUtil.isPoseInAnyZone(robotState.getEstimatedPose(), ZoneConstants.Neutral.COMPOSITE, true)) {
+            return RobotFieldZone.NEUTRAL;
+        }
+        if (ZoneUtil.isPoseInOpposingAllianceZone(robotState.getEstimatedPose(), ZoneConstants.OpposingAlliance.COMPOSITE)) {
+            return RobotFieldZone.OPPOSING_ALLIANCE;
+        }
+        return RobotFieldZone.UNKNOWN;
+    }
+
+    static TargetState resolveTargetForZoneConstraints(TargetState desiredTargetState, RobotFieldZone robotFieldZone) {
+        // Do not force-retarget; preserve the user-selected target.
+        return desiredTargetState;
+    }
+
+    static boolean isTargetAllowedInZone(TargetState targetState, RobotFieldZone robotFieldZone) {
+        if (targetState == TargetState.HUB) {
+            return robotFieldZone == RobotFieldZone.CURRENT_ALLIANCE;
+        }
+        // Passing is legal from any zone.
+        return true;
+    }
+
+    static boolean isPassingTarget(TargetState targetState) {
+        return targetState != TargetState.HUB;
+    }
+
+    static boolean isPassLineOfSightClear(
+        Translation2d shooterPosition,
+        Translation2d passingTargetPosition,
+        RectangleZone hubZone,
+        RectangleZone flippedHubZone,
+        double hubBlockerRadiusMeters
+    ) {
+        return ZoneUtil.hasLineOfSightWithRectangularBlocker(
+                shooterPosition,
+                passingTargetPosition,
+                hubZone,
+                hubBlockerRadiusMeters,
+                false
+            )
+            && ZoneUtil.hasLineOfSightWithRectangularBlocker(
+                shooterPosition,
+                passingTargetPosition,
+                flippedHubZone,
+                hubBlockerRadiusMeters,
+                false
+            );
+    }
+
+    private static RectangleZone flipRectangleZone(RectangleZone zone) {
+        return new RectangleZone(
+            zone.name() + "_flipped",
+            FlippingUtil.flipFieldPosition(zone.cornerA()),
+            FlippingUtil.flipFieldPosition(zone.cornerB())
+        );
+    }
+
+    private Translation3d getFieldTargetLocation(TargetState targetState) {
+        Translation3d targetLocation = switch (targetState) {
+            case HUB -> FieldConstants.Hub.hubCenter;
+            case PASS_ALLIANCE_TOP -> FieldConstants.Passing.allianceTop;
+            case PASS_ALLIANCE_CENTER -> FieldConstants.Passing.allianceCenter;
+            case PASS_ALLIANCE_BOTTOM -> FieldConstants.Passing.allianceBottom;
+            case PASS_NEUTRAL_TOP -> FieldConstants.Passing.neutralTop;
+            case PASS_NEUTRAL_CENTER -> FieldConstants.Passing.neutralCenter;
+            case PASS_NEUTRAL_BOTTOM -> FieldConstants.Passing.neutralBottom;
+        };
         if (Constants.shouldFlipPath()) {
             Translation2d fieldPosition = FlippingUtil.flipFieldPosition(targetLocation.toTranslation2d());
             targetLocation = new Translation3d(fieldPosition.getX(), fieldPosition.getY(), targetLocation.getZ());
@@ -766,14 +922,13 @@ public class Superstructure extends SubsystemBase {
         double vy = vHorizontal * Math.sin(fieldYaw) + context.shooterKinematics().shooterVyField();
         double vz = exitVelocity * Math.sin(pitch);
 
-        double hubZ = FieldConstants.Hub.hubCenter.getZ();
         return BallisticsPhysics.simulateToHeight3D(
             shooterPosition,
             vx,
             vy,
             vz,
             spinRateRadPerSec,
-            hubZ,
+            context.targetLocation().getZ(),
             0.002
         );
     }
@@ -785,6 +940,10 @@ public class Superstructure extends SubsystemBase {
 
     public void setDesiredIntakeState(DesiredIntakeState desiredIntakeState) {
         this.desiredIntakeState = desiredIntakeState;
+    }
+
+    public void setDesiredTargetState(TargetState desiredTargetState) {
+        this.desiredTargetState = desiredTargetState;
     }
 
     @AutoLogOutput(key = "Superstructure/currentSystemState")
@@ -805,5 +964,23 @@ public class Superstructure extends SubsystemBase {
     @AutoLogOutput(key = "Superstructure/desiredIntakeState")
     public DesiredIntakeState getDesiredIntakeState() {
         return desiredIntakeState;
+    }
+
+    @AutoLogOutput(key = "Superstructure/currentTargetState")
+    public TargetState getCurrentTargetState() {
+        return currentTargetState;
+    }
+
+    @AutoLogOutput(key = "Superstructure/desiredTargetState")
+    public TargetState getDesiredTargetState() {
+        return desiredTargetState;
+    }
+
+    public Translation3d getCurrentFieldTargetLocation() {
+        return getFieldTargetLocation(currentTargetState);
+    }
+
+    public InterpolatingMatrixTreeMap<Double, N3, N1> getCurrentTargetLerpTable() {
+        return isPassingTarget(currentTargetState) ? shooter.getPassLerpTable() : shooter.getLerpTable();
     }
 }

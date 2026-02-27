@@ -196,4 +196,64 @@ class ZoneUtilTest {
         assertFalse(blockedWithZeroRadius);
     }
 
+    @Test
+    void hasLineOfSightWithRectangularBlocker_returnsFalseWhenSegmentCrossesZone() {
+        boolean hasLineOfSight = ZoneUtil.hasLineOfSightWithRectangularBlocker(
+            new Translation2d(0.0, 0.0),
+            new Translation2d(10.0, 0.0),
+            new RectangleZone(
+                "hub_zone",
+                new Translation2d(4.8, -0.3),
+                new Translation2d(5.2, 0.3)
+            ),
+            0.0,
+            false
+        );
+
+        assertFalse(hasLineOfSight);
+    }
+
+    @Test
+    void hasLineOfSightWithRectangularBlocker_returnsTrueWhenSegmentMissesZone() {
+        boolean hasLineOfSight = ZoneUtil.hasLineOfSightWithRectangularBlocker(
+            new Translation2d(0.0, 0.0),
+            new Translation2d(10.0, 0.0),
+            new RectangleZone(
+                "hub_zone",
+                new Translation2d(4.8, 1.0),
+                new Translation2d(5.2, 1.3)
+            ),
+            0.0,
+            false
+        );
+
+        assertTrue(hasLineOfSight);
+    }
+
+    @Test
+    void hasLineOfSightWithRectangularBlocker_paddingCanBlockNearMiss() {
+        RectangleZone nearMissZone = new RectangleZone(
+            "near_miss_hub_zone",
+            new Translation2d(4.8, 0.25),
+            new Translation2d(5.2, 0.35)
+        );
+        boolean clearWithoutPadding = ZoneUtil.hasLineOfSightWithRectangularBlocker(
+            new Translation2d(0.0, 0.0),
+            new Translation2d(10.0, 0.0),
+            nearMissZone,
+            0.0,
+            false
+        );
+        boolean blockedWithPadding = ZoneUtil.hasLineOfSightWithRectangularBlocker(
+            new Translation2d(0.0, 0.0),
+            new Translation2d(10.0, 0.0),
+            nearMissZone,
+            0.3,
+            false
+        );
+
+        assertTrue(clearWithoutPadding);
+        assertFalse(blockedWithPadding);
+    }
+
 }

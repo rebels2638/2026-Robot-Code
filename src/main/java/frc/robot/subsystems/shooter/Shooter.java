@@ -405,6 +405,10 @@ public class Shooter extends SubsystemBase {
         return config.getLerpTable();
     }
 
+    public InterpolatingMatrixTreeMap<Double, N3, N1> getPassLerpTable() {
+        return config.getPassLerpTable();
+    }
+
     public Pose3d getShooterRelativePose() {
         return config.getShooterPose3d();
     }
@@ -415,6 +419,14 @@ public class Shooter extends SubsystemBase {
 
     public double getMaxShotDistFromShooterMeters() {
         return config.maxShotDistFromShooterMeters;
+    }
+
+    public double getMinPassDistFromShooterMeters() {
+        return config.minPassDistFromShooterMeters;
+    }
+
+    public double getMaxPassDistFromShooterMeters() {
+        return config.maxPassDistFromShooterMeters;
     }
 
     public double getLatencyCompensationSeconds() {

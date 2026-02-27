@@ -7,6 +7,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.math.geometry.Translation2d;
+import frc.robot.constants.ZoneConstants.RectangleZone;
 import frc.robot.lib.util.ShotCalculator.ShotData;
 import org.junit.jupiter.api.Test;
 
@@ -261,6 +262,142 @@ class SuperstructureShotReadinessTest {
 
         assertEquals(-10.0, range.minAbsDeg(), 1e-9);
         assertEquals(170.0, range.maxAbsDeg(), 1e-9);
+    }
+
+    @Test
+    void resolveTargetForZoneConstraints_preservesUserSelectedTarget() {
+        assertEquals(
+            Superstructure.TargetState.HUB,
+            Superstructure.resolveTargetForZoneConstraints(
+                Superstructure.TargetState.HUB,
+                Superstructure.RobotFieldZone.CURRENT_ALLIANCE
+            )
+        );
+        assertEquals(
+            Superstructure.TargetState.HUB,
+            Superstructure.resolveTargetForZoneConstraints(
+                Superstructure.TargetState.HUB,
+                Superstructure.RobotFieldZone.NEUTRAL
+            )
+        );
+        assertEquals(
+            Superstructure.TargetState.HUB,
+            Superstructure.resolveTargetForZoneConstraints(
+                Superstructure.TargetState.HUB,
+                Superstructure.RobotFieldZone.OPPOSING_ALLIANCE
+            )
+        );
+        assertEquals(
+            Superstructure.TargetState.HUB,
+            Superstructure.resolveTargetForZoneConstraints(
+                Superstructure.TargetState.HUB,
+                Superstructure.RobotFieldZone.UNKNOWN
+            )
+        );
+    }
+
+    @Test
+    void isTargetAllowedInZone_hubOnlyAllowedInCurrentAllianceZone() {
+        assertTrue(
+            Superstructure.isTargetAllowedInZone(
+                Superstructure.TargetState.HUB,
+                Superstructure.RobotFieldZone.CURRENT_ALLIANCE
+            )
+        );
+        assertFalse(
+            Superstructure.isTargetAllowedInZone(
+                Superstructure.TargetState.HUB,
+                Superstructure.RobotFieldZone.NEUTRAL
+            )
+        );
+        assertFalse(
+            Superstructure.isTargetAllowedInZone(
+                Superstructure.TargetState.HUB,
+                Superstructure.RobotFieldZone.OPPOSING_ALLIANCE
+            )
+        );
+        assertFalse(
+            Superstructure.isTargetAllowedInZone(
+                Superstructure.TargetState.HUB,
+                Superstructure.RobotFieldZone.UNKNOWN
+            )
+        );
+    }
+
+    @Test
+    void resolveTargetForZoneConstraints_allPassTargetsAreAllowedFromAnyZone() {
+        Superstructure.TargetState[] passTargets = {
+            Superstructure.TargetState.PASS_ALLIANCE_TOP,
+            Superstructure.TargetState.PASS_ALLIANCE_CENTER,
+            Superstructure.TargetState.PASS_ALLIANCE_BOTTOM,
+            Superstructure.TargetState.PASS_NEUTRAL_TOP,
+            Superstructure.TargetState.PASS_NEUTRAL_CENTER,
+            Superstructure.TargetState.PASS_NEUTRAL_BOTTOM
+        };
+        Superstructure.RobotFieldZone[] zones = {
+            Superstructure.RobotFieldZone.CURRENT_ALLIANCE,
+            Superstructure.RobotFieldZone.NEUTRAL,
+            Superstructure.RobotFieldZone.OPPOSING_ALLIANCE,
+            Superstructure.RobotFieldZone.UNKNOWN
+        };
+
+        for (Superstructure.TargetState passTarget : passTargets) {
+            for (Superstructure.RobotFieldZone zone : zones) {
+                assertEquals(
+                    passTarget,
+                    Superstructure.resolveTargetForZoneConstraints(passTarget, zone)
+                );
+            }
+        }
+    }
+
+    @Test
+    void isPassLineOfSightClear_checksBothHubCenters() {
+        Translation2d shooter = new Translation2d(0.0, 0.0);
+        Translation2d target = new Translation2d(10.0, 0.0);
+        RectangleZone clearHub = new RectangleZone(
+            "clear_hub",
+            new Translation2d(5.0, 1.0),
+            new Translation2d(6.0, 2.0)
+        );
+        RectangleZone clearFlippedHub = new RectangleZone(
+            "clear_flipped_hub",
+            new Translation2d(5.0, -2.0),
+            new Translation2d(6.0, -1.0)
+        );
+        RectangleZone blockingHub = new RectangleZone(
+            "blocking_hub",
+            new Translation2d(4.8, -0.2),
+            new Translation2d(5.2, 0.2)
+        );
+
+        assertTrue(
+            Superstructure.isPassLineOfSightClear(
+                shooter,
+                target,
+                clearHub,
+                clearFlippedHub,
+                0.12
+            )
+        );
+        assertFalse(
+            Superstructure.isPassLineOfSightClear(
+                shooter,
+                target,
+                blockingHub,
+                clearFlippedHub,
+                0.12
+            )
+        );
+        assertFalse(
+            Superstructure.isPassLineOfSightClear(
+                shooter,
+                target,
+                clearHub,
+                blockingHub,
+                0.12
+            )
+        );
     }
 
     private static ShotData shotData(double effectiveDistanceMeters) {

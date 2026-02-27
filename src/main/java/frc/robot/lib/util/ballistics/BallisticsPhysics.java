@@ -6,6 +6,8 @@ import frc.robot.lib.util.ballistics.ProjectileState.Derivatives;
 public final class BallisticsPhysics {
     private static final double DEFAULT_DT = 0.002;
     private static final double MAX_SIM_TIME = 5.0;
+    // Numerical integration jitter can dip a few 1e-5 m below zero at the sample boundary.
+    private static final double TARGET_REACH_HEIGHT_EPSILON_METERS = 5e-4;
 
     private BallisticsPhysics() {
     }
@@ -168,7 +170,7 @@ public final class BallisticsPhysics {
                 double t = (distance - prev.x()) / (state.x() - prev.x());
                 double zAtDistance = prev.z() + t * (state.z() - prev.z());
                 double timeAtDistance = (elapsed - dt) + t * dt;
-                boolean reached = zAtDistance >= 0.0;
+                boolean reached = zAtDistance >= -TARGET_REACH_HEIGHT_EPSILON_METERS;
                 return new TrajectoryResult(timeAtDistance, zAtDistance, distance, reached);
             }
         }

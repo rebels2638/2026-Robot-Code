@@ -7,11 +7,12 @@ import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.math.geometry.Rotation3d;
 import edu.wpi.first.math.geometry.Transform3d;
 import edu.wpi.first.math.geometry.Translation2d;
+import edu.wpi.first.math.geometry.Translation3d;
 import edu.wpi.first.math.kinematics.ChassisSpeeds;
 import edu.wpi.first.wpilibj.Timer;
-import frc.robot.constants.FieldConstants;
 import frc.robot.lib.util.ShotCalculator;
 import frc.robot.lib.util.ballistics.ProjectileVisualizer;
+import frc.robot.subsystems.Superstructure;
 import frc.robot.subsystems.shooter.Shooter;
 
 public class VisualizeShot {
@@ -55,16 +56,18 @@ public class VisualizeShot {
 
         double flywheelRPS = Shooter.getInstance().getFlywheelVelocityRotationsPerSec();
         double exitVelocity = launchExitVelocityMetersPerSec;
+        Superstructure superstructure = Superstructure.getInstance();
+        Translation3d targetLocation = superstructure.getCurrentFieldTargetLocation();
         double shooterDistanceToTarget =
-            shooterPose.getTranslation().toTranslation2d().getDistance(FieldConstants.Hub.hubCenter.toTranslation2d());
+            shooterPose.getTranslation().toTranslation2d().getDistance(targetLocation.toTranslation2d());
         double backspinRadPerSec = ShotCalculator.calculateSpinRateRadPerSec(
             shooterDistanceToTarget,
-            Shooter.getInstance().getLerpTable(),
+            superstructure.getCurrentTargetLerpTable(),
             flywheelRPS,
             Shooter.getInstance()::calculateShotExitVelocityMetersPerSec,
             rps -> Shooter.getInstance().calculateBackSpinRPM(rps) * 2.0 * Math.PI / 60.0,
             shooterPose.getZ(),
-            FieldConstants.Hub.hubCenter.getZ()
+            targetLocation.getZ()
         );
         double backspinRPM = backspinRadPerSec * 60.0 / (2.0 * Math.PI);
         
@@ -100,13 +103,14 @@ public class VisualizeShot {
         Logger.recordOutput("VisualizeShot/tangentialVyField", tangentialVyField);
         Logger.recordOutput("VisualizeShot/shooterVxField", shooterVxField);
         Logger.recordOutput("VisualizeShot/shooterVyField", shooterVyField);
+        Logger.recordOutput("VisualizeShot/targetLocation", targetLocation);
 
         ProjectileVisualizer.addProjectile(
             shooterVxField,
             shooterVyField,
             exitVelocity,
             shooterPose,
-            FieldConstants.Hub.hubCenter.getZ(),
+            targetLocation.getZ(),
             backspinRPM
         );
     }
