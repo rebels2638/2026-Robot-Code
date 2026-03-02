@@ -17,6 +17,7 @@ import com.ctre.phoenix6.signals.MotorAlignmentValue;
 import com.ctre.phoenix6.controls.MotionMagicVoltage;
 import com.ctre.phoenix6.controls.PositionVoltage;
 import com.ctre.phoenix6.controls.TorqueCurrentFOC;
+import com.ctre.phoenix6.controls.VelocityTorqueCurrentFOC;
 import com.ctre.phoenix6.controls.VelocityVoltage;
 import com.ctre.phoenix6.controls.VoltageOut;
 import com.ctre.phoenix6.hardware.TalonFX;
@@ -66,7 +67,8 @@ public class ShooterIOTalonFX implements ShooterIO {
     private final PositionVoltage hoodMotorRequest = new PositionVoltage(0).withSlot(0);
     private final MotionMagicVoltage turretMotorRequest = new MotionMagicVoltage(0).withSlot(0);
 
-    private final VelocityVoltage flywheelMotorRequest = new VelocityVoltage(0).withSlot(0);
+    // private final VelocityVoltage flywheelMotorRequest = new VelocityVoltage(0).withSlot(0);
+    private final VelocityTorqueCurrentFOC flywheelMotorRequest = new VelocityTorqueCurrentFOC(0).withSlot(0);
 
     private final ShooterConfig config;
     private final TalonFXConfiguration hoodConfig;
