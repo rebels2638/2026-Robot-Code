@@ -14,12 +14,14 @@ import edu.wpi.first.wpilibj.Timer;
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
 import frc.robot.RobotState;
 import frc.robot.VisualizeShot;
+import frc.robot.configs.SuperstructureConfig;
 import frc.robot.constants.Constants;
 import frc.robot.constants.FieldConstants;
 import frc.robot.constants.ZoneConstants;
 import frc.robot.constants.ZoneConstants.RectangleZone;
 import frc.robot.lib.util.ballistics.BallisticsPhysics;
 import frc.robot.lib.BLine.FlippingUtil;
+import frc.robot.lib.util.ConfigLoader;
 import frc.robot.lib.util.ShotKinematicsUtil;
 import frc.robot.lib.util.ShotCalculator;
 import frc.robot.lib.util.ShotCalculator.ShotData;
@@ -107,20 +109,10 @@ public class Superstructure extends SubsystemBase {
     private final SwerveDrive swerveDrive = SwerveDrive.getInstance();
     private final Intake intake = Intake.getInstance();
     private final RobotState robotState = RobotState.getInstance();
+    private final SuperstructureConfig config;
+    private final Rotation2d bumpSnapAngle;
 
-    private static final double SHOT_DURATION_SECONDS = .3; // Time to complete one shot
-    private static final double ALTERNATING_INTAKE_TOGGLE_SECONDS = 1;
-    private static final double BALLS_PER_SECOND = 9.5; // Balls per second to visualize
-
-    private static final double TURRET_ROTATION_BUFFER_DEG = 20.0;
-    private static final double MAX_TRANSLATIONAL_VELOCITY_DURING_SHOT_METERS_PER_SEC = 2.5;
-    private static final double MAX_ANGULAR_VELOCITY_DURING_SHOT_RAD_PER_SEC = 3;
-    private static final double SHOT_IMPACT_TOLERANCE_METERS = 0.3;
-    private static final double LAST_IN_RANGE_SHOT_MAX_AGE_SECONDS = 1.0;
-    private static final double BUMP_MAX_VELOCITY_METERS_PER_SEC = 1.8;
-    private static final Rotation2d BUMP_SNAP_ANGLE = Rotation2d.fromDegrees(45);
-    private static final double PASS_HUB_BLOCKER_RADIUS_METERS = 0.12;
-    private LoggedNetworkNumber latencyCompensationSeconds = new LoggedNetworkNumber("Shooter/latencyCompSec"); // todo: should be in superstructure config
+    private final LoggedNetworkNumber latencyCompensationSeconds = new LoggedNetworkNumber("Shooter/latencyCompSec");
     private double shotStartTime = 0;
     private double lastBallVisualizedTime = 0;
     private boolean hasStartedShooting = false;
@@ -188,6 +180,9 @@ public class Superstructure extends SubsystemBase {
     ) {}
 
     private Superstructure() {
+        config = ConfigLoader.load("superstructure", SuperstructureConfig.class);
+        bumpSnapAngle = Rotation2d.fromDegrees(config.bumpSnapAngleDegrees);
+
         // Set up suppliers for the shooter - these provide dynamic setpoints based on shot calculation
         shooter.setHoodAngleSupplier(this::getTargetHoodAngle);
         shooter.setTurretAngleSupplier(this::getTargetTurretAngle);
@@ -196,7 +191,7 @@ public class Superstructure extends SubsystemBase {
 
     @Override
     public void periodic() {
-        latencyCompensationSeconds.setDefault(shooter.getLatencyCompensationSeconds());
+        latencyCompensationSeconds.setDefault(config.latencyCompensationSeconds);
 
         // Calculate raw shot data once per cycle, then apply close-shot guard for mechanism setpoints.
         cachedShotComputationContext = buildShotComputationContext();
@@ -217,7 +212,7 @@ public class Superstructure extends SubsystemBase {
         boolean hasValidLastInRangeShotData = isLastInRangeShotDataValid(
             nowSeconds,
             lastInRangeShotTimestampSeconds,
-            LAST_IN_RANGE_SHOT_MAX_AGE_SECONDS
+            config.lastInRangeShotMaxAgeSeconds
         );
         if (!hasValidLastInRangeShotData) {
             lastInRangeShotData = null;
@@ -231,7 +226,7 @@ public class Superstructure extends SubsystemBase {
         Logger.recordOutput("Superstructure/rawShotData", mostRecentShotData);
         Logger.recordOutput("Superstructure/usingCloseShotGuard", cachedShotData != mostRecentShotData);
         Logger.recordOutput("Superstructure/hasLastInRangeShotData", hasValidLastInRangeShotData);
-        Logger.recordOutput("Superstructure/lastInRangeShotMaxAgeSeconds", LAST_IN_RANGE_SHOT_MAX_AGE_SECONDS);
+        Logger.recordOutput("Superstructure/lastInRangeShotMaxAgeSeconds", config.lastInRangeShotMaxAgeSeconds);
         Logger.recordOutput("Superstructure/lastInRangeShotAgeSeconds", nowSeconds - lastInRangeShotTimestampSeconds);
         cachedShotReadinessData = calculateShotReadinessData(cachedShotComputationContext);
         logShotReadinessData(cachedShotReadinessData);
@@ -251,7 +246,7 @@ public class Superstructure extends SubsystemBase {
 
     private void handleSystemStateTransitions() {
         if (currentSystemState == CurrentSystemState.SHOOTING
-            && Timer.getTimestamp() - shotStartTime < SHOT_DURATION_SECONDS) {
+            && Timer.getTimestamp() - shotStartTime < config.shotDurationSeconds) {
             return; // If we're shooting, don't transition to another state until the shot is complete to prevent jitter
         }
 
@@ -380,13 +375,13 @@ public class Superstructure extends SubsystemBase {
 
         double now = Timer.getTimestamp();
         double timeSinceShotStart = now - shotStartTime;
-        if (timeSinceShotStart >= SHOT_DURATION_SECONDS) {
+        if (timeSinceShotStart >= config.shotDurationSeconds) {
             if (!hasStartedShooting) {
                 hasStartedShooting = true;
                 lastBallVisualizedTime = now;
                 new VisualizeShot(cachedShotData.exitVelocity());
             } else {
-                double ballIntervalSeconds = 1.0 / BALLS_PER_SECOND;
+                double ballIntervalSeconds = 1.0 / config.ballsPerSecond;
                 if (now - lastBallVisualizedTime >= ballIntervalSeconds) {
                     lastBallVisualizedTime = now;
                     new VisualizeShot(cachedShotData.exitVelocity());
@@ -396,8 +391,8 @@ public class Superstructure extends SubsystemBase {
     }
 
     private void handleBumpState() {
-        swerveDrive.setSnapTargetAngle(BUMP_SNAP_ANGLE);
-        swerveDrive.setTranslationVelocityCapMaxVelocityMetersPerSec(BUMP_MAX_VELOCITY_METERS_PER_SEC);
+        swerveDrive.setSnapTargetAngle(bumpSnapAngle);
+        swerveDrive.setTranslationVelocityCapMaxVelocityMetersPerSec(config.bumpMaxVelocityMetersPerSec);
         swerveDrive.setDesiredOmegaOverrideState(SwerveDrive.DesiredOmegaOverrideState.SNAPPED);
         swerveDrive.setDesiredTranslationOverrideState(SwerveDrive.DesiredTranslationOverrideState.CAPPED);
         
@@ -444,8 +439,8 @@ public class Superstructure extends SubsystemBase {
     }
 
     private void applyShotMotionCaps() {
-        swerveDrive.setTranslationVelocityCapMaxVelocityMetersPerSec(MAX_TRANSLATIONAL_VELOCITY_DURING_SHOT_METERS_PER_SEC);
-        swerveDrive.setOmegaVelocityCapMaxRadiansPerSec(MAX_ANGULAR_VELOCITY_DURING_SHOT_RAD_PER_SEC);
+        swerveDrive.setTranslationVelocityCapMaxVelocityMetersPerSec(config.maxTranslationalVelocityDuringShotMetersPerSec);
+        swerveDrive.setOmegaVelocityCapMaxRadiansPerSec(config.maxAngularVelocityDuringShotRadPerSec);
     }
 
     private void applyShooterAndHopperSetpoints(
@@ -490,7 +485,7 @@ public class Superstructure extends SubsystemBase {
             lastAlternatingIntakeToggleTime = now;
         }
 
-        boolean timerElapsed = now - lastAlternatingIntakeToggleTime >= ALTERNATING_INTAKE_TOGGLE_SECONDS;
+        boolean timerElapsed = now - lastAlternatingIntakeToggleTime >= config.alternatingIntakeToggleSeconds;
         boolean pivotSettled = intake.isPivotAtSetpoint();
         if (timerElapsed && pivotSettled) {
             lastAlternatingIntakeToggleTime = now;
@@ -570,13 +565,13 @@ public class Superstructure extends SubsystemBase {
         );
         double impactErrorMeters = actualLanding.toTranslation2d()
             .getDistance(setpointLanding.toTranslation2d());
-        boolean shooterReady = impactErrorMeters <= SHOT_IMPACT_TOLERANCE_METERS;
+        boolean shooterReady = impactErrorMeters <= config.shotImpactToleranceMeters;
         double minShotDistance = context.minDistanceMeters();
         double maxShotDistance = context.maxDistanceMeters();
         boolean distanceInRange = isDistanceInRange(effectiveDistance, minShotDistance, maxShotDistance);
         boolean readyForShot = isShotReady(
             impactErrorMeters,
-            SHOT_IMPACT_TOLERANCE_METERS,
+            config.shotImpactToleranceMeters,
             effectiveDistance,
             minShotDistance,
             maxShotDistance
@@ -672,7 +667,7 @@ public class Superstructure extends SubsystemBase {
             turretCurrentDeg,
             turretMinDeg,
             turretMaxDeg,
-            TURRET_ROTATION_BUFFER_DEG
+            config.turretRotationBufferDeg
         );
         Logger.recordOutput("Superstructure/shootingRange/turretCurrentDeg", turretCurrentDeg);
         Logger.recordOutput("Superstructure/shootingRange/turretMinDeg", turretMinDeg);
@@ -789,7 +784,7 @@ public class Superstructure extends SubsystemBase {
                 targetLocation.toTranslation2d(),
                 ZoneConstants.Hub.EXCLUSION,
                 flipRectangleZone(ZoneConstants.Hub.EXCLUSION),
-                PASS_HUB_BLOCKER_RADIUS_METERS
+                config.passHubBlockerRadiusMeters
             );
 
         currentTargetState = zoneResolvedTarget;
@@ -929,7 +924,7 @@ public class Superstructure extends SubsystemBase {
             vz,
             spinRateRadPerSec,
             context.targetLocation().getZ(),
-            0.002
+            config.ballisticsSimulationStepSeconds
         );
     }
 

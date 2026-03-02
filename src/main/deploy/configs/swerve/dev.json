@@ -37,9 +37,9 @@
   "gyro": {
     "canId": 2,
     "canBusName": "drivetrain",
-    "mountPoseYaw": 88.42582702636719,
-    "mountPosePitch": 0.6793335676193237,
-    "mountPoseRoll": 3.79,
+    "mountPoseYaw": -90.022,
+    "mountPosePitch": -0.6564,
+    "mountPoseRoll": -0.4994,
     "gyroScalarZ": 0.0
   },
   "moduleGeneral": {

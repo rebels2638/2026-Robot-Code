@@ -49,8 +49,7 @@ public class RobotState {
     ) {}
 
 
-    private static final double poseBufferSizeSeconds = 2.0;
-    private final TimeInterpolatableBuffer<Pose2d> poseBuffer = TimeInterpolatableBuffer.createBuffer(poseBufferSizeSeconds);
+    private final TimeInterpolatableBuffer<Pose2d> poseBuffer;
 
     private SwerveDrivePoseEstimator swerveDrivePoseEstimator;
 
@@ -59,7 +58,6 @@ public class RobotState {
     private int visionObservationsRejected = 0;
 
     private double lastGyroResetTime = Timer.getTimestamp();
-    private double gyroTimeoutSeconds = 1.0;
 
     private Rotation3d lastGyroAngle = new Rotation3d();
 
@@ -85,6 +83,7 @@ public class RobotState {
         SwerveConfig swerveConfig = ConfigLoader.load("swerve", SwerveConfig.class);
         drivetrainConfig = swerveConfig.drivetrain;
         robotStateConfig = ConfigLoader.load("robotState", RobotStateConfig.class);
+        poseBuffer = TimeInterpolatableBuffer.createBuffer(robotStateConfig.poseBufferSizeSeconds);
 
         kinematics = new SwerveDriveKinematics(
             drivetrainConfig.getFrontLeftPositionMeters(),
@@ -183,7 +182,7 @@ public class RobotState {
     public void addVisionObservation(VisionObservation observation) {
         // If measurement is old enough to be outside the pose buffer's timespan, skip.
         try {
-            if (poseBuffer.getInternalBuffer().lastKey() - poseBufferSizeSeconds > observation.timestampSeconds()) {
+            if (poseBuffer.getInternalBuffer().lastKey() - robotStateConfig.poseBufferSizeSeconds > observation.timestampSeconds()) {
                 visionObservationsRejected++;
                 Logger.recordOutput("RobotState/vision/visionObservationsRejected", visionObservationsRejected);
                 return;
@@ -206,7 +205,9 @@ public class RobotState {
         Logger.recordOutput("RobotState/vision/visionLatency", Timer.getFPGATimestamp() - observation.timestampSeconds());
 
 
-        if (DriverStation.isDisabled() && Timer.getTimestamp() - lastGyroResetTime > gyroTimeoutSeconds && observation.visionMeasurementStdDevs().get(2,0) < 300) {
+        if (DriverStation.isDisabled()
+            && Timer.getTimestamp() - lastGyroResetTime > robotStateConfig.gyroResetTimeoutSeconds
+            && observation.visionMeasurementStdDevs().get(2,0) < robotStateConfig.gyroResetMaxVisionRotationStdDev) {
                 resetPose(new Pose2d(getEstimatedPose().getTranslation(), observation.visionRobotPoseMeters().getRotation()));
                 lastGyroResetTime = Timer.getTimestamp();
                 
