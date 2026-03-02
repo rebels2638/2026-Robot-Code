@@ -194,7 +194,7 @@ public class Shooter extends SubsystemBase {
         shooterIO.setAngle(clampedAngleRotations);
     }
 
-    private void setTurretAngle(Rotation2d angle) {
+    public void setTurretAngle(Rotation2d angle) {
         double requestedDeg = angle.getDegrees();
         double currentDeg = shooterInputs.turretAngleRotations * 360.0;
         double minDeg = config.turretMinAngleDeg;
