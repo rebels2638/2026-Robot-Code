@@ -91,7 +91,7 @@
       "flightTimeSeconds": 1.725768
     }
   ],
-  "minShotDistFromShooterMeters": 1.12,
+  "minShotDistFromShooterMeters": 2,
   "maxShotDistFromShooterMeters": 3.3,
   "minPassDistFromShooterMeters": 1.0,
   "maxPassDistFromShooterMeters": 17.0,
@@ -125,9 +125,9 @@
   "turretKD": 0.0,
   "turretMotorToOutputShaftRatio": 20.27,
   "turretStartingAngleDeg": 180.0,
-  "turretMinAngleDeg": 40.0,
-  "turretMaxAngleDeg": 290.0,
-  "turretMaxVelocityDegPerSec": 900.0,
+  "turretMinAngleDeg": 90.0,
+  "turretMaxAngleDeg": 270.0,
+  "turretMaxVelocityDegPerSec": 1200.0,
   "turretMaxAccelerationDegPerSec2": 3000.0,
   "flywheelCanId": 31,
   "flywheelFollowerCanId": 33,
@@ -156,16 +156,17 @@
   "flywheelVelocityToleranceRPS": 3.0,
   "shootingLerpTable": [
     {
-      "distanceMeters": 1.12,
-      "hoodAngleDegrees": 24.984,
-      "flywheelVelocityRPS": 30.0,
-      "flightTimeSeconds": 0.154847
+      "distanceMeters": 2,
+      "hoodAngleDegrees": 70,
+      "flywheelVelocityRPS": 33.0,
+      "flightTimeSeconds": 1
     },
     {
       "distanceMeters": 3.3,
-      "hoodAngleDegrees": 30.0,
+      "hoodAngleDegrees": 60.0,
       "flywheelVelocityRPS": 40.0,
-      "flightTimeSeconds": 0.358147
+      
+      "flightTimeSeconds": 1.2
     }
   ]
 }
