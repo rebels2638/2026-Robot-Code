@@ -49,6 +49,8 @@ public class ManualOverride {
     private static NetworkTableEntry climberToggle;
     private static boolean climberEStopEnabled = false;
 
+    private static NetworkTableEntry resetGyro;
+
     // Swerve Drive set up
     // SwerveDrive toggle -> Module toggles -> Steer/Drive toggles
     private static SwerveDrive swerveDrive;
@@ -133,6 +135,9 @@ public class ManualOverride {
         climberToggle = table.getEntry("DisableClimber");
         climberToggle.setBoolean(false);
 
+        resetGyro = table.getEntry("ResetGyro");
+        resetGyro.setBoolean(false);
+
         // Swerve Drive
         swerveDrive = SwerveDrive.getInstance();
         swerveDriveToggle = table.getEntry("Swerve/DisableSwerveDrive");
@@ -146,6 +151,13 @@ public class ManualOverride {
 
     public static void update() {
         initalize();
+
+        boolean resetGyroState = resetGyro.getValue().getBoolean();
+
+        if (resetGyroState) {
+            System.out.println("RESET GYRO");
+            resetGyro.setBoolean(false);
+        }
 
         // ===== SHOOTER CASCADING LOGIC =====
         boolean shooterToggleState = shooterToggle.getValue().getBoolean();

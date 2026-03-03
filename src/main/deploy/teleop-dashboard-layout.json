@@ -8,8 +8,8 @@
         "layouts": [
           {
             "title": "Superstructure",
-            "x": 1251.0,
-            "y": 139.0,
+            "x": 278.0,
+            "y": 278.0,
             "width": 278.0,
             "height": 278.0,
             "type": "List Layout",
@@ -17,19 +17,6 @@
               "label_position": "TOP"
             },
             "children": [
-              {
-                "title": "CurrentState",
-                "x": 0.0,
-                "y": 0.0,
-                "width": 128.0,
-                "height": 128.0,
-                "type": "Large Text Display",
-                "properties": {
-                  "topic": "/Dashboard/Superstructure/CurrentState",
-                  "period": 0.06,
-                  "data_type": "string"
-                }
-              },
               {
                 "title": "DesiredState",
                 "x": 0.0,
@@ -39,6 +26,19 @@
                 "type": "Large Text Display",
                 "properties": {
                   "topic": "/Dashboard/Superstructure/DesiredState",
+                  "period": 0.06,
+                  "data_type": "string"
+                }
+              },
+              {
+                "title": "CurrentState",
+                "x": 0.0,
+                "y": 0.0,
+                "width": 128.0,
+                "height": 128.0,
+                "type": "Large Text Display",
+                "properties": {
+                  "topic": "/Dashboard/Superstructure/CurrentState",
                   "period": 0.06,
                   "data_type": "string"
                 }
@@ -94,104 +94,6 @@
                   "period": 0.06,
                   "data_type": "string"
                 }
-              },
-              {
-                "title": "State Lock Acquired",
-                "x": 0.0,
-                "y": 0.0,
-                "width": 139.0,
-                "height": 139.0,
-                "type": "Boolean Box",
-                "properties": {
-                  "topic": "/AdvantageKit/RealOutputs/SwerveDrive/stateLockAcquired",
-                  "period": 0.06,
-                  "data_type": "boolean",
-                  "true_color": 4283215696,
-                  "false_color": 4294198070,
-                  "true_icon": "None",
-                  "false_icon": "None"
-                }
-              }
-            ]
-          },
-          {
-            "title": "Shooter",
-            "x": 278.0,
-            "y": 0.0,
-            "width": 278.0,
-            "height": 556.0,
-            "type": "List Layout",
-            "properties": {
-              "label_position": "TOP"
-            },
-            "children": [
-              {
-                "title": "FlywheelAtSetpoint",
-                "x": 0.0,
-                "y": 0.0,
-                "width": 139.0,
-                "height": 139.0,
-                "type": "Boolean Box",
-                "properties": {
-                  "topic": "/Dashboard/Shooter/FlywheelAtSetpoint",
-                  "period": 0.06,
-                  "data_type": "boolean",
-                  "true_color": 4283215696,
-                  "false_color": 4294198070,
-                  "true_icon": "None",
-                  "false_icon": "None"
-                }
-              },
-              {
-                "title": "HoodAtSetpoint",
-                "x": 0.0,
-                "y": 0.0,
-                "width": 139.0,
-                "height": 139.0,
-                "type": "Boolean Box",
-                "properties": {
-                  "topic": "/Dashboard/Shooter/HoodAtSetpoint",
-                  "period": 0.06,
-                  "data_type": "boolean",
-                  "true_color": 4283215696,
-                  "false_color": 4294198070,
-                  "true_icon": "None",
-                  "false_icon": "None"
-                }
-              },
-              {
-                "title": "TurretAtSetpoint",
-                "x": 0.0,
-                "y": 0.0,
-                "width": 139.0,
-                "height": 139.0,
-                "type": "Boolean Box",
-                "properties": {
-                  "topic": "/Dashboard/Shooter/TurretAtSetpoint",
-                  "period": 0.06,
-                  "data_type": "boolean",
-                  "true_color": 4283215696,
-                  "false_color": 4294198070,
-                  "true_icon": "None",
-                  "false_icon": "None"
-                }
-              },
-              {
-                "title": "ShotValid",
-                "x": 0.0,
-                "y": 0.0,
-                "width": 139.0,
-                "height": 139.0,
-                "type": "Boolean Box",
-                "properties": {
-                  "topic": "/Dashboard/Shooter/ShotValid",
-                  "period": 0.06,
-                  "data_type": "boolean",
-                  "true_color": 4283215696,
-                  "false_color": 4294198070,
-                  "true_icon": "None",
-                  "false_icon": "None"
-                }
               }
             ]
           }
@@ -201,8 +103,8 @@
             "title": "Field",
             "x": 556.0,
             "y": 0.0,
-            "width": 695.0,
-            "height": 417.0,
+            "width": 417.0,
+            "height": 695.0,
             "type": "Field",
             "properties": {
               "topic": "/Dashboard/Field",
@@ -212,7 +114,7 @@
               "robot_length": 0.85,
               "show_other_objects": true,
               "show_trajectories": true,
-              "field_rotation": 0.0,
+              "field_rotation": -90.0,
               "robot_color": 4294198070,
               "trajectory_color": 4294967295,
               "show_robot_outside_widget": true
@@ -221,7 +123,7 @@
           {
             "title": "Voltage",
             "x": 278.0,
-            "y": 556.0,
+            "y": 139.0,
             "width": 278.0,
             "height": 139.0,
             "type": "Voltage View",
@@ -252,8 +154,8 @@
           },
           {
             "title": "MatchTime",
-            "x": 1251.0,
-            "y": 0.0,
+            "x": 278.0,
+            "y": 556.0,
             "width": 278.0,
             "height": 139.0,
             "type": "Match Time",
@@ -267,16 +169,20 @@
             }
           },
           {
-            "title": "ActiveHub",
-            "x": 1251.0,
-            "y": 417.0,
+            "title": "ShotValid",
+            "x": 278.0,
+            "y": 0.0,
             "width": 278.0,
-            "height": 278.0,
-            "type": "Single Color View",
+            "height": 139.0,
+            "type": "Boolean Box",
             "properties": {
-              "topic": "/Dashboard/Match Data/ActiveHub",
+              "topic": "/Dashboard/Shooter/ShotValid",
               "period": 0.06,
-              "data_type": "string"
+              "data_type": "boolean",
+              "true_color": 4283215696,
+              "false_color": 4294198070,
+              "true_icon": "None",
+              "false_icon": "None"
             }
           }
         ]
@@ -290,7 +196,7 @@
             "title": "Superstructure",
             "x": 417.0,
             "y": 417.0,
-            "width": 417.0,
+            "width": 278.0,
             "height": 278.0,
             "type": "List Layout",
             "properties": {
@@ -330,7 +236,7 @@
           {
             "title": "AutoChooser",
             "x": 0.0,
-            "y": 417.0,
+            "y": 556.0,
             "width": 417.0,
             "height": 139.0,
             "type": "ComboBox Chooser",
@@ -342,7 +248,7 @@
           },
           {
             "title": "Swerve Drive",
-            "x": 417.0,
+            "x": 1112.0,
             "y": 0.0,
             "width": 417.0,
             "height": 417.0,
@@ -356,9 +262,9 @@
           },
           {
             "title": "Field",
-            "x": 834.0,
+            "x": 695.0,
             "y": 0.0,
-            "width": 834.0,
+            "width": 417.0,
             "height": 695.0,
             "type": "Field",
             "properties": {
@@ -369,7 +275,7 @@
               "robot_length": 0.85,
               "show_other_objects": true,
               "show_trajectories": true,
-              "field_rotation": 0.0,
+              "field_rotation": -90.0,
               "robot_color": 4294198070,
               "trajectory_color": 4294967295,
               "show_robot_outside_widget": true
@@ -378,7 +284,7 @@
           {
             "title": "MatchTime",
             "x": 0.0,
-            "y": 556.0,
+            "y": 417.0,
             "width": 417.0,
             "height": 139.0,
             "type": "Match Time",
@@ -773,6 +679,19 @@
             "type": "Toggle Switch",
             "properties": {
               "topic": "/ManualOverride/Intake/DisableIntake",
+              "period": 0.06,
+              "data_type": "boolean"
+            }
+          },
+          {
+            "title": "Reset Gyro",
+            "x": 556.0,
+            "y": 417.0,
+            "width": 278.0,
+            "height": 139.0,
+            "type": "Toggle Button",
+            "properties": {
+              "topic": "/ManualOverride/ResetGyro",
               "period": 0.06,
               "data_type": "boolean"
             }

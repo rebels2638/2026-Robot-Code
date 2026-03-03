@@ -4,16 +4,12 @@ import edu.wpi.first.networktables.NetworkTable;
 import edu.wpi.first.networktables.NetworkTableInstance;
 import edu.wpi.first.networktables.StringPublisher;
 
-import java.util.Optional;
-
 import edu.wpi.first.networktables.BooleanPublisher;
 import edu.wpi.first.networktables.DoublePublisher;
 import edu.wpi.first.wpilibj.DriverStation;
-import edu.wpi.first.wpilibj.DriverStation.Alliance;
 import edu.wpi.first.wpilibj.smartdashboard.Field2d;
 import edu.wpi.first.wpilibj.smartdashboard.SendableBuilderImpl;
 import edu.wpi.first.wpilibj.smartdashboard.SendableChooser;
-import edu.wpi.first.wpilibj.util.Color;
 import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.InstantCommand; 
 import edu.wpi.first.util.sendable.Sendable;
@@ -37,14 +33,13 @@ public class Dashboard {
     private static BooleanPublisher hoodAtSetpoint;
     private static BooleanPublisher turretAtSetpoint;
     private static BooleanPublisher shotValid;
-    private static StringPublisher activeHub;
-
-    private static final Color blue = new Color(0, 0, 255);
-    private static final Color red = new Color(255, 0, 0);
-    private static final Color green = new Color(0, 255, 0);
     
     private static SendableChooser<Command> autoChooser;
     private static SendableBuilderImpl autoBuilder;
+
+    // FIX: Promoted from local variables to static fields so update() can be called each loop
+    private static SendableBuilderImpl fieldBuilder;
+    private static SendableBuilderImpl swerveBuilder;
     
     private static boolean initialized = false;
 
@@ -66,7 +61,6 @@ public class Dashboard {
         superstructureCurrentState = table.getStringTopic("Superstructure/CurrentState").publish();
         superStructureDesiredState = table.getStringTopic("Superstructure/DesiredState").publish();
         matchTimePublisher = table.getDoubleTopic("Match Data/MatchTime").publish();
-        activeHub = table.getStringTopic("Match Data/ActiveHub").publish();
         shotValid = table.getBooleanTopic("Shooter/ShotValid").publish();
 
         // Swerve Drive State Publishers
@@ -83,7 +77,8 @@ public class Dashboard {
         NetworkTable fieldTable = table.getSubTable("Field");
         robotField = new Field2d();
         
-        SendableBuilderImpl fieldBuilder = new SendableBuilderImpl();
+        // FIX: Now a static field instead of a local variable
+        fieldBuilder = new SendableBuilderImpl();
         fieldBuilder.setTable(fieldTable);
         robotField.initSendable(fieldBuilder);
         fieldBuilder.startListeners();
@@ -118,11 +113,12 @@ public class Dashboard {
                     () -> swerveDrive.getSwerveModuleStates()[3].speedMetersPerSecond, null);
 
                 builder.addDoubleProperty("Robot Angle", 
-                    () -> RobotState.getInstance().getAngleToFloor().getRadians(), null);
+                    () -> RobotState.getInstance().getEstimatedPose().getRotation().getRadians(), null);
             }
         };
         
-        SendableBuilderImpl swerveBuilder = new SendableBuilderImpl();
+        // FIX: Now a static field instead of a local variable
+        swerveBuilder = new SendableBuilderImpl();
         swerveBuilder.setTable(swerveTable);
         swerveSendable.initSendable(swerveBuilder);
         swerveBuilder.startListeners();
@@ -139,66 +135,6 @@ public class Dashboard {
         autoBuilder.update();  
 
         initialized = true;
-    }
-
-    private static Color getHubState() {
-        Optional<Alliance> alliance = DriverStation.getAlliance();
-        if (alliance.isEmpty()) {
-            return green;
-        }
-        if (DriverStation.isAutonomousEnabled()) {
-            return green;
-        }
-        if (!DriverStation.isTeleopEnabled()) {
-            return green;
-        }
-
-        double matchTime = DriverStation.getMatchTime();
-        String gameData = DriverStation.getGameSpecificMessage();
-        if (gameData.isEmpty()) {
-            return green;
-        }
-        boolean redInactiveFirst = false;
-        switch (gameData.charAt(0)) {
-            case 'R' -> redInactiveFirst = true;
-            case 'B' -> redInactiveFirst = false;
-            default -> {
-                return green;
-            }
-        }
-
-        boolean redActiveShift1 = redInactiveFirst;   // red was inactive first = blue won auto = red active shift 1
-        boolean blueActiveShift1 = !redInactiveFirst;
-
-        boolean redActive;
-        boolean blueActive;
-
-        if (matchTime > 130) {
-            // Transition shift, both active.
-            redActive = true;
-            blueActive = true;
-        } else if (matchTime > 105) {
-            redActive = redActiveShift1;
-            blueActive = blueActiveShift1;
-        } else if (matchTime > 80) {
-            redActive = !redActiveShift1;
-            blueActive = !blueActiveShift1;
-        } else if (matchTime > 55) {
-            redActive = redActiveShift1;
-            blueActive = blueActiveShift1;
-        } else if (matchTime > 30) {
-            redActive = !redActiveShift1;
-            blueActive = !blueActiveShift1;
-        } else {
-            // End game, both active.
-            redActive = true;
-            blueActive = true;
-        }
-
-        if (redActive && blueActive) return green;
-        if (redActive) return red;
-        if (blueActive) return blue;
-        return green; // fallback, both inactive shouldn't happen
     }
 
     public static void updateData() {
@@ -224,11 +160,20 @@ public class Dashboard {
 
         // Update match data
         matchTimePublisher.set(DriverStation.getMatchTime());
-        activeHub.set(getHubState().toHexString());
 
         // Update the field with current robot pose
         robotField.setRobotPose(RobotState.getInstance().getEstimatedPose());
-        
+
+        // FIX: Call update() on all builders so their data is pushed to NetworkTables each loop.
+        // Previously only autoBuilder.update() was called — fieldBuilder and swerveBuilder
+        // were local variables in initialize() and could never be updated, so the pose
+        // and swerve widget data never changed after initialization.
+        if (fieldBuilder != null) {
+            fieldBuilder.update();
+        }
+        if (swerveBuilder != null) {
+            swerveBuilder.update();
+        }
         if (autoBuilder != null) {
             autoBuilder.update();
         }
