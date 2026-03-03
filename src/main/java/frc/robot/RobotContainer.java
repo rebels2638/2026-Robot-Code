@@ -1,6 +1,7 @@
 package frc.robot;
 
 import org.littletonrobotics.junction.Logger;
+import org.littletonrobotics.junction.networktables.LoggedNetworkNumber;
 
 import edu.wpi.first.math.MathUtil;
 import edu.wpi.first.math.geometry.Pose2d;
@@ -24,6 +25,9 @@ import frc.robot.lib.BLine.Path.Waypoint;
 import frc.robot.lib.input.XboxController;
 import frc.robot.lib.util.ballistics.ProjectileVisualizer;
 import frc.robot.subsystems.Superstructure;
+import frc.robot.subsystems.Superstructure.TargetState;
+import frc.robot.subsystems.hopper.Hopper;
+import frc.robot.subsystems.hopper.Hopper.HopperSetpoint;
 import frc.robot.subsystems.intake.Intake;
 import frc.robot.subsystems.shooter.Shooter;
 import frc.robot.subsystems.swerve.SwerveDrive;
@@ -47,8 +51,15 @@ public class RobotContainer {
 
     private final RobotState robotState = RobotState.getInstance();
     private final SwerveDrive swerveDrive = SwerveDrive.getInstance();
-    // private final Superstructure superstructure = Superstructure.getInstance();
+    private final Superstructure superstructure = Superstructure.getInstance();
     private final Vision vision = Vision.getInstance();
+    private final Shooter shooter = Shooter.getInstance();
+    private final Hopper hopper = Hopper.getInstance();
+
+    LoggedNetworkNumber shooterFlywheelSet = new LoggedNetworkNumber("flywheelSet", 0);
+    LoggedNetworkNumber turret = new LoggedNetworkNumber("turretSet", 180);
+    LoggedNetworkNumber hood = new LoggedNetworkNumber("hoodSet", 70);
+
     @SuppressWarnings("unused")
     private final ProjectileVisualizer projectileVisualizer = ProjectileVisualizer.getInstance();
 
@@ -70,12 +81,15 @@ public class RobotContainer {
 
         // Set default state to TELEOP
         swerveDrive.setDesiredSystemState(SwerveDrive.DesiredSystemState.TELEOP);
+        superstructure.setDesiredTargetState(TargetState.HUB);
         
         // Set default superstructure state to HOME
-        // superstructure.setDesiredSystemState(Superstructure.DesiredSystemState.HOME);
-        // superstructure.setDesiredIntakeState(Superstructure.DesiredIntakeState.STOWED);
+        superstructure.setDesiredSystemState(Superstructure.DesiredSystemState.HOME);
+        superstructure.setDesiredIntakeState(Superstructure.DesiredIntakeState.STOWED);
 
         // superstructure.setDesiredTargetState(Superstructure.TargetState.PASS_ALLIANCE_TOP);
+
+        
 
         configureBindings();
     }
@@ -90,17 +104,51 @@ public class RobotContainer {
     }
 
     private void configureBindings() {
-        xboxDriver.getXButton().onTrue(
-            new InstantCommand(() -> robotState.resetPose(new Pose2d(robotState.getEstimatedPose().getTranslation(), new Rotation2d(0))))
-        );
+        // xboxDriver.getXButton().onTrue(
+        //     new InstantCommand(() -> robotState.resetPose(new Pose2d(robotState.getEstimatedPose().getTranslation(), new Rotation2d(0))))
+        // );
         // xboxDriver.getAButton().onTrue(
-        //     new InstantCommand(() -> superstructure.setDesiredSystemState(Superstructure.DesiredSystemState.HOME))
+        //     new InstantCommand(() -> Shooter.getInstance().setHoodAngle(Rotation2d.fromDegrees(hood.getAsDouble())))
         // );
         // xboxDriver.getBButton().onTrue(
-        //     new InstantCommand(() -> superstructure.setDesiredSystemState(Superstructure.DesiredSystemState.SHOOTING))
+        //     new InstantCommand(() -> Shooter.getInstance().setShotVelocity(shooterFlywheelSet.getAsDouble()))
+        // );
+        // xboxDriver.getXButton().onTrue(
+        //     new InstantCommand(() -> Hopper.getInstance().setSetpoint(HopperSetpoint.FEEDING))
+        // );
+        // xboxDriver.getYButton().onTrue(
+        //     new InstantCommand(() -> Shooter.getInstance().setHoodAngle(Rotation2d.fromDegrees(70))).andThen(
+        //         new InstantCommand(() -> Shooter.getInstance().setShotVelocity(0))
+        //     ).andThen(
+        //         new InstantCommand(() -> Hopper.getInstance().setSetpoint(HopperSetpoint.OFF))
+        //     )
+
+        xboxDriver.getAButton().onTrue(
+            new InstantCommand(() -> superstructure.setDesiredSystemState(Superstructure.DesiredSystemState.HOME))
+        );
+        xboxDriver.getBButton().onTrue(
+            new InstantCommand(() -> superstructure.setDesiredSystemState(Superstructure.DesiredSystemState.SHOOTING))
+        );
+        xboxDriver.getXButton().onTrue(
+            new InstantCommand(() -> superstructure.setDesiredSystemState(Superstructure.DesiredSystemState.TRACKING))
+        );
         // );
 
-        // xboxOperator.getYButton().onTrue(
+        // xboxDriver.getAButton().onTrue(
+        //     new InstantCommand(() -> shooter.setTurretAngle(new Rotation2d(180
+        //     )))
+        // );
+        // xboxDriver.getBButton().onTrue(
+        //     new InstantCommand(() -> shooter.setTurretAngle((Rotation2d.fromDegrees(turret.getAsDouble()))))
+        // );
+
+        // xboxDriver.getXButton().onTrue(
+        //     new InstantCommand(() -> hopper.setSetpoint(HopperSetpoint.FEEDING))
+        // );
+        // xboxDriver.getYButton().onTrue(
+        //     new InstantCommand(() -> hopper.setSetpoint(HopperSetpoint.OFF))
+        // );
+                // xboxOperator.getYButton().onTrue(
         //     new InstantCommand(() -> superstructure.setDesiredTargetState(Superstructure.TargetState.HUB))
         // );
         // xboxOperator.getUpDpad().onTrue(
@@ -155,17 +203,17 @@ public class RobotContainer {
     public void teleopInit() {
         // Ensure we're in teleop state
         swerveDrive.setDesiredSystemState(SwerveDrive.DesiredSystemState.TELEOP);
-        // superstructure.setDesiredSystemState(Superstructure.DesiredSystemState.HOME);
+        superstructure.setDesiredSystemState(Superstructure.DesiredSystemState.HOME);
     }
 
     public void autonomousInit() {
         // Set up for autonomous
-        // superstructure.setDesiredSystemState(Superstructure.DesiredSystemState.HOME);
+        superstructure.setDesiredSystemState(Superstructure.DesiredSystemState.HOME);
         swerveDrive.setDesiredSystemState(SwerveDrive.DesiredSystemState.IDLE);
     }
 
     public void disabledInit() {
-        // superstructure.setDesiredSystemState(Superstructure.DesiredSystemState.DISABLED);
+        superstructure.setDesiredSystemState(Superstructure.DesiredSystemState.DISABLED);
         swerveDrive.setDesiredSystemState(SwerveDrive.DesiredSystemState.DISABLED);
     }
 
