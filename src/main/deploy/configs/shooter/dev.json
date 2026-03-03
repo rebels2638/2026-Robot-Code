@@ -114,13 +114,13 @@
   "hoodMaxAngleDegrees": 70,
   "turretCanId": 27,
   "isTurretInverted": true,
-  "turretStatorCurrentLimit": 40.0,
-  "turretPeakForwardTorqueCurrent": 40.0,
-  "turretPeakReverseTorqueCurrent": -40.0,
+  "turretStatorCurrentLimit": 80.0,
+  "turretPeakForwardTorqueCurrent": 80.0,
+  "turretPeakReverseTorqueCurrent": -80.0,
   "turretKS": 0.3,
   "turretKV": 0.0,
   "turretKA": 0.0,
-  "turretKP": 120.0,
+  "turretKP": 50.0,
   "turretKI": 0.0,
   "turretKD": 0.0,
   "turretMotorToOutputShaftRatio": 20.27,
@@ -129,12 +129,13 @@
   "turretMaxAngleDeg": 270.0,
   "turretMaxVelocityDegPerSec": 1200.0,
   "turretMaxAccelerationDegPerSec2": 3000.0,
+  "turretAngleToleranceRotations": 0.01388,
   "flywheelCanId": 31,
   "flywheelFollowerCanId": 33,
   "isFlywheelInverted": true,
   "isFlywheelFollowerOppositeDirection": true,
-  "flywheelStatorCurrentLimit": 80.0,
-  "flywheelPeakForwardTorqueCurrent": 80.0,
+  "flywheelStatorCurrentLimit": 50.0,
+  "flywheelPeakForwardTorqueCurrent": 50.0,
   "flywheelPeakReverseTorqueCurrent": 0,
   "flywheelKS": 0,
   "flywheelKV": 0,
@@ -151,22 +152,21 @@
   "shooterPoseZ": 0.69,
   "shooterPoseRollDeg": 0.0,
   "shooterPosePitchDeg": 0.0,
-  "shooterPoseYawDeg": 92.0,
+  "shooterPoseYawDeg": 0.0,
   "hoodAngleToleranceDegrees": 2.0,
-  "flywheelVelocityToleranceRPS": 3.0,
+  "flywheelVelocityToleranceRPS": 8.0,
   "shootingLerpTable": [
     {
-      "distanceMeters": 2,
+      "distanceMeters": 2.2,
       "hoodAngleDegrees": 70,
-      "flywheelVelocityRPS": 33.0,
+      "flywheelVelocityRPS": 26.0,
       "flightTimeSeconds": 1
     },
     {
-      "distanceMeters": 3.3,
-      "hoodAngleDegrees": 60.0,
-      "flywheelVelocityRPS": 40.0,
-      
-      "flightTimeSeconds": 1.2
+      "distanceMeters": 3.6,
+      "hoodAngleDegrees": 65.0,
+      "flywheelVelocityRPS": 33.0,
+      "flightTimeSeconds": 2
     }
   ]
 }

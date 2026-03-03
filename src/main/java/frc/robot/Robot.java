@@ -18,6 +18,7 @@ import edu.wpi.first.wpilibj.Filesystem;
 import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.CommandScheduler;
 import frc.robot.constants.Constants;
+import frc.robot.constants.FieldConstants;
 import frc.robot.lib.BLine.FollowPath;
 
 /**
@@ -118,6 +119,9 @@ public class Robot extends LoggedRobot {
         // robot's periodic
         // block in order for anything in the Command-based framework to work.
         CommandScheduler.getInstance().run();
+
+        Logger.recordOutput("Superstructure/shotData", RobotState.getInstance().getEstimatedPose().getTranslation().getDistance(FieldConstants.Hub.hubCenter.toTranslation2d()));
+
     }
 
     /** This function is called once each time the robot enters Disabled mode. */

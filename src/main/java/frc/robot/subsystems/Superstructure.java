@@ -5,6 +5,7 @@ import org.littletonrobotics.junction.Logger;
 import org.littletonrobotics.junction.networktables.LoggedNetworkNumber;
 
 import edu.wpi.first.math.InterpolatingMatrixTreeMap;
+import edu.wpi.first.math.MathUtil;
 import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.math.geometry.Translation2d;
 import edu.wpi.first.math.geometry.Translation3d;
@@ -37,6 +38,8 @@ import frc.robot.subsystems.intake.Intake;
 import frc.robot.subsystems.intake.Intake.IntakeSetpoint;
 
 public class Superstructure extends SubsystemBase {
+    private static final double TARGET_HEIGHT_REACH_EPSILON_METERS = 5e-4;
+
     private static Superstructure instance;
     public static Superstructure getInstance() {
         if (instance == null) {
@@ -137,6 +140,15 @@ public class Superstructure extends SubsystemBase {
         0.0,
         false,
         false,
+        false,
+        false,
+        0.0,
+        0.0,
+        0.0,
+        false,
+        false,
+        false,
+        false,
         true,
         true,
         false
@@ -149,8 +161,17 @@ public class Superstructure extends SubsystemBase {
         double effectiveDistanceMeters,
         double minShotDistanceMeters,
         double maxShotDistanceMeters,
+        boolean hoodAtSetpoint,
+        boolean turretAtSetpoint,
+        boolean flywheelAtSetpoint,
+        boolean swerveRotationNominal,
+        double hoodErrorDegrees,
+        double turretErrorDegrees,
+        double flywheelErrorRps,
         boolean shooterReady,
         boolean distanceInRange,
+        boolean actualReachedTargetHeight,
+        boolean setpointReachedTargetHeight,
         boolean lineOfSightClear,
         boolean zoneAllowsTarget,
         boolean readyForShot
@@ -186,6 +207,7 @@ public class Superstructure extends SubsystemBase {
         // Set up suppliers for the shooter - these provide dynamic setpoints based on shot calculation
         shooter.setHoodAngleSupplier(this::getTargetHoodAngle);
         shooter.setTurretAngleSupplier(this::getTargetTurretAngle);
+        shooter.setTurretVelocitySupplier(this::getTargetTurretVelocityRotPerSec);
         shooter.setFlywheelRPSSupplier(this::getTargetFlywheelRPS);
     }
 
@@ -509,9 +531,19 @@ public class Superstructure extends SubsystemBase {
         double actualTurret = shooter.getTurretAngleRotations();
         double actualFlywheel = shooter.getFlywheelVelocityRotationsPerSec();
 
-        double setpointHood = getTargetHoodAngle().getRotations();
-        double setpointTurret = getTargetTurretAngle().getRotations();
-        double setpointFlywheel = getTargetFlywheelRPS();
+        // Use the commanded (clamped/resolved) shooter setpoints so impact math matches what hardware is tracking.
+        double setpointHood = shooter.getHoodSetpointRotations();
+        double setpointTurret = shooter.getTurretSetpointRotations();
+        double setpointFlywheel = shooter.getFlywheelSetpointRPS();
+
+        double hoodErrorDegrees = Math.abs((actualHood - setpointHood) * 360.0);
+        double turretErrorRotations = MathUtil.inputModulus(actualTurret - setpointTurret, -0.5, 0.5);
+        double turretErrorDegrees = Math.abs(turretErrorRotations * 360.0);
+        double flywheelErrorRps = Math.abs(actualFlywheel - setpointFlywheel);
+        boolean hoodAtSetpoint = shooter.isHoodAtSetpoint();
+        boolean turretAtSetpoint = shooter.isTurretAtSetpoint();
+        boolean flywheelAtSetpoint = shooter.isFlywheelAtSetpoint();
+        boolean swerveRotationNominal = isSwerveRotationNominalForShot();
 
         double effectiveDistance = cachedShotData.effectiveDistance();
         double shooterHeight = context.shooterKinematics().shooterPosition().getZ();
@@ -565,17 +597,19 @@ public class Superstructure extends SubsystemBase {
         );
         double impactErrorMeters = actualLanding.toTranslation2d()
             .getDistance(setpointLanding.toTranslation2d());
-        boolean shooterReady = impactErrorMeters <= config.shotImpactToleranceMeters;
+        boolean actualReachedTargetHeight = didShotReachTargetHeight(actualLanding, targetHeight);
+        boolean setpointReachedTargetHeight = didShotReachTargetHeight(setpointLanding, targetHeight);
+        boolean shooterReady = hoodAtSetpoint
+            && turretAtSetpoint
+            && flywheelAtSetpoint
+            && swerveRotationNominal;
         double minShotDistance = context.minDistanceMeters();
         double maxShotDistance = context.maxDistanceMeters();
         boolean distanceInRange = isDistanceInRange(effectiveDistance, minShotDistance, maxShotDistance);
-        boolean readyForShot = isShotReady(
-            impactErrorMeters,
-            config.shotImpactToleranceMeters,
-            effectiveDistance,
-            minShotDistance,
-            maxShotDistance
-        ) && context.lineOfSightClear() && context.zoneAllowsTarget();
+        boolean readyForShot = shooterReady
+            && distanceInRange
+            && context.lineOfSightClear()
+            && context.zoneAllowsTarget();
 
         return new ShotReadinessData(
             actualLanding,
@@ -584,8 +618,17 @@ public class Superstructure extends SubsystemBase {
             effectiveDistance,
             minShotDistance,
             maxShotDistance,
+            hoodAtSetpoint,
+            turretAtSetpoint,
+            flywheelAtSetpoint,
+            swerveRotationNominal,
+            hoodErrorDegrees,
+            turretErrorDegrees,
+            flywheelErrorRps,
             shooterReady,
             distanceInRange,
+            actualReachedTargetHeight,
+            setpointReachedTargetHeight,
             context.lineOfSightClear(),
             context.zoneAllowsTarget(),
             readyForShot
@@ -598,11 +641,30 @@ public class Superstructure extends SubsystemBase {
         Logger.recordOutput("Superstructure/effectiveShotDistanceMeters", data.effectiveDistanceMeters());
         Logger.recordOutput("Superstructure/minShotDistanceMeters", data.minShotDistanceMeters());
         Logger.recordOutput("Superstructure/maxShotDistanceMeters", data.maxShotDistanceMeters());
+        Logger.recordOutput("Superstructure/hoodAtSetpoint", data.hoodAtSetpoint());
+        Logger.recordOutput("Superstructure/turretAtSetpoint", data.turretAtSetpoint());
+        Logger.recordOutput("Superstructure/flywheelAtSetpoint", data.flywheelAtSetpoint());
+        Logger.recordOutput("Superstructure/swerveRotationNominal", data.swerveRotationNominal());
+        Logger.recordOutput("Superstructure/hoodErrorDegrees", data.hoodErrorDegrees());
+        Logger.recordOutput("Superstructure/turretErrorDegrees", data.turretErrorDegrees());
+        Logger.recordOutput("Superstructure/flywheelErrorRps", data.flywheelErrorRps());
         Logger.recordOutput("Superstructure/actualLanding", data.actualLanding());
         Logger.recordOutput("Superstructure/setpointLanding", data.setpointLanding());
         Logger.recordOutput("Superstructure/impactErrorMeters", data.impactErrorMeters());
+        Logger.recordOutput("Superstructure/actualReachedTargetHeight", data.actualReachedTargetHeight());
+        Logger.recordOutput("Superstructure/setpointReachedTargetHeight", data.setpointReachedTargetHeight());
         Logger.recordOutput("Superstructure/targetLineOfSightClear", data.lineOfSightClear());
         Logger.recordOutput("Superstructure/targetZoneAllowed", data.zoneAllowsTarget());
+    }
+
+    static boolean didShotReachTargetHeight(Translation3d landingPosition, double targetHeightMeters) {
+        return Math.abs(landingPosition.getZ() - targetHeightMeters) <= TARGET_HEIGHT_REACH_EPSILON_METERS;
+    }
+
+    private boolean isSwerveRotationNominalForShot() {
+        SwerveDrive.CurrentOmegaOverrideState omegaState = swerveDrive.getCurrentOmegaOverrideState();
+        return omegaState == SwerveDrive.CurrentOmegaOverrideState.RANGED_NOMINAL
+            || omegaState == SwerveDrive.CurrentOmegaOverrideState.RANGED_CAPPED_NOMINAL;
     }
 
     static boolean isShotReady(
@@ -743,6 +805,42 @@ public class Superstructure extends SubsystemBase {
 
     private Rotation2d getTargetTurretAngle() {
         return cachedShotData.targetFieldYaw().minus(robotState.getEstimatedPose().getRotation());
+    }
+
+    private double getTargetTurretVelocityRotPerSec() {
+        if (cachedShotData == null || cachedShotComputationContext == null) {
+            return 0.0;
+        }
+
+        ShotKinematicsUtil.ShooterKinematics shooterKinematics = cachedShotComputationContext.shooterKinematics();
+        Translation2d turretPositionInField = shooterKinematics.shooterPosition().toTranslation2d();
+        Translation2d targetToTurretVector =
+            turretPositionInField.minus(cachedShotData.compensatedTargetPosition());
+        double vectorNormSquared = targetToTurretVector.getNorm() * targetToTurretVector.getNorm();
+        if (vectorNormSquared < 1e-6) {
+            return 0.0;
+        }
+
+        // d/dt(atan2(y, x)) for relative target vector in field frame.
+        double angularVelocityInFieldRadPerSec =
+            (targetToTurretVector.getX() * shooterKinematics.shooterVyField()
+                - targetToTurretVector.getY() * shooterKinematics.shooterVxField())
+                / vectorNormSquared;
+
+        // Convert desired field-relative LOS rate to turret-relative rate in robot frame.
+        double turretDesiredAngularVelocityRadPerSec =
+            angularVelocityInFieldRadPerSec - shooterKinematics.fieldRelativeSpeeds().omegaRadiansPerSecond;
+        double turretDesiredAngularVelocityRotPerSec = turretDesiredAngularVelocityRadPerSec / (2.0 * Math.PI);
+
+        Logger.recordOutput(
+            "Superstructure/turretDesiredAngularVelocityFieldRadPerSec",
+            angularVelocityInFieldRadPerSec
+        );
+        Logger.recordOutput(
+            "Superstructure/turretDesiredAngularVelocityRotPerSec",
+            turretDesiredAngularVelocityRotPerSec
+        );
+        return turretDesiredAngularVelocityRotPerSec;
     }
 
     private double getTargetFlywheelRPS() {

@@ -14,7 +14,6 @@ import com.ctre.phoenix6.StatusSignal;
 import com.ctre.phoenix6.configs.TalonFXConfiguration;
 import com.ctre.phoenix6.controls.Follower;
 import com.ctre.phoenix6.signals.MotorAlignmentValue;
-import com.ctre.phoenix6.controls.MotionMagicVoltage;
 import com.ctre.phoenix6.controls.PositionVoltage;
 import com.ctre.phoenix6.controls.TorqueCurrentFOC;
 import com.ctre.phoenix6.controls.VelocityTorqueCurrentFOC;
@@ -25,12 +24,15 @@ import com.ctre.phoenix6.signals.InvertedValue;
 import com.ctre.phoenix6.signals.NeutralModeValue;
 import com.ctre.phoenix6.signals.StaticFeedforwardSignValue;
 
+import edu.wpi.first.math.MathUtil;
+import edu.wpi.first.math.controller.SimpleMotorFeedforward;
 import edu.wpi.first.units.measure.Angle;
 import edu.wpi.first.units.measure.AngularVelocity;
 import edu.wpi.first.units.measure.Current;
 import edu.wpi.first.units.measure.Temperature;
 import edu.wpi.first.units.measure.Voltage;
 import frc.robot.configs.ShooterConfig;
+import frc.robot.constants.Constants;
 import frc.robot.lib.util.DashboardMotorControlLoopConfigurator.MotorControlLoopConfig;
 import frc.robot.lib.util.PhoenixUtil;
 
@@ -64,8 +66,8 @@ public class ShooterIOTalonFX implements ShooterIO {
     private final StatusSignal<Temperature> flywheelFollowerTemperature;
     private final StatusSignal<Voltage> flywheelFollowerMotorVoltage;
 
-    private final PositionVoltage hoodMotorRequest = new PositionVoltage(0).withSlot(0);
-    private final MotionMagicVoltage turretMotorRequest = new MotionMagicVoltage(0).withSlot(0);
+    private final PositionVoltage hoodMotorRequest = new PositionVoltage(0).withSlot(0).withEnableFOC(true);
+    private final PositionVoltage turretMotorRequest = new PositionVoltage(0).withSlot(0).withEnableFOC(true);
     private final VelocityTorqueCurrentFOC flywheelMotorRequest = new VelocityTorqueCurrentFOC(0).withSlot(0);
 
     private final ShooterConfig config;
@@ -73,6 +75,9 @@ public class ShooterIOTalonFX implements ShooterIO {
     private final TalonFXConfiguration turretConfig;
     private final TalonFXConfiguration flywheelConfig;
     private final TalonFXConfiguration flywheelFollowerConfig;
+    private final SimpleMotorFeedforward turretFeedforward;
+    private double previousTurretRequestedAngleRotations;
+    private double previousTurretRequestedVelocityRotPerSec = 0.0;
 
     public ShooterIOTalonFX(ShooterConfig config) {
         this.config = config;
@@ -119,10 +124,16 @@ public class ShooterIOTalonFX implements ShooterIO {
         turretConfig.Slot0.kP = config.turretKP;
         turretConfig.Slot0.kI = config.turretKI;
         turretConfig.Slot0.kD = config.turretKD;
-        turretConfig.Slot0.kS = config.turretKS;
-        turretConfig.Slot0.kV = config.turretKV;
-        turretConfig.Slot0.kA = config.turretKA;
-        turretConfig.Slot0.StaticFeedforwardSign = StaticFeedforwardSignValue.UseVelocitySign;
+        turretConfig.Slot0.kS = 0.0;
+        turretConfig.Slot0.kV = 0.0;
+        turretConfig.Slot0.kA = 0.0;
+        turretConfig.Slot0.StaticFeedforwardSign = StaticFeedforwardSignValue.UseClosedLoopSign;
+        turretFeedforward = new SimpleMotorFeedforward(
+            config.turretKS,
+            config.turretKV,
+            config.turretKA,
+            Constants.kLOOP_CYCLE_MS
+        );
 
         turretConfig.ClosedLoopGeneral.ContinuousWrap = false;
         turretConfig.Feedback.SensorToMechanismRatio = config.turretMotorToOutputShaftRatio;
@@ -156,6 +167,7 @@ public class ShooterIOTalonFX implements ShooterIO {
         turretMotor = new TalonFX(config.turretCanId, new CANBus(config.canBusName));
         PhoenixUtil.tryUntilOk(5, () -> turretMotor.getConfigurator().apply(turretConfig, 0.25));
         PhoenixUtil.tryUntilOk(5, () -> turretMotor.setPosition(config.turretStartingAngleDeg / 360.0, 0.25));
+        previousTurretRequestedAngleRotations = config.turretStartingAngleDeg / 360.0;
 
         // Flywheel motor configuration (velocity control) - Leader
         flywheelConfig = new TalonFXConfiguration();
@@ -182,7 +194,6 @@ public class ShooterIOTalonFX implements ShooterIO {
 
         flywheelConfig.TorqueCurrent.PeakForwardTorqueCurrent = config.flywheelPeakForwardTorqueCurrent;
         flywheelConfig.TorqueCurrent.PeakReverseTorqueCurrent = config.flywheelPeakReverseTorqueCurrent;
-
         flywheelConfig.FutureProofConfigs = false;
 
         flywheelMotor = new TalonFX(config.flywheelCanId, new CANBus(config.canBusName));
@@ -286,7 +297,7 @@ public class ShooterIOTalonFX implements ShooterIO {
         inputs.flywheelTemperatureFahrenheit = flywheelTemperature.getValue().in(Fahrenheit);
         inputs.flywheelFollowerTemperatureFahrenheit = flywheelFollowerTemperature.getValue().in(Fahrenheit);
 
-        Logger.recordOutput("Shooter/turretTalonSetpoint", turretMotor.getClosedLoopReference().getValueAsDouble());
+        Logger.recordOutput("Shooter/turretTalonSetpointRotations", turretMotor.getClosedLoopReference().getValueAsDouble());
     }
 
     @Override
@@ -300,10 +311,65 @@ public class ShooterIOTalonFX implements ShooterIO {
 
     @Override
     public void setTurretAngle(double angleRotations) {
+        setTurretAngle(angleRotations, Double.NaN);
+    }
+
+    @Override
+    public void setTurretAngle(double angleRotations, double velocityRotationsPerSec) {
         double minRot = config.turretMinAngleDeg / 360.0;
         double maxRot = config.turretMaxAngleDeg / 360.0;
-        double clampedAngle = Math.max(minRot, Math.min(maxRot, angleRotations));
-        turretMotor.setControl(turretMotorRequest.withPosition(clampedAngle));
+        double clampedAngle = MathUtil.clamp(angleRotations, minRot, maxRot);
+
+        double desiredVelocityRotPerSec;
+        if (Double.isFinite(velocityRotationsPerSec)) {
+            desiredVelocityRotPerSec = velocityRotationsPerSec;
+        } else {
+            // Wrap requested delta to avoid large velocity spikes near 0/1-rotation boundaries.
+            double wrappedDeltaRotations = MathUtil.inputModulus(
+                clampedAngle - previousTurretRequestedAngleRotations,
+                -0.5,
+                0.5
+            );
+            desiredVelocityRotPerSec = wrappedDeltaRotations / Constants.kLOOP_CYCLE_MS;
+        }
+        double maxVelocityRotPerSec = turretConfig.MotionMagic.MotionMagicCruiseVelocity;
+        double velocityRotPerSec = MathUtil.clamp(
+            desiredVelocityRotPerSec,
+            -maxVelocityRotPerSec,
+            maxVelocityRotPerSec
+        );
+
+        double maxAccelerationRotPerSec2 = turretConfig.MotionMagic.MotionMagicAcceleration;
+        double desiredAccelerationRotPerSec2 =
+            (velocityRotPerSec - previousTurretRequestedVelocityRotPerSec) / Constants.kLOOP_CYCLE_MS;
+        double accelerationRotPerSec2 = MathUtil.clamp(
+            desiredAccelerationRotPerSec2,
+            -maxAccelerationRotPerSec2,
+            maxAccelerationRotPerSec2
+        );
+        double constrainedVelocityRotPerSec = MathUtil.clamp(
+            previousTurretRequestedVelocityRotPerSec + (accelerationRotPerSec2 * Constants.kLOOP_CYCLE_MS),
+            -maxVelocityRotPerSec,
+            maxVelocityRotPerSec
+        );
+
+        turretMotor.setControl(
+            turretMotorRequest
+                .withPosition(clampedAngle)
+                .withVelocity(constrainedVelocityRotPerSec)
+                .withFeedForward(
+                    turretFeedforward.calculateWithVelocities(
+                        previousTurretRequestedVelocityRotPerSec,
+                        constrainedVelocityRotPerSec
+                    )
+                )
+        );
+        Logger.recordOutput("Shooter/turretCommandedVelocityRotationsPerSec", constrainedVelocityRotPerSec);
+        Logger.recordOutput("Shooter/turretDesiredVelocityRotationsPerSec", desiredVelocityRotPerSec);
+        Logger.recordOutput("Shooter/turretCommandedAccelerationRotationsPerSec2", accelerationRotPerSec2);
+
+        previousTurretRequestedAngleRotations = clampedAngle;
+        previousTurretRequestedVelocityRotPerSec = constrainedVelocityRotPerSec;
     }
 
     @Override
@@ -341,13 +407,17 @@ public class ShooterIOTalonFX implements ShooterIO {
     }
 
     @Override
-    public void configureTurretControlLoop(MotorControlLoopConfig config) {
-        turretConfig.Slot0.kP = config.kP();
-        turretConfig.Slot0.kI = config.kI();
-        turretConfig.Slot0.kD = config.kD();
-        turretConfig.Slot0.kS = config.kS();
-        turretConfig.Slot0.kV = config.kV();
-        turretConfig.Slot0.kA = config.kA();
+    public void configureTurretControlLoop(MotorControlLoopConfig controlLoopConfig) {
+        turretConfig.Slot0.kP = controlLoopConfig.kP();
+        turretConfig.Slot0.kI = controlLoopConfig.kI();
+        turretConfig.Slot0.kD = controlLoopConfig.kD();
+        turretConfig.Slot0.kS = 0.0;
+        turretConfig.Slot0.kV = 0.0;
+        turretConfig.Slot0.kA = 0.0;
+
+        turretFeedforward.setKs(controlLoopConfig.kS());
+        turretFeedforward.setKv(controlLoopConfig.kV());
+        turretFeedforward.setKa(controlLoopConfig.kA());
 
         PhoenixUtil.tryUntilOk(5, () -> turretMotor.getConfigurator().apply(turretConfig, 0.25));
     }

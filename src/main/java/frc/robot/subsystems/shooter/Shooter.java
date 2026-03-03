@@ -57,7 +57,7 @@ public class Shooter extends SubsystemBase {
     }
 
     public enum FlywheelSetpoint {
-        OFF(-999999.0), // prevent bang bang jitter
+        OFF(-1.0), // prevent bang bang jitter
         DYNAMIC(Double.NaN);
 
         private final double rps;
@@ -73,6 +73,7 @@ public class Shooter extends SubsystemBase {
     // Setpoint Suppliers (set by Superstructure)
     private Supplier<Rotation2d> hoodAngleSupplier = () -> Rotation2d.fromDegrees(45.0);
     private Supplier<Rotation2d> turretAngleSupplier = () -> new Rotation2d(0);
+    private Supplier<Double> turretVelocitySupplier = () -> 0.0;
     private Supplier<Double> flywheelRPSSupplier = () -> 0.0;
 
     private final ShooterIO shooterIO;
@@ -158,6 +159,10 @@ public class Shooter extends SubsystemBase {
         this.turretAngleSupplier = supplier;
     }
 
+    public void setTurretVelocitySupplier(Supplier<Double> supplier) {
+        this.turretVelocitySupplier = supplier;
+    }
+
     public void setFlywheelRPSSupplier(Supplier<Double> supplier) {
         this.flywheelRPSSupplier = supplier;
     }
@@ -169,7 +174,8 @@ public class Shooter extends SubsystemBase {
 
     public void setTurretSetpoint(TurretSetpoint setpoint) {
         Rotation2d target = setpoint == TurretSetpoint.DYNAMIC ? turretAngleSupplier.get() : setpoint.getAngle();
-        setTurretAngle(target);
+        double targetVelocityRotPerSec = setpoint == TurretSetpoint.DYNAMIC ? turretVelocitySupplier.get() : 0.0;
+        setTurretAngle(target, targetVelocityRotPerSec);
     }
 
     public void setFlywheelSetpoint(FlywheelSetpoint setpoint) {
@@ -195,6 +201,10 @@ public class Shooter extends SubsystemBase {
     }
 
     public void setTurretAngle(Rotation2d angle) {
+        setTurretAngle(angle, 0.0);
+    }
+
+    public void setTurretAngle(Rotation2d angle, double requestedVelocityRotPerSec) {
         double requestedDeg = angle.getDegrees();
         double currentDeg = shooterInputs.turretAngleRotations * 360.0;
         double minDeg = config.turretMinAngleDeg;
@@ -218,8 +228,12 @@ public class Shooter extends SubsystemBase {
         Logger.recordOutput("Shooter/turretUnwindTargetDeg", unwindTargetDeg);
         Logger.recordOutput("Shooter/turretResolvedSetpointDeg", targetAngleDeg);
         Logger.recordOutput("Shooter/turretAngleSetpointRotations", targetAngleRotations);
+        Logger.recordOutput("Shooter/turretRequestedVelocityRotationsPerSec", requestedVelocityRotPerSec);
 
-        shooterIO.setTurretAngle(targetAngleRotations);
+        shooterIO.setTurretAngle(
+            targetAngleRotations,
+            usedUnwindFallback ? 0.0 : requestedVelocityRotPerSec
+        );
     }
 
     static TurretResolution resolveTurretTargetDegrees(
@@ -293,6 +307,18 @@ public class Shooter extends SubsystemBase {
 
     public double getFlywheelVelocityRotationsPerSec() {
         return shooterInputs.flywheelVelocityRotationsPerSec;
+    }
+
+    public double getHoodSetpointRotations() {
+        return hoodSetpointRotations;
+    }
+
+    public double getTurretSetpointRotations() {
+        return turretSetpointRotations;
+    }
+
+    public double getFlywheelSetpointRPS() {
+        return flywheelSetpointRPS;
     }
 
     public void enableHoodEStop() {

@@ -7,6 +7,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.math.geometry.Translation2d;
+import edu.wpi.first.math.geometry.Translation3d;
 import frc.robot.constants.ZoneConstants.RectangleZone;
 import frc.robot.lib.util.ShotCalculator.ShotData;
 import org.junit.jupiter.api.Test;
@@ -72,6 +73,16 @@ class SuperstructureShotReadinessTest {
     void isDistanceInRange_falseForReversedBoundsAndNaNDistance() {
         assertFalse(Superstructure.isDistanceInRange(4.0, 6.0, 2.0));
         assertFalse(Superstructure.isDistanceInRange(Double.NaN, 2.0, 6.0));
+    }
+
+    @Test
+    void didShotReachTargetHeight_trueWithinReachEpsilon() {
+        assertTrue(Superstructure.didShotReachTargetHeight(new Translation3d(1.0, 2.0, 1.8009), 1.8010));
+    }
+
+    @Test
+    void didShotReachTargetHeight_falseWhenBelowTargetBeyondEpsilon() {
+        assertFalse(Superstructure.didShotReachTargetHeight(new Translation3d(1.0, 2.0, 0.10), 1.80));
     }
 
     @Test

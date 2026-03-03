@@ -14,7 +14,7 @@ public class ShotCalculator {
     private static final double MIN_EFFECTIVE_COS = 0.05;
     private static final double MIN_FLIGHT_TIME_SECONDS = 1e-3;
     private static final double MIN_EXIT_VELOCITY_DENOMINATOR = 1e-6;
-    private static final int FLIGHT_TIME_SOLVE_ITERATIONS = 4;
+    private static final int FLIGHT_TIME_SOLVE_ITERATIONS = 15;
     private static final double FLIGHT_TIME_SOLVE_TOLERANCE_SECONDS = 1e-3;
 
     private record ShotKinematics(double exitVelocityMetersPerSec, double spinRateRadPerSec) {}

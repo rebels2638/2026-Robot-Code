@@ -192,6 +192,11 @@ public class ShooterIOSim implements ShooterIO {
 
     @Override
     public void setTurretAngle(double angleRotations) {
+        setTurretAngle(angleRotations, 0.0);
+    }
+
+    @Override
+    public void setTurretAngle(double angleRotations, double velocityRotationsPerSec) {
         if (isTurretEStopped) {
             turretSim.setInputVoltage(0);
             isTurretClosedLoop = false;
@@ -201,7 +206,8 @@ public class ShooterIOSim implements ShooterIO {
         double maxRot = config.turretMaxAngleDeg / 360.0;
         double clampedAngle = MathUtil.clamp(angleRotations, minRot, maxRot);
         double goalRadians = clampedAngle * (2 * Math.PI);
-        turretFeedback.setGoal(goalRadians);
+        double goalVelocityRadPerSec = velocityRotationsPerSec * (2 * Math.PI);
+        turretFeedback.setGoal(new TrapezoidProfile.State(goalRadians, goalVelocityRadPerSec));
         isTurretClosedLoop = true;
     }
 

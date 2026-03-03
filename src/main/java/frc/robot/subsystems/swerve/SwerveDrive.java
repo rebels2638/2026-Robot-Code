@@ -145,7 +145,7 @@ public class SwerveDrive extends SubsystemBase {
     private Rotation2d snapTargetAngle = Rotation2d.fromDegrees(0);
     private PIDController omegaOverridePIDController;
     private PIDController snappedOmegaOverridePIDController;
-    private static final double OMEGA_OVERRIDE_CONTROLLER_MAX_VELOCITY_FACTOR = 0.6;
+    private static final double OMEGA_OVERRIDE_CONTROLLER_MAX_VELOCITY_FACTOR = 1;
     private static final double RANGED_ROTATION_BUFFER_RAD = Math.toRadians(15.0); // Buffer to prevent oscillation at boundaries
     private boolean hasWarnedInvalidBufferedRotationRange = false;
     private boolean hasWarnedInvalidAccumulatedRotationRange = false;

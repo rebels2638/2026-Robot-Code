@@ -38,6 +38,9 @@ public interface ShooterIO {
     public default void updateInputs(ShooterIOInputs inputs) {}
     public default void setAngle(double angleRotations) {}
     public default void setTurretAngle(double angleRotations) {}
+    public default void setTurretAngle(double angleRotations, double velocityRotationsPerSec) {
+        setTurretAngle(angleRotations);
+    }
     public default void setShotVelocity(double velocityRotationsPerSec) {}
     public default void setHoodTorqueCurrentFOC(double torqueCurrentFOC) {}
     public default void setTurretTorqueCurrentFOC(double torqueCurrentFOC) {}
