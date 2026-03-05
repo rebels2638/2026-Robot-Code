@@ -16,6 +16,7 @@ import frc.robot.constants.Constants;
 import frc.robot.constants.vision.VisionConstants;
 import frc.robot.lib.util.ConfigLoader;
 import frc.robot.lib.util.LimelightHelpers;
+import frc.robot.lib.util.LoopCycleProfiler;
 import frc.robot.subsystems.vision.VisionIO.PoseObservationType;
 
 import java.util.ArrayList;
@@ -27,6 +28,9 @@ import java.util.function.Supplier;
 import org.littletonrobotics.junction.Logger;
 
 public class Vision extends SubsystemBase {
+    private static final double DETAILED_POSE_LOG_PERIOD_SECONDS = 0.2;
+    private static final double IMU_MODE_REFRESH_PERIOD_SECONDS = 1.0;
+
     private static Vision instance = null;
     private static final VisionConfig config = ConfigLoader.load(
         "vision",
@@ -72,6 +76,9 @@ public class Vision extends SubsystemBase {
     private final Alert[] disconnectedAlerts;
     private final TimeInterpolatableBuffer<Rotation2d> rotationRateBuffer;
     private final String[] limelightNames;
+    private int lastImuMode = Integer.MIN_VALUE;
+    private double lastImuModeWriteTimestampSeconds = Double.NEGATIVE_INFINITY;
+    private double lastDetailedPoseLogTimestampSeconds = Double.NEGATIVE_INFINITY;
 
     private Vision(Consumer<VisionObservation> consumer, Supplier<Rotation2d> rotationRateSupplier, VisionIO... io) {
         this.consumer = consumer;
@@ -119,49 +126,80 @@ public class Vision extends SubsystemBase {
 
     @Override
     public void periodic() {
-        int imuMode = DriverStation.isDisabled() ? config.disabledImuMode : config.enabledImuMode;
-        for (String cameraName : limelightNames) {
-            LimelightHelpers.SetIMUMode(cameraName, imuMode);
-        }
+        long periodicStartNanos = LoopCycleProfiler.markStart();
 
+        long imuModeStartNanos = LoopCycleProfiler.markStart();
+        double currentTime = Timer.getTimestamp();
+        int imuMode = DriverStation.isDisabled() ? config.disabledImuMode : config.enabledImuMode;
+        if (imuMode != lastImuMode
+            || currentTime - lastImuModeWriteTimestampSeconds >= IMU_MODE_REFRESH_PERIOD_SECONDS) {
+            for (String cameraName : limelightNames) {
+                LimelightHelpers.SetIMUMode(cameraName, imuMode);
+            }
+            lastImuMode = imuMode;
+            lastImuModeWriteTimestampSeconds = currentTime;
+        }
+        LoopCycleProfiler.endSection("Vision/SetIMUMode", imuModeStartNanos);
+
+        long inputUpdateStartNanos = LoopCycleProfiler.markStart();
         for (int i = 0; i < io.length; i++) {
             io[i].updateInputs(inputs[i]);
             Logger.processInputs("Vision/Camera" + Integer.toString(i), inputs[i]);
         }
+        LoopCycleProfiler.endSection("Vision/UpdateAndProcessInputs", inputUpdateStartNanos);
 
         // Record current rotation rate
-        double currentTime = Timer.getTimestamp();
+        long rotationRateStartNanos = LoopCycleProfiler.markStart();
 
         // Store rotation rate in buffer
         rotationRateBuffer.addSample(currentTime, rotationRateSupplier.get());
+        LoopCycleProfiler.endSection("Vision/RotationRateBufferUpdate", rotationRateStartNanos);
 
         // Initialize logging values
-        List<Pose3d> allTagPoses = new LinkedList<>();
-        List<Pose3d> allRobotPoses = new LinkedList<>();
-        List<Pose3d> allRobotPosesAccepted = new LinkedList<>();
-        List<Pose3d> allRobotPosesRejected = new LinkedList<>();
+        boolean shouldLogDetailedPoseArrays =
+            currentTime - lastDetailedPoseLogTimestampSeconds >= DETAILED_POSE_LOG_PERIOD_SECONDS;
+        if (shouldLogDetailedPoseArrays) {
+            lastDetailedPoseLogTimestampSeconds = currentTime;
+        }
+
+        long cameraProcessingStartNanos = LoopCycleProfiler.markStart();
+        List<Pose3d> allTagPoses = shouldLogDetailedPoseArrays ? new LinkedList<>() : null;
+        List<Pose3d> allRobotPoses = shouldLogDetailedPoseArrays ? new LinkedList<>() : null;
+        List<Pose3d> allRobotPosesAccepted = shouldLogDetailedPoseArrays ? new LinkedList<>() : null;
+        List<Pose3d> allRobotPosesRejected = shouldLogDetailedPoseArrays ? new LinkedList<>() : null;
+        int totalAcceptedCount = 0;
+        int totalRejectedCount = 0;
+        int totalObservationCount = 0;
 
         // Loop over cameras
         for (int cameraIndex = 0; cameraIndex < io.length; cameraIndex++) {
+            long perCameraStartNanos = LoopCycleProfiler.markStart();
+            String cameraTimingPrefix = "Vision/Camera" + Integer.toString(cameraIndex);
+
             // Update disconnected alert
             disconnectedAlerts[cameraIndex].set(!inputs[cameraIndex].connected);
 
             // Initialize logging values
-            List<Pose3d> tagPoses = new LinkedList<>();
-            List<Pose3d> robotPoses = new LinkedList<>();
-            List<Pose3d> robotPosesAccepted = new LinkedList<>();
-            List<Pose3d> robotPosesRejected = new LinkedList<>();
+            List<Pose3d> tagPoses = shouldLogDetailedPoseArrays ? new LinkedList<>() : null;
+            List<Pose3d> robotPoses = shouldLogDetailedPoseArrays ? new LinkedList<>() : null;
+            List<Pose3d> robotPosesAccepted = shouldLogDetailedPoseArrays ? new LinkedList<>() : null;
+            List<Pose3d> robotPosesRejected = shouldLogDetailedPoseArrays ? new LinkedList<>() : null;
+            int acceptedCount = 0;
+            int rejectedCount = 0;
 
             // Add tag poses
-            for (int tagId : inputs[cameraIndex].tagIds) {
-                var tagPose = VisionConstants.aprilTagLayout.getTagPose(tagId);
-                if (tagPose.isPresent()) {
-                    tagPoses.add(tagPose.get());
+            if (shouldLogDetailedPoseArrays) {
+                for (int tagId : inputs[cameraIndex].tagIds) {
+                    var tagPose = VisionConstants.aprilTagLayout.getTagPose(tagId);
+                    if (tagPose.isPresent()) {
+                        tagPoses.add(tagPose.get());
+                    }
                 }
             }
 
             // Loop over pose observations
             for (var observation : inputs[cameraIndex].robotPoseObservations) {
+                totalObservationCount++;
                 // Check rotation rate at observation timestamp
                 boolean rotationRateTooHigh = false;
                 var rotationRateAtTime = rotationRateBuffer.getSample(observation.timestamp());
@@ -198,11 +236,15 @@ public class Vision extends SubsystemBase {
                         || observation.pose().getY() > VisionConstants.aprilTagLayout.getFieldWidth();
 
                 // Add pose to log
-                robotPoses.add(observation.pose());
+                if (shouldLogDetailedPoseArrays) {
+                    robotPoses.add(observation.pose());
+                }
                 if (rejectPose) {
-                    robotPosesRejected.add(observation.pose());
-                } else {
-                    robotPosesAccepted.add(observation.pose());
+                    rejectedCount++;
+                    totalRejectedCount++;
+                    if (shouldLogDetailedPoseArrays) {
+                        robotPosesRejected.add(observation.pose());
+                    }
                 }
 
                 // Skip if rejected
@@ -228,8 +270,18 @@ public class Vision extends SubsystemBase {
                 }
 
                 if (!Double.isFinite(linearStdDev) || !Double.isFinite(angularStdDev)) {
-                    robotPosesRejected.add(observation.pose());
+                    rejectedCount++;
+                    totalRejectedCount++;
+                    if (shouldLogDetailedPoseArrays) {
+                        robotPosesRejected.add(observation.pose());
+                    }
                     continue;
+                }
+
+                acceptedCount++;
+                totalAcceptedCount++;
+                if (shouldLogDetailedPoseArrays) {
+                    robotPosesAccepted.add(observation.pose());
                 }
 
                 // Send vision observation
@@ -243,34 +295,51 @@ public class Vision extends SubsystemBase {
             }
 
             // Log camera datadata
-            Logger.recordOutput(
-                "Vision/Camera" + Integer.toString(cameraIndex) + "/TagPoses",
-                tagPoses.toArray(new Pose3d[tagPoses.size()]));
-            Logger.recordOutput(
-                "Vision/Camera" + Integer.toString(cameraIndex) + "/RobotPoses",
-                robotPoses.toArray(new Pose3d[robotPoses.size()]));
-            Logger.recordOutput(
-                "Vision/Camera" + Integer.toString(cameraIndex) + "/RobotPosesAccepted",
-                robotPosesAccepted.toArray(new Pose3d[robotPosesAccepted.size()]));
-            Logger.recordOutput(
-                "Vision/Camera" + Integer.toString(cameraIndex) + "/RobotPosesRejected",
-                robotPosesRejected.toArray(new Pose3d[robotPosesRejected.size()]));
-            allTagPoses.addAll(tagPoses);
-            allRobotPoses.addAll(robotPoses);
-            allRobotPosesAccepted.addAll(robotPosesAccepted);
-            allRobotPosesRejected.addAll(robotPosesRejected);
+            Logger.recordOutput(cameraTimingPrefix + "/PoseObservationCount", inputs[cameraIndex].robotPoseObservations.length);
+            Logger.recordOutput(cameraTimingPrefix + "/PoseAcceptedCount", acceptedCount);
+            Logger.recordOutput(cameraTimingPrefix + "/PoseRejectedCount", rejectedCount);
+            if (shouldLogDetailedPoseArrays) {
+                Logger.recordOutput(
+                    cameraTimingPrefix + "/TagPoses",
+                    tagPoses.toArray(new Pose3d[tagPoses.size()]));
+                Logger.recordOutput(
+                    cameraTimingPrefix + "/RobotPoses",
+                    robotPoses.toArray(new Pose3d[robotPoses.size()]));
+                Logger.recordOutput(
+                    cameraTimingPrefix + "/RobotPosesAccepted",
+                    robotPosesAccepted.toArray(new Pose3d[robotPosesAccepted.size()]));
+                Logger.recordOutput(
+                    cameraTimingPrefix + "/RobotPosesRejected",
+                    robotPosesRejected.toArray(new Pose3d[robotPosesRejected.size()]));
+                allTagPoses.addAll(tagPoses);
+                allRobotPoses.addAll(robotPoses);
+                allRobotPosesAccepted.addAll(robotPosesAccepted);
+                allRobotPosesRejected.addAll(robotPosesRejected);
+            }
+
+            LoopCycleProfiler.endSection(cameraTimingPrefix + "/Total", perCameraStartNanos);
         }
+        LoopCycleProfiler.endSection("Vision/CameraProcessing", cameraProcessingStartNanos);
 
         // Log summary data
-        Logger.recordOutput(
-            "Vision/Summary/TagPoses", allTagPoses.toArray(new Pose3d[allTagPoses.size()]));
-        Logger.recordOutput(
-            "Vision/Summary/RobotPoses", allRobotPoses.toArray(new Pose3d[allRobotPoses.size()]));
-        Logger.recordOutput(
-            "Vision/Summary/RobotPosesAccepted",
-            allRobotPosesAccepted.toArray(new Pose3d[allRobotPosesAccepted.size()]));
-        Logger.recordOutput(
-            "Vision/Summary/RobotPosesRejected",
-            allRobotPosesRejected.toArray(new Pose3d[allRobotPosesRejected.size()]));
+        long summaryLogStartNanos = LoopCycleProfiler.markStart();
+        Logger.recordOutput("Vision/Summary/PoseObservationCount", totalObservationCount);
+        Logger.recordOutput("Vision/Summary/PoseAcceptedCount", totalAcceptedCount);
+        Logger.recordOutput("Vision/Summary/PoseRejectedCount", totalRejectedCount);
+        if (shouldLogDetailedPoseArrays) {
+            Logger.recordOutput(
+                "Vision/Summary/TagPoses", allTagPoses.toArray(new Pose3d[allTagPoses.size()]));
+            Logger.recordOutput(
+                "Vision/Summary/RobotPoses", allRobotPoses.toArray(new Pose3d[allRobotPoses.size()]));
+            Logger.recordOutput(
+                "Vision/Summary/RobotPosesAccepted",
+                allRobotPosesAccepted.toArray(new Pose3d[allRobotPosesAccepted.size()]));
+            Logger.recordOutput(
+                "Vision/Summary/RobotPosesRejected",
+                allRobotPosesRejected.toArray(new Pose3d[allRobotPosesRejected.size()]));
+        }
+        LoopCycleProfiler.endSection("Vision/SummaryLogging", summaryLogStartNanos);
+
+        LoopCycleProfiler.endSection("Vision/PeriodicTotal", periodicStartNanos);
     }
 }
