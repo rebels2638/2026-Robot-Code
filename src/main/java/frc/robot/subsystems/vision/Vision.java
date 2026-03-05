@@ -28,8 +28,8 @@ import java.util.function.Supplier;
 import org.littletonrobotics.junction.Logger;
 
 public class Vision extends SubsystemBase {
-    private static final double DETAILED_POSE_LOG_PERIOD_SECONDS = 0.2;
-    private static final double IMU_MODE_REFRESH_PERIOD_SECONDS = 1.0;
+    private static final double DETAILED_POSE_LOG_PERIOD_SECONDS = Double.MAX_VALUE;
+    private static final double IMU_MODE_REFRESH_PERIOD_SECONDS = 0.1;
 
     private static Vision instance = null;
     private static final VisionConfig config = ConfigLoader.load(
