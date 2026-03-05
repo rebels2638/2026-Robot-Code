@@ -46,13 +46,7 @@ public class Vision extends SubsystemBase {
                 config.cameras != null ? config.cameras : List.of();
             if (useSimulation) {
                 for (VisionConfig.CameraConfig camera : cameraConfigs) {
-                    ioList.add(
-                        new VisionIOPhotonVisionSim(
-                            camera.name,
-                            camera.getRobotToCamera(),
-                            () -> robotState.getEstimatedPose()
-                        )
-                    );
+                    ioList.add(new VisionIO() {});
                 }
             } else {
                 for (VisionConfig.CameraConfig camera : cameraConfigs) {
