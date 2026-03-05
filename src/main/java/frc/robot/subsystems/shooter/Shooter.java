@@ -17,6 +17,7 @@ import frc.robot.constants.Constants;
 import frc.robot.constants.FieldConstants;
 import frc.robot.lib.util.ConfigLoader;
 import frc.robot.lib.util.DashboardMotorControlLoopConfigurator;
+import frc.robot.lib.util.LoopCycleProfiler;
 
 public class Shooter extends SubsystemBase {
     private static Shooter instance = null;
@@ -134,10 +135,18 @@ public class Shooter extends SubsystemBase {
 
     @Override
     public void periodic() {
+        long periodicStartNanos = LoopCycleProfiler.markStart();
+
+        long updateInputsStartNanos = LoopCycleProfiler.markStart();
         shooterIO.updateInputs(shooterInputs);
+        LoopCycleProfiler.endSection("Shooter/UpdateInputs", updateInputsStartNanos);
+
+        long processInputsStartNanos = LoopCycleProfiler.markStart();
         Logger.processInputs("Shooter", shooterInputs);
+        LoopCycleProfiler.endSection("Shooter/ProcessInputs", processInputsStartNanos);
 
         // Handle control loop configuration updates
+        long configUpdatesStartNanos = LoopCycleProfiler.markStart();
         if (hoodControlLoopConfigurator.hasChanged()) {
             shooterIO.configureHoodControlLoop(hoodControlLoopConfigurator.getConfig());
         }
@@ -147,7 +156,9 @@ public class Shooter extends SubsystemBase {
         if (flywheelControlLoopConfigurator.hasChanged()) {
             shooterIO.configureFlywheelControlLoop(flywheelControlLoopConfigurator.getConfig());
         }
+        LoopCycleProfiler.endSection("Shooter/ControlLoopConfigUpdates", configUpdatesStartNanos);
 
+        LoopCycleProfiler.endSection("Shooter/PeriodicTotal", periodicStartNanos);
     }
 
     // Supplier setters (called by Superstructure)
@@ -276,12 +287,46 @@ public class Shooter extends SubsystemBase {
             targetAngleDeg = bestAngleDeg;
             usedUnwindFallback = false;
         } else {
-            unwindTargetDeg = Math.abs(minDeg) <= Math.abs(maxDeg) ? minDeg : maxDeg;
+            unwindTargetDeg = selectFallbackTurretBoundDegrees(
+                requestedDeg,
+                currentDeg,
+                minDeg,
+                maxDeg,
+                currentBranchClampedDeg
+            );
             targetAngleDeg = unwindTargetDeg;
             usedUnwindFallback = true;
         }
 
         return new TurretResolution(targetAngleDeg, usedUnwindFallback, unwindTargetDeg);
+    }
+
+    static double selectFallbackTurretBoundDegrees(
+        double requestedDeg,
+        double currentDeg,
+        double minDeg,
+        double maxDeg,
+        double currentBranchClampedDeg
+    ) {
+        double minAimErrorDeg = Math.abs(MathUtil.inputModulus(requestedDeg - minDeg, -180.0, 180.0));
+        double maxAimErrorDeg = Math.abs(MathUtil.inputModulus(requestedDeg - maxDeg, -180.0, 180.0));
+        if (minAimErrorDeg < maxAimErrorDeg) {
+            return minDeg;
+        }
+        if (maxAimErrorDeg < minAimErrorDeg) {
+            return maxDeg;
+        }
+
+        double minCurrentDistanceDeg = Math.abs(minDeg - currentDeg);
+        double maxCurrentDistanceDeg = Math.abs(maxDeg - currentDeg);
+        if (minCurrentDistanceDeg < maxCurrentDistanceDeg) {
+            return minDeg;
+        }
+        if (maxCurrentDistanceDeg < minCurrentDistanceDeg) {
+            return maxDeg;
+        }
+
+        return currentBranchClampedDeg;
     }
 
     static record TurretResolution(

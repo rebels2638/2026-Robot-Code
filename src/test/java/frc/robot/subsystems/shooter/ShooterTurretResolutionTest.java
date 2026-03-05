@@ -38,33 +38,33 @@ class ShooterTurretResolutionTest {
     }
 
     @Test
-    // If no wrapped angle is legal, fallback should unwind toward the bound nearest zero.
-    void resolveTurretTargetDegrees_usesUnwindFallbackTowardZeroWhenNoWrappedEquivalent() {
+    // If no wrapped angle is legal, fallback should choose the limit with lower aim error.
+    void resolveTurretTargetDegrees_usesUnwindFallbackTowardNearestAimBoundWhenNoWrappedEquivalent() {
         Shooter.TurretResolution resolution = Shooter.resolveTurretTargetDegrees(
-            0.0,
-            0.0,
+            330.0,
             100.0,
-            200.0
+            90.0,
+            270.0
         );
 
         assertTrue(resolution.usedUnwindFallback());
-        assertEquals(100.0, resolution.targetAngleDeg(), EPS);
-        assertEquals(100.0, resolution.unwindTargetDeg(), EPS);
+        assertEquals(270.0, resolution.targetAngleDeg(), EPS);
+        assertEquals(270.0, resolution.unwindTargetDeg(), EPS);
     }
 
     @Test
-    // Negative-only range fallback should choose the upper (closer-to-zero) boundary.
-    void resolveTurretTargetDegrees_unwindFallbackChoosesBoundClosestToZeroForNegativeRange() {
+    // When both bounds have equal aim error, fallback should use the bound closest to current angle.
+    void resolveTurretTargetDegrees_unwindFallbackBreaksAimErrorTieUsingCurrentAngle() {
         Shooter.TurretResolution resolution = Shooter.resolveTurretTargetDegrees(
             0.0,
-            0.0,
-            -200.0,
-            -100.0
+            250.0,
+            90.0,
+            270.0
         );
 
         assertTrue(resolution.usedUnwindFallback());
-        assertEquals(-100.0, resolution.targetAngleDeg(), EPS);
-        assertEquals(-100.0, resolution.unwindTargetDeg(), EPS);
+        assertEquals(270.0, resolution.targetAngleDeg(), EPS);
+        assertEquals(270.0, resolution.unwindTargetDeg(), EPS);
     }
 
     @Test

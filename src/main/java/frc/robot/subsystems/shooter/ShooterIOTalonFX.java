@@ -12,12 +12,12 @@ import com.ctre.phoenix6.BaseStatusSignal;
 import com.ctre.phoenix6.CANBus;
 import com.ctre.phoenix6.StatusSignal;
 import com.ctre.phoenix6.configs.TalonFXConfiguration;
+import com.ctre.phoenix6.controls.DynamicMotionMagicVoltage;
 import com.ctre.phoenix6.controls.Follower;
 import com.ctre.phoenix6.signals.MotorAlignmentValue;
 import com.ctre.phoenix6.controls.PositionVoltage;
 import com.ctre.phoenix6.controls.TorqueCurrentFOC;
 import com.ctre.phoenix6.controls.VelocityTorqueCurrentFOC;
-import com.ctre.phoenix6.controls.VelocityVoltage;
 import com.ctre.phoenix6.controls.VoltageOut;
 import com.ctre.phoenix6.hardware.TalonFX;
 import com.ctre.phoenix6.signals.InvertedValue;
@@ -25,7 +25,6 @@ import com.ctre.phoenix6.signals.NeutralModeValue;
 import com.ctre.phoenix6.signals.StaticFeedforwardSignValue;
 
 import edu.wpi.first.math.MathUtil;
-import edu.wpi.first.math.controller.SimpleMotorFeedforward;
 import edu.wpi.first.units.measure.Angle;
 import edu.wpi.first.units.measure.AngularVelocity;
 import edu.wpi.first.units.measure.Current;
@@ -67,7 +66,8 @@ public class ShooterIOTalonFX implements ShooterIO {
     private final StatusSignal<Voltage> flywheelFollowerMotorVoltage;
 
     private final PositionVoltage hoodMotorRequest = new PositionVoltage(0).withSlot(0).withEnableFOC(true);
-    private final PositionVoltage turretMotorRequest = new PositionVoltage(0).withSlot(0).withEnableFOC(true);
+    private final DynamicMotionMagicVoltage turretMotorRequest =
+        new DynamicMotionMagicVoltage(0, 0, 0).withSlot(0).withEnableFOC(true);
     private final VelocityTorqueCurrentFOC flywheelMotorRequest = new VelocityTorqueCurrentFOC(0).withSlot(0);
 
     private final ShooterConfig config;
@@ -75,7 +75,6 @@ public class ShooterIOTalonFX implements ShooterIO {
     private final TalonFXConfiguration turretConfig;
     private final TalonFXConfiguration flywheelConfig;
     private final TalonFXConfiguration flywheelFollowerConfig;
-    private final SimpleMotorFeedforward turretFeedforward;
     private double previousTurretRequestedAngleRotations;
     private double previousTurretRequestedVelocityRotPerSec = 0.0;
 
@@ -124,16 +123,10 @@ public class ShooterIOTalonFX implements ShooterIO {
         turretConfig.Slot0.kP = config.turretKP;
         turretConfig.Slot0.kI = config.turretKI;
         turretConfig.Slot0.kD = config.turretKD;
-        turretConfig.Slot0.kS = 0.0;
-        turretConfig.Slot0.kV = 0.0;
-        turretConfig.Slot0.kA = 0.0;
+        turretConfig.Slot0.kS = config.turretKS;
+        turretConfig.Slot0.kV = config.turretKV;
+        turretConfig.Slot0.kA = config.turretKA;
         turretConfig.Slot0.StaticFeedforwardSign = StaticFeedforwardSignValue.UseClosedLoopSign;
-        turretFeedforward = new SimpleMotorFeedforward(
-            config.turretKS,
-            config.turretKV,
-            config.turretKA,
-            Constants.kLOOP_CYCLE_MS
-        );
 
         turretConfig.ClosedLoopGeneral.ContinuousWrap = false;
         turretConfig.Feedback.SensorToMechanismRatio = config.turretMotorToOutputShaftRatio;
@@ -159,8 +152,10 @@ public class ShooterIOTalonFX implements ShooterIO {
         // Motion Magic constraints (degrees/sec -> rotations/sec)
         double turretCruiseVelocityRotPerSec = config.turretMaxVelocityDegPerSec / 360.0;
         double turretAccelerationRotPerSec2 = config.turretMaxAccelerationDegPerSec2 / 360.0;
+        double turretJerkRotPerSec3 = config.turretMaxJerkDegPerSec3 / 360.0;
         turretConfig.MotionMagic.MotionMagicCruiseVelocity = turretCruiseVelocityRotPerSec;
         turretConfig.MotionMagic.MotionMagicAcceleration = turretAccelerationRotPerSec2;
+        turretConfig.MotionMagic.MotionMagicJerk = turretJerkRotPerSec3;
 
         turretConfig.FutureProofConfigs = false;
 
@@ -178,6 +173,7 @@ public class ShooterIOTalonFX implements ShooterIO {
         flywheelConfig.Slot0.kS = config.flywheelKS;
         flywheelConfig.Slot0.kV = config.flywheelKV;
         flywheelConfig.Slot0.kA = config.flywheelKA;
+        
         flywheelConfig.Slot0.StaticFeedforwardSign = StaticFeedforwardSignValue.UseVelocitySign;
 
         flywheelConfig.ClosedLoopGeneral.ContinuousWrap = false;
@@ -352,17 +348,14 @@ public class ShooterIOTalonFX implements ShooterIO {
             -maxVelocityRotPerSec,
             maxVelocityRotPerSec
         );
+        double maxJerkRotPerSec3 = turretConfig.MotionMagic.MotionMagicJerk;
 
         turretMotor.setControl(
             turretMotorRequest
                 .withPosition(clampedAngle)
-                .withVelocity(constrainedVelocityRotPerSec)
-                .withFeedForward(
-                    turretFeedforward.calculateWithVelocities(
-                        previousTurretRequestedVelocityRotPerSec,
-                        constrainedVelocityRotPerSec
-                    )
-                )
+                .withVelocity(Math.abs(constrainedVelocityRotPerSec))
+                .withAcceleration(Math.abs(maxAccelerationRotPerSec2))
+                .withJerk(Math.abs(maxJerkRotPerSec3))
         );
         Logger.recordOutput("Shooter/turretCommandedVelocityRotationsPerSec", constrainedVelocityRotPerSec);
         Logger.recordOutput("Shooter/turretDesiredVelocityRotationsPerSec", desiredVelocityRotPerSec);
@@ -411,13 +404,9 @@ public class ShooterIOTalonFX implements ShooterIO {
         turretConfig.Slot0.kP = controlLoopConfig.kP();
         turretConfig.Slot0.kI = controlLoopConfig.kI();
         turretConfig.Slot0.kD = controlLoopConfig.kD();
-        turretConfig.Slot0.kS = 0.0;
-        turretConfig.Slot0.kV = 0.0;
-        turretConfig.Slot0.kA = 0.0;
-
-        turretFeedforward.setKs(controlLoopConfig.kS());
-        turretFeedforward.setKv(controlLoopConfig.kV());
-        turretFeedforward.setKa(controlLoopConfig.kA());
+        turretConfig.Slot0.kS = controlLoopConfig.kS();
+        turretConfig.Slot0.kV = controlLoopConfig.kV();
+        turretConfig.Slot0.kA = controlLoopConfig.kA();
 
         PhoenixUtil.tryUntilOk(5, () -> turretMotor.getConfigurator().apply(turretConfig, 0.25));
     }

@@ -74,6 +74,7 @@ public class ShooterConfig {
 
     public double turretMaxVelocityDegPerSec;
     public double turretMaxAccelerationDegPerSec2;
+    public double turretMaxJerkDegPerSec3;
 
     public int flywheelCanId;
     public int flywheelFollowerCanId;
