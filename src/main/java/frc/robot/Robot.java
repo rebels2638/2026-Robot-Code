@@ -128,7 +128,7 @@ public class Robot extends LoggedRobot {
         LoopCycleProfiler.endSection("Robot/CommandSchedulerRun", schedulerStartNanos);
 
         long shotDistanceLogStartNanos = LoopCycleProfiler.markStart();
-        Logger.recordOutput("Superstructure/shotData", RobotState.getInstance().getEstimatedPose().getTranslation().getDistance(FieldConstants.Hub.hubCenter.toTranslation2d()));
+        Logger.recordOutput("shot/shotDistanceMeters", RobotState.getInstance().getEstimatedPose().getTranslation().getDistance(FieldConstants.Hub.hubCenter.toTranslation2d()));
         LoopCycleProfiler.endSection("Robot/SuperstructureShotDistanceLog", shotDistanceLogStartNanos);
 
         LoopCycleProfiler.finishCycle(SLOW_LOOP_WARNING_THRESHOLD_MS);
