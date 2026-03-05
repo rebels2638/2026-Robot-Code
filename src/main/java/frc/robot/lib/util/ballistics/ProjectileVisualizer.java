@@ -10,6 +10,7 @@ import edu.wpi.first.math.geometry.Rotation3d;
 import edu.wpi.first.math.geometry.Translation3d;
 import edu.wpi.first.wpilibj.Timer;
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
+import frc.robot.lib.util.LoopCycleProfiler;
 
 /**
  * Visualizes one or more projectiles using physics simulation with drag and Magnus effect.
@@ -113,6 +114,9 @@ public class ProjectileVisualizer extends SubsystemBase {
 
     @Override
     public void periodic() {
+        long periodicStartNanos = LoopCycleProfiler.markStart();
+
+        long updateProjectilesStartNanos = LoopCycleProfiler.markStart();
         double now = timestampSupplier.get();
         Iterator<ProjectileInstance> iterator = projectiles.iterator();
 
@@ -129,20 +133,29 @@ public class ProjectileVisualizer extends SubsystemBase {
                 iterator.remove();
             }
         }
+        LoopCycleProfiler.endSection("ProjectileVisualizer/UpdateProjectiles", updateProjectilesStartNanos);
 
         // Reset nextId when no projectiles are active
+        long resetIdStartNanos = LoopCycleProfiler.markStart();
         if (projectiles.isEmpty()) {
             nextId = 0;
         }
+        LoopCycleProfiler.endSection("ProjectileVisualizer/ResetIdWhenEmpty", resetIdStartNanos);
 
         // Build translations array from only active projectiles
+        long buildTranslationsStartNanos = LoopCycleProfiler.markStart();
         Translation3d[] activeTranslations = new Translation3d[projectiles.size()];
         for (int i = 0; i < projectiles.size(); i++) {
             activeTranslations[i] = projectiles.get(i).currentPosition;
         }
+        LoopCycleProfiler.endSection("ProjectileVisualizer/BuildTranslations", buildTranslationsStartNanos);
 
+        long outputLogStartNanos = LoopCycleProfiler.markStart();
         Logger.recordOutput("ProjectileVisualizer/Translations", activeTranslations);
         Logger.recordOutput("ProjectileVisualizer/ActiveCount", projectiles.size());
+        LoopCycleProfiler.endSection("ProjectileVisualizer/OutputLogging", outputLogStartNanos);
+
+        LoopCycleProfiler.endSection("ProjectileVisualizer/PeriodicTotal", periodicStartNanos);
     }
 
     void setTimestampSupplierForTesting(Supplier<Double> timestampSupplier) {

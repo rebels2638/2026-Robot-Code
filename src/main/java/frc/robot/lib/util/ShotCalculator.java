@@ -319,31 +319,12 @@ public class ShotCalculator {
             setpointSpinRateRadPerSec = 0.0;
         }
 
-        if (!useFlightTimeVelocitySolve) {
-            return new ShotKinematics(
-                setpointExitVelocityMetersPerSec * measuredScale,
-                setpointSpinRateRadPerSec * measuredScale
-            );
-        }
-
-        double baseExitVelocity = solveSetpointExitVelocityMetersPerSec(
-            distanceMeters,
-            hoodAngleDegrees,
-            flightTimeSeconds,
-            setpointFlywheelRps,
-            wheelRpsToExitVelocity,
-            wheelRpsToSpinRateRadPerSec,
-            shooterHeightMeters,
-            targetHeightMeters
+        // Ballistics flight-time solve is intentionally disabled for shot kinematics.
+        // Exit velocity/spin are now purely wheel-model setpoint values scaled by measured flywheel speed.
+        return new ShotKinematics(
+            setpointExitVelocityMetersPerSec * measuredScale,
+            setpointSpinRateRadPerSec * measuredScale
         );
-        double solvedExitVelocity = baseExitVelocity * measuredScale;
-        double baseSpinRateRadPerSec = scaleSpinForExitVelocity(
-            setpointSpinRateRadPerSec,
-            setpointExitVelocityMetersPerSec,
-            baseExitVelocity
-        );
-        double solvedSpinRateRadPerSec = baseSpinRateRadPerSec * measuredScale;
-        return new ShotKinematics(solvedExitVelocity, solvedSpinRateRadPerSec);
     }
 
     private static double solveSetpointExitVelocityMetersPerSec(

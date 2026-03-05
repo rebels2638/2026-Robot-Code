@@ -20,9 +20,9 @@ import frc.robot.constants.Constants;
 import frc.robot.constants.FieldConstants;
 import frc.robot.constants.ZoneConstants;
 import frc.robot.constants.ZoneConstants.RectangleZone;
-import frc.robot.lib.util.ballistics.BallisticsPhysics;
 import frc.robot.lib.BLine.FlippingUtil;
 import frc.robot.lib.util.ConfigLoader;
+import frc.robot.lib.util.LoopCycleProfiler;
 import frc.robot.lib.util.ShotKinematicsUtil;
 import frc.robot.lib.util.ShotCalculator;
 import frc.robot.lib.util.ShotCalculator.ShotData;
@@ -132,9 +132,6 @@ public class Superstructure extends SubsystemBase {
     private double lastInRangeShotTimestampSeconds = Double.NEGATIVE_INFINITY;
     private ShotComputationContext cachedShotComputationContext;
     private ShotReadinessData cachedShotReadinessData = new ShotReadinessData(
-        new Translation3d(),
-        new Translation3d(),
-        Double.POSITIVE_INFINITY,
         0.0,
         0.0,
         0.0,
@@ -145,8 +142,6 @@ public class Superstructure extends SubsystemBase {
         0.0,
         0.0,
         0.0,
-        false,
-        false,
         false,
         false,
         true,
@@ -155,9 +150,6 @@ public class Superstructure extends SubsystemBase {
     );
 
     private record ShotReadinessData(
-        Translation3d actualLanding,
-        Translation3d setpointLanding,
-        double impactErrorMeters,
         double effectiveDistanceMeters,
         double minShotDistanceMeters,
         double maxShotDistanceMeters,
@@ -170,8 +162,6 @@ public class Superstructure extends SubsystemBase {
         double flywheelErrorRps,
         boolean shooterReady,
         boolean distanceInRange,
-        boolean actualReachedTargetHeight,
-        boolean setpointReachedTargetHeight,
         boolean lineOfSightClear,
         boolean zoneAllowsTarget,
         boolean readyForShot
@@ -213,6 +203,9 @@ public class Superstructure extends SubsystemBase {
 
     @Override
     public void periodic() {
+        long periodicStartNanos = LoopCycleProfiler.markStart();
+
+        long shotComputationStartNanos = LoopCycleProfiler.markStart();
         latencyCompensationSeconds.setDefault(config.latencyCompensationSeconds);
 
         // Calculate raw shot data once per cycle, then apply close-shot guard for mechanism setpoints.
@@ -250,11 +243,22 @@ public class Superstructure extends SubsystemBase {
         Logger.recordOutput("Superstructure/hasLastInRangeShotData", hasValidLastInRangeShotData);
         Logger.recordOutput("Superstructure/lastInRangeShotMaxAgeSeconds", config.lastInRangeShotMaxAgeSeconds);
         Logger.recordOutput("Superstructure/lastInRangeShotAgeSeconds", nowSeconds - lastInRangeShotTimestampSeconds);
+        LoopCycleProfiler.endSection("Superstructure/ShotComputation", shotComputationStartNanos);
+
+        long shotReadinessStartNanos = LoopCycleProfiler.markStart();
         cachedShotReadinessData = calculateShotReadinessData(cachedShotComputationContext);
         logShotReadinessData(cachedShotReadinessData);
-        
+        LoopCycleProfiler.endSection("Superstructure/ShotReadiness", shotReadinessStartNanos);
+
+        long stateTransitionsStartNanos = LoopCycleProfiler.markStart();
         handleStateTransitions();
+        LoopCycleProfiler.endSection("Superstructure/StateTransitions", stateTransitionsStartNanos);
+
+        long currentStateStartNanos = LoopCycleProfiler.markStart();
         handleCurrentState();
+        LoopCycleProfiler.endSection("Superstructure/CurrentStateHandling", currentStateStartNanos);
+
+        LoopCycleProfiler.endSection("Superstructure/PeriodicTotal", periodicStartNanos);
     }
 
     /**
@@ -395,6 +399,11 @@ public class Superstructure extends SubsystemBase {
     private void handleShootingState() {        
         applyDynamicShotOutputs(HopperSetpoint.FEEDING);
 
+        boolean shouldVisualizeShots = Constants.currentMode == Constants.Mode.SIM;
+        if (!shouldVisualizeShots) {
+            return;
+        }
+
         double now = Timer.getTimestamp();
         double timeSinceShotStart = now - shotStartTime;
         if (timeSinceShotStart >= config.shotDurationSeconds) {
@@ -520,7 +529,6 @@ public class Superstructure extends SubsystemBase {
 
     /**
      * Checks if all mechanisms are at their setpoints and ready to shoot.
-     * Uses shot impact error and lerp table distance bounds as readiness metrics.
      */
     private boolean isReadyForShot() {
         return cachedShotReadinessData.readyForShot();
@@ -546,59 +554,6 @@ public class Superstructure extends SubsystemBase {
         boolean swerveRotationNominal = isSwerveRotationNominalForShot();
 
         double effectiveDistance = cachedShotData.effectiveDistance();
-        double shooterHeight = context.shooterKinematics().shooterPosition().getZ();
-        double targetHeight = context.targetLocation().getZ();
-
-        double actualExitVelocity = cachedShotData.exitVelocity();
-        double actualSpinRateRadPerSec = ShotCalculator.calculateSpinRateRadPerSec(
-            effectiveDistance,
-            context.lerpTable(),
-            actualFlywheel,
-            shooter::calculateShotExitVelocityMetersPerSec,
-            rps -> shooter.calculateBackSpinRPM(rps) * 2.0 * Math.PI / 60.0,
-            shooterHeight,
-            targetHeight,
-            !context.passingTarget()
-        );
-        double setpointExitVelocity = ShotCalculator.calculateExitVelocityMetersPerSec(
-            effectiveDistance,
-            context.lerpTable(),
-            setpointFlywheel,
-            shooter::calculateShotExitVelocityMetersPerSec,
-            rps -> shooter.calculateBackSpinRPM(rps) * 2.0 * Math.PI / 60.0,
-            shooterHeight,
-            targetHeight,
-            !context.passingTarget()
-        );
-        double setpointSpinRateRadPerSec = ShotCalculator.calculateSpinRateRadPerSec(
-            effectiveDistance,
-            context.lerpTable(),
-            setpointFlywheel,
-            shooter::calculateShotExitVelocityMetersPerSec,
-            rps -> shooter.calculateBackSpinRPM(rps) * 2.0 * Math.PI / 60.0,
-            shooterHeight,
-            targetHeight,
-            !context.passingTarget()
-        );
-
-        Translation3d actualLanding = simulateShotLanding(
-            context,
-            actualHood,
-            actualTurret,
-            actualExitVelocity,
-            actualSpinRateRadPerSec
-        );
-        Translation3d setpointLanding = simulateShotLanding(
-            context,
-            setpointHood,
-            setpointTurret,
-            setpointExitVelocity,
-            setpointSpinRateRadPerSec
-        );
-        double impactErrorMeters = actualLanding.toTranslation2d()
-            .getDistance(setpointLanding.toTranslation2d());
-        boolean actualReachedTargetHeight = didShotReachTargetHeight(actualLanding, targetHeight);
-        boolean setpointReachedTargetHeight = didShotReachTargetHeight(setpointLanding, targetHeight);
         boolean shooterReady = hoodAtSetpoint
             && turretAtSetpoint
             && flywheelAtSetpoint
@@ -612,9 +567,6 @@ public class Superstructure extends SubsystemBase {
             && context.zoneAllowsTarget();
 
         return new ShotReadinessData(
-            actualLanding,
-            setpointLanding,
-            impactErrorMeters,
             effectiveDistance,
             minShotDistance,
             maxShotDistance,
@@ -627,8 +579,6 @@ public class Superstructure extends SubsystemBase {
             flywheelErrorRps,
             shooterReady,
             distanceInRange,
-            actualReachedTargetHeight,
-            setpointReachedTargetHeight,
             context.lineOfSightClear(),
             context.zoneAllowsTarget(),
             readyForShot
@@ -648,11 +598,6 @@ public class Superstructure extends SubsystemBase {
         Logger.recordOutput("Superstructure/hoodErrorDegrees", data.hoodErrorDegrees());
         Logger.recordOutput("Superstructure/turretErrorDegrees", data.turretErrorDegrees());
         Logger.recordOutput("Superstructure/flywheelErrorRps", data.flywheelErrorRps());
-        Logger.recordOutput("Superstructure/actualLanding", data.actualLanding());
-        Logger.recordOutput("Superstructure/setpointLanding", data.setpointLanding());
-        Logger.recordOutput("Superstructure/impactErrorMeters", data.impactErrorMeters());
-        Logger.recordOutput("Superstructure/actualReachedTargetHeight", data.actualReachedTargetHeight());
-        Logger.recordOutput("Superstructure/setpointReachedTargetHeight", data.setpointReachedTargetHeight());
         Logger.recordOutput("Superstructure/targetLineOfSightClear", data.lineOfSightClear());
         Logger.recordOutput("Superstructure/targetZoneAllowed", data.zoneAllowsTarget());
     }
@@ -1048,36 +993,6 @@ public class Superstructure extends SubsystemBase {
             targetLocation = new Translation3d(fieldPosition.getX(), fieldPosition.getY(), targetLocation.getZ());
         }
         return targetLocation;
-    }
-
-    private Translation3d simulateShotLanding(
-        ShotComputationContext context,
-        double hoodAngleRotations,
-        double turretAngleRotations,
-        double exitVelocity,
-        double spinRateRadPerSec
-    ) {
-        Translation3d shooterPosition = context.shooterKinematics().shooterPosition();
-
-        double pitch = hoodAngleRotations * 2.0 * Math.PI;
-        double turretYaw = turretAngleRotations * 2.0 * Math.PI;
-        Rotation2d robotHeading = context.shooterKinematics().robotHeading();
-        double fieldYaw = turretYaw + robotHeading.getRadians();
-
-        double vHorizontal = exitVelocity * Math.cos(pitch);
-        double vx = vHorizontal * Math.cos(fieldYaw) + context.shooterKinematics().shooterVxField();
-        double vy = vHorizontal * Math.sin(fieldYaw) + context.shooterKinematics().shooterVyField();
-        double vz = exitVelocity * Math.sin(pitch);
-
-        return BallisticsPhysics.simulateToHeight3D(
-            shooterPosition,
-            vx,
-            vy,
-            vz,
-            spinRateRadPerSec,
-            context.targetLocation().getZ(),
-            config.ballisticsSimulationStepSeconds
-        );
     }
 
     // Public interface

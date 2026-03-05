@@ -8,6 +8,7 @@ import frc.robot.configs.IntakeConfig;
 import frc.robot.constants.Constants;
 import frc.robot.lib.util.ConfigLoader;
 import frc.robot.lib.util.DashboardMotorControlLoopConfigurator;
+import frc.robot.lib.util.LoopCycleProfiler;
 
 public class Intake extends SubsystemBase {
     private static Intake instance = null;
@@ -72,15 +73,26 @@ public class Intake extends SubsystemBase {
 
     @Override
     public void periodic() {
-        intakeIO.updateInputs(intakeInputs);
-        Logger.processInputs("Intake", intakeInputs);
+        long periodicStartNanos = LoopCycleProfiler.markStart();
 
+        long updateInputsStartNanos = LoopCycleProfiler.markStart();
+        intakeIO.updateInputs(intakeInputs);
+        LoopCycleProfiler.endSection("Intake/UpdateInputs", updateInputsStartNanos);
+
+        long processInputsStartNanos = LoopCycleProfiler.markStart();
+        Logger.processInputs("Intake", intakeInputs);
+        LoopCycleProfiler.endSection("Intake/ProcessInputs", processInputsStartNanos);
+
+        long configUpdatesStartNanos = LoopCycleProfiler.markStart();
         if (rollerControlLoopConfigurator.hasChanged()) {
             intakeIO.configureControlLoop(rollerControlLoopConfigurator.getConfig());
         }
         if (pivotControlLoopConfigurator.hasChanged()) {
             intakeIO.configurePivotControlLoop(pivotControlLoopConfigurator.getConfig());
         }
+        LoopCycleProfiler.endSection("Intake/ControlLoopConfigUpdates", configUpdatesStartNanos);
+
+        LoopCycleProfiler.endSection("Intake/PeriodicTotal", periodicStartNanos);
     }
 
     private void setRollerVelocity(double velocityRotationsPerSec) {

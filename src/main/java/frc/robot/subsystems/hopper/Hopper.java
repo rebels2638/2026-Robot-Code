@@ -8,6 +8,7 @@ import frc.robot.configs.HopperConfig;
 import frc.robot.constants.Constants;
 import frc.robot.lib.util.ConfigLoader;
 import frc.robot.lib.util.DashboardMotorControlLoopConfigurator;
+import frc.robot.lib.util.LoopCycleProfiler;
 
 public class Hopper extends SubsystemBase {
     private static Hopper instance = null;
@@ -66,13 +67,23 @@ public class Hopper extends SubsystemBase {
 
     @Override
     public void periodic() {
-        hopperIO.updateInputs(hopperInputs);
-        Logger.processInputs("Hopper", hopperInputs);
+        long periodicStartNanos = LoopCycleProfiler.markStart();
 
+        long updateInputsStartNanos = LoopCycleProfiler.markStart();
+        hopperIO.updateInputs(hopperInputs);
+        LoopCycleProfiler.endSection("Hopper/UpdateInputs", updateInputsStartNanos);
+
+        long processInputsStartNanos = LoopCycleProfiler.markStart();
+        Logger.processInputs("Hopper", hopperInputs);
+        LoopCycleProfiler.endSection("Hopper/ProcessInputs", processInputsStartNanos);
+
+        long configUpdatesStartNanos = LoopCycleProfiler.markStart();
         if (hopperControlLoopConfigurator.hasChanged()) {
             hopperIO.configureControlLoop(hopperControlLoopConfigurator.getConfig());
         }
+        LoopCycleProfiler.endSection("Hopper/ControlLoopConfigUpdates", configUpdatesStartNanos);
 
+        LoopCycleProfiler.endSection("Hopper/PeriodicTotal", periodicStartNanos);
     }
 
     public void setHopperVelocity(double velocityRotationsPerSec) {

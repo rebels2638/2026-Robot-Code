@@ -8,6 +8,7 @@ import frc.robot.configs.ClimberConfig;
 import frc.robot.constants.Constants;
 import frc.robot.lib.util.ConfigLoader;
 import frc.robot.lib.util.DashboardMotorControlLoopConfigurator;
+import frc.robot.lib.util.LoopCycleProfiler;
 
 public class Climber extends SubsystemBase {
     private static Climber instance = null;
@@ -57,13 +58,23 @@ public class Climber extends SubsystemBase {
 
     @Override
     public void periodic() {
-        climberIO.updateInputs(climberInputs);
-        Logger.processInputs("Climber", climberInputs);
+        long periodicStartNanos = LoopCycleProfiler.markStart();
 
+        long updateInputsStartNanos = LoopCycleProfiler.markStart();
+        climberIO.updateInputs(climberInputs);
+        LoopCycleProfiler.endSection("Climber/UpdateInputs", updateInputsStartNanos);
+
+        long processInputsStartNanos = LoopCycleProfiler.markStart();
+        Logger.processInputs("Climber", climberInputs);
+        LoopCycleProfiler.endSection("Climber/ProcessInputs", processInputsStartNanos);
+
+        long configUpdatesStartNanos = LoopCycleProfiler.markStart();
         if (climberControlLoopConfigurator.hasChanged()) {
             climberIO.configureControlLoop(climberControlLoopConfigurator.getConfig());
         }
+        LoopCycleProfiler.endSection("Climber/ControlLoopConfigUpdates", configUpdatesStartNanos);
 
+        LoopCycleProfiler.endSection("Climber/PeriodicTotal", periodicStartNanos);
     }
 
     private void setClimberPosition(double positionRotations) {
