@@ -175,7 +175,7 @@ public class SwerveDrive extends SubsystemBase {
     private double modulesAlignmentToleranceDeg = 15.0;
     private Rotation2d modulesAlignmentTargetRotation = Rotation2d.fromDegrees(0);
 
-    public static final double ODOMETRY_FREQUENCY = 250;
+    public static final double ODOMETRY_FREQUENCY = 150;
 
     public static final Lock odometryLock = new ReentrantLock();
 
