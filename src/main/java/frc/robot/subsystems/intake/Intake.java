@@ -3,6 +3,7 @@ package frc.robot.subsystems.intake;
 import org.littletonrobotics.junction.AutoLogOutput;
 import org.littletonrobotics.junction.Logger;
 
+import edu.wpi.first.wpilibj.DriverStation;
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
 import frc.robot.configs.IntakeConfig;
 import frc.robot.constants.Constants;
@@ -35,6 +36,8 @@ public class Intake extends SubsystemBase {
 
     private final DashboardMotorControlLoopConfigurator rollerControlLoopConfigurator;
     private final DashboardMotorControlLoopConfigurator pivotControlLoopConfigurator;
+    private boolean pendingRollerControlLoopConfigApply = false;
+    private boolean pendingPivotControlLoopConfigApply = false;
 
     private double rollerSetpointRPS = 0.0;
     private double pivotSetpointRotations = 0.0;
@@ -84,11 +87,17 @@ public class Intake extends SubsystemBase {
         LoopCycleProfiler.endSection("Intake/ProcessInputs", processInputsStartNanos);
 
         long configUpdatesStartNanos = LoopCycleProfiler.markStart();
-        if (rollerControlLoopConfigurator.hasChanged()) {
-            intakeIO.configureControlLoop(rollerControlLoopConfigurator.getConfig());
-        }
-        if (pivotControlLoopConfigurator.hasChanged()) {
-            intakeIO.configurePivotControlLoop(pivotControlLoopConfigurator.getConfig());
+        pendingRollerControlLoopConfigApply |= rollerControlLoopConfigurator.hasChanged();
+        pendingPivotControlLoopConfigApply |= pivotControlLoopConfigurator.hasChanged();
+        if (DriverStation.isDisabled()) {
+            if (pendingRollerControlLoopConfigApply) {
+                intakeIO.configureControlLoop(rollerControlLoopConfigurator.getConfig());
+                pendingRollerControlLoopConfigApply = false;
+            }
+            if (pendingPivotControlLoopConfigApply) {
+                intakeIO.configurePivotControlLoop(pivotControlLoopConfigurator.getConfig());
+                pendingPivotControlLoopConfigApply = false;
+            }
         }
         LoopCycleProfiler.endSection("Intake/ControlLoopConfigUpdates", configUpdatesStartNanos);
 

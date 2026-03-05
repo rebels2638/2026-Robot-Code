@@ -3,6 +3,7 @@ package frc.robot.subsystems.climber;
 import org.littletonrobotics.junction.AutoLogOutput;
 import org.littletonrobotics.junction.Logger;
 
+import edu.wpi.first.wpilibj.DriverStation;
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
 import frc.robot.configs.ClimberConfig;
 import frc.robot.constants.Constants;
@@ -32,6 +33,7 @@ public class Climber extends SubsystemBase {
     private final ClimberConfig config;
 
     private final DashboardMotorControlLoopConfigurator climberControlLoopConfigurator;
+    private boolean pendingClimberControlLoopConfigApply = false;
 
     private double targetPositionRotations = 0.0;
 
@@ -69,8 +71,10 @@ public class Climber extends SubsystemBase {
         LoopCycleProfiler.endSection("Climber/ProcessInputs", processInputsStartNanos);
 
         long configUpdatesStartNanos = LoopCycleProfiler.markStart();
-        if (climberControlLoopConfigurator.hasChanged()) {
+        pendingClimberControlLoopConfigApply |= climberControlLoopConfigurator.hasChanged();
+        if (DriverStation.isDisabled() && pendingClimberControlLoopConfigApply) {
             climberIO.configureControlLoop(climberControlLoopConfigurator.getConfig());
+            pendingClimberControlLoopConfigApply = false;
         }
         LoopCycleProfiler.endSection("Climber/ControlLoopConfigUpdates", configUpdatesStartNanos);
 

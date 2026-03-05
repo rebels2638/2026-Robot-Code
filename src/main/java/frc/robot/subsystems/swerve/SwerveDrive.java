@@ -220,6 +220,8 @@ public class SwerveDrive extends SubsystemBase {
 
     private final DashboardMotorControlLoopConfigurator driveControlLoopConfigurator;
     private final DashboardMotorControlLoopConfigurator steerControlLoopConfigurator;
+    private boolean pendingDriveControlLoopConfigApply = false;
+    private boolean pendingSteerControlLoopConfigApply = false;
 
     private final SysIdRoutine driveCharacterizationSysIdRoutine;
     private final SysIdRoutine steerCharacterizationSysIdRoutine;
@@ -405,14 +407,20 @@ public class SwerveDrive extends SubsystemBase {
         LoopCycleProfiler.endSection("SwerveDrive/BuildModuleStates", buildModuleStatesStartNanos);
 
         long configUpdateStartNanos = LoopCycleProfiler.markStart();
-        if (driveControlLoopConfigurator.hasChanged()) {
-            for (ModuleIO module : modules) {
-                module.configureDriveControlLoop(driveControlLoopConfigurator.getConfig());
+        pendingDriveControlLoopConfigApply |= driveControlLoopConfigurator.hasChanged();
+        pendingSteerControlLoopConfigApply |= steerControlLoopConfigurator.hasChanged();
+        if (DriverStation.isDisabled()) {
+            if (pendingDriveControlLoopConfigApply) {
+                for (ModuleIO module : modules) {
+                    module.configureDriveControlLoop(driveControlLoopConfigurator.getConfig());
+                }
+                pendingDriveControlLoopConfigApply = false;
             }
-        }
-        if (steerControlLoopConfigurator.hasChanged()) {
-            for (ModuleIO module : modules) {
-                module.configureSteerControlLoop(steerControlLoopConfigurator.getConfig());
+            if (pendingSteerControlLoopConfigApply) {
+                for (ModuleIO module : modules) {
+                    module.configureSteerControlLoop(steerControlLoopConfigurator.getConfig());
+                }
+                pendingSteerControlLoopConfigApply = false;
             }
         }
         LoopCycleProfiler.endSection("SwerveDrive/ControlLoopConfigUpdates", configUpdateStartNanos);

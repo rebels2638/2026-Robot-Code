@@ -11,6 +11,7 @@ import edu.wpi.first.math.geometry.Pose3d;
 import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.math.numbers.N1;
 import edu.wpi.first.math.numbers.N3;
+import edu.wpi.first.wpilibj.DriverStation;
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
 import frc.robot.configs.ShooterConfig;
 import frc.robot.constants.Constants;
@@ -85,6 +86,9 @@ public class Shooter extends SubsystemBase {
     private final DashboardMotorControlLoopConfigurator hoodControlLoopConfigurator;
     private final DashboardMotorControlLoopConfigurator turretControlLoopConfigurator;
     private final DashboardMotorControlLoopConfigurator flywheelControlLoopConfigurator;
+    private boolean pendingHoodControlLoopConfigApply = false;
+    private boolean pendingTurretControlLoopConfigApply = false;
+    private boolean pendingFlywheelControlLoopConfigApply = false;
 
     private double hoodSetpointRotations = 0.0;
     private double turretSetpointRotations = 0.0;
@@ -147,14 +151,22 @@ public class Shooter extends SubsystemBase {
 
         // Handle control loop configuration updates
         long configUpdatesStartNanos = LoopCycleProfiler.markStart();
-        if (hoodControlLoopConfigurator.hasChanged()) {
-            shooterIO.configureHoodControlLoop(hoodControlLoopConfigurator.getConfig());
-        }
-        if (turretControlLoopConfigurator.hasChanged()) {
-            shooterIO.configureTurretControlLoop(turretControlLoopConfigurator.getConfig());
-        }
-        if (flywheelControlLoopConfigurator.hasChanged()) {
-            shooterIO.configureFlywheelControlLoop(flywheelControlLoopConfigurator.getConfig());
+        pendingHoodControlLoopConfigApply |= hoodControlLoopConfigurator.hasChanged();
+        pendingTurretControlLoopConfigApply |= turretControlLoopConfigurator.hasChanged();
+        pendingFlywheelControlLoopConfigApply |= flywheelControlLoopConfigurator.hasChanged();
+        if (DriverStation.isDisabled()) {
+            if (pendingHoodControlLoopConfigApply) {
+                shooterIO.configureHoodControlLoop(hoodControlLoopConfigurator.getConfig());
+                pendingHoodControlLoopConfigApply = false;
+            }
+            if (pendingTurretControlLoopConfigApply) {
+                shooterIO.configureTurretControlLoop(turretControlLoopConfigurator.getConfig());
+                pendingTurretControlLoopConfigApply = false;
+            }
+            if (pendingFlywheelControlLoopConfigApply) {
+                shooterIO.configureFlywheelControlLoop(flywheelControlLoopConfigurator.getConfig());
+                pendingFlywheelControlLoopConfigApply = false;
+            }
         }
         LoopCycleProfiler.endSection("Shooter/ControlLoopConfigUpdates", configUpdatesStartNanos);
 

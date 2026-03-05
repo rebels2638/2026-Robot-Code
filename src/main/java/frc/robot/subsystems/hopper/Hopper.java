@@ -3,6 +3,7 @@ package frc.robot.subsystems.hopper;
 import org.littletonrobotics.junction.AutoLogOutput;
 import org.littletonrobotics.junction.Logger;
 
+import edu.wpi.first.wpilibj.DriverStation;
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
 import frc.robot.configs.HopperConfig;
 import frc.robot.constants.Constants;
@@ -41,6 +42,7 @@ public class Hopper extends SubsystemBase {
     private final HopperConfig config;
 
     private final DashboardMotorControlLoopConfigurator hopperControlLoopConfigurator;
+    private boolean pendingHopperControlLoopConfigApply = false;
 
     private double hopperSetpointRPS = 0.0;
 
@@ -78,8 +80,10 @@ public class Hopper extends SubsystemBase {
         LoopCycleProfiler.endSection("Hopper/ProcessInputs", processInputsStartNanos);
 
         long configUpdatesStartNanos = LoopCycleProfiler.markStart();
-        if (hopperControlLoopConfigurator.hasChanged()) {
+        pendingHopperControlLoopConfigApply |= hopperControlLoopConfigurator.hasChanged();
+        if (DriverStation.isDisabled() && pendingHopperControlLoopConfigApply) {
             hopperIO.configureControlLoop(hopperControlLoopConfigurator.getConfig());
+            pendingHopperControlLoopConfigApply = false;
         }
         LoopCycleProfiler.endSection("Hopper/ControlLoopConfigUpdates", configUpdatesStartNanos);
 

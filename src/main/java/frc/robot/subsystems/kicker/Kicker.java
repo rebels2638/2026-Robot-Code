@@ -3,6 +3,7 @@ package frc.robot.subsystems.kicker;
 import org.littletonrobotics.junction.AutoLogOutput;
 import org.littletonrobotics.junction.Logger;
 
+import edu.wpi.first.wpilibj.DriverStation;
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
 import frc.robot.configs.KickerConfig;
 import frc.robot.constants.Constants;
@@ -41,6 +42,7 @@ public class Kicker extends SubsystemBase {
     private final KickerConfig config;
 
     private final DashboardMotorControlLoopConfigurator kickerControlLoopConfigurator;
+    private boolean pendingKickerControlLoopConfigApply = false;
 
     private double kickerSetpointRPS = 0.0;
 
@@ -79,8 +81,10 @@ public class Kicker extends SubsystemBase {
 
         // Handle control loop configuration updates
         long configUpdatesStartNanos = LoopCycleProfiler.markStart();
-        if (kickerControlLoopConfigurator.hasChanged()) {
+        pendingKickerControlLoopConfigApply |= kickerControlLoopConfigurator.hasChanged();
+        if (DriverStation.isDisabled() && pendingKickerControlLoopConfigApply) {
             kickerIO.configureControlLoop(kickerControlLoopConfigurator.getConfig());
+            pendingKickerControlLoopConfigApply = false;
         }
         LoopCycleProfiler.endSection("Kicker/ControlLoopConfigUpdates", configUpdatesStartNanos);
 
