@@ -124,6 +124,105 @@ class SwerveDriveRangedRotationTest {
     }
 
     @Test
+    void applyClosingRecoveryBoundaryFeedforward_enforcesMinimumOmegaForClosingMinBoundary() {
+        SwerveDrive.RecoveryBoundaryFeedforward feedforward =
+            SwerveDrive.applyClosingRecoveryBoundaryFeedforward(
+                -0.5,
+                Math.toRadians(-25.0),
+                Math.toRadians(-30.0),
+                Math.toRadians(30.0),
+                Math.toRadians(-15.0),
+                Math.toRadians(15.0),
+                1.25,
+                0.0,
+                4.0
+            );
+
+        assertEquals(1.25, feedforward.adjustedOmega(), 1e-9);
+        assertEquals(1.25, feedforward.feedforwardOmegaRadPerSec(), 1e-9);
+        assertEquals(SwerveDrive.RecoveryBoundaryFeedforward.MIN_BOUNDARY, feedforward.activeBoundary());
+    }
+
+    @Test
+    void applyClosingRecoveryBoundaryFeedforward_enforcesMinimumOmegaForClosingMaxBoundary() {
+        SwerveDrive.RecoveryBoundaryFeedforward feedforward =
+            SwerveDrive.applyClosingRecoveryBoundaryFeedforward(
+                0.25,
+                Math.toRadians(25.0),
+                Math.toRadians(-30.0),
+                Math.toRadians(30.0),
+                Math.toRadians(-15.0),
+                Math.toRadians(15.0),
+                0.0,
+                -1.75,
+                4.0
+            );
+
+        assertEquals(-1.75, feedforward.adjustedOmega(), 1e-9);
+        assertEquals(-1.75, feedforward.feedforwardOmegaRadPerSec(), 1e-9);
+        assertEquals(SwerveDrive.RecoveryBoundaryFeedforward.MAX_BOUNDARY, feedforward.activeBoundary());
+    }
+
+    @Test
+    void applyClosingRecoveryBoundaryFeedforward_doesNotOverrideFasterDriverEscapeCommand() {
+        SwerveDrive.RecoveryBoundaryFeedforward feedforward =
+            SwerveDrive.applyClosingRecoveryBoundaryFeedforward(
+                -2.5,
+                Math.toRadians(25.0),
+                Math.toRadians(-30.0),
+                Math.toRadians(30.0),
+                Math.toRadians(-15.0),
+                Math.toRadians(15.0),
+                0.0,
+                -1.0,
+                4.0
+            );
+
+        assertEquals(-2.5, feedforward.adjustedOmega(), 1e-9);
+        assertEquals(-1.0, feedforward.feedforwardOmegaRadPerSec(), 1e-9);
+    }
+
+    @Test
+    void applyClosingRecoveryBoundaryFeedforward_ignoresOpeningBoundaryMotion() {
+        SwerveDrive.RecoveryBoundaryFeedforward feedforward =
+            SwerveDrive.applyClosingRecoveryBoundaryFeedforward(
+                -0.5,
+                Math.toRadians(-25.0),
+                Math.toRadians(-30.0),
+                Math.toRadians(30.0),
+                Math.toRadians(-15.0),
+                Math.toRadians(15.0),
+                -1.25,
+                0.0,
+                4.0
+            );
+
+        assertEquals(-0.5, feedforward.adjustedOmega(), 1e-9);
+        assertEquals(0.0, feedforward.feedforwardOmegaRadPerSec(), 1e-9);
+        assertEquals(SwerveDrive.RecoveryBoundaryFeedforward.MIN_BOUNDARY, feedforward.activeBoundary());
+    }
+
+    @Test
+    void applyClosingRecoveryBoundaryFeedforward_isInactiveOutsideRecoveryBuffer() {
+        SwerveDrive.RecoveryBoundaryFeedforward feedforward =
+            SwerveDrive.applyClosingRecoveryBoundaryFeedforward(
+                0.75,
+                0.0,
+                Math.toRadians(-30.0),
+                Math.toRadians(30.0),
+                Math.toRadians(-15.0),
+                Math.toRadians(15.0),
+                1.25,
+                -1.75,
+                4.0
+            );
+
+        assertEquals(0.75, feedforward.adjustedOmega(), 1e-9);
+        assertEquals(0.0, feedforward.feedforwardOmegaRadPerSec(), 1e-9);
+        assertEquals(SwerveDrive.RecoveryBoundaryFeedforward.NO_ACTIVE_BOUNDARY, feedforward.activeBoundary());
+    }
+
+    @Test
     void resolveReturnToRangeTargetAngle_targetsNearestRecoveryBound() {
         double targetNearMin = SwerveDrive.resolveReturnToRangeTargetAngle(
             Math.toRadians(-25.0),

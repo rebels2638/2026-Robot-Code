@@ -148,9 +148,16 @@ public class SwerveDrive extends SubsystemBase {
     private PIDController snappedOmegaOverridePIDController;
     private static final double OMEGA_OVERRIDE_CONTROLLER_MAX_VELOCITY_FACTOR = 1;
     private static final double RANGED_ROTATION_BUFFER_RAD = Math.toRadians(15.0); // Buffer to prevent oscillation at boundaries
+    private static final double RANGED_ROTATION_BOUNDARY_VELOCITY_MAX_SAMPLE_AGE_S = 0.1;
     private boolean hasWarnedInvalidBufferedRotationRange = false;
     private boolean hasWarnedInvalidAccumulatedRotationRange = false;
     private boolean hasWarnedInvalidWrappedRotationRange = false;
+    private RotationRangeFrame lastRotationRangeFrame = null;
+    private double lastRecoveryMinBoundaryRad = Double.NaN;
+    private double lastRecoveryMaxBoundaryRad = Double.NaN;
+    private double lastRotationRangeUpdateTimestampSec = Double.NaN;
+    private double recoveryMinBoundaryVelocityRadPerSec = 0.0;
+    private double recoveryMaxBoundaryVelocityRadPerSec = 0.0;
 
     private boolean shouldOverrideOmega = false;
     private double omegaOverride = 0.0;
@@ -923,19 +930,47 @@ public class SwerveDrive extends SubsystemBase {
     private double limitOmegaForRange(double desiredOmega) {
         double current = RobotState.getInstance().getAccumulatedYawRadians();
         double currentOmega = RobotState.getInstance().getYawVelocityRadPerSec();
-        RotationRangeBounds bounds = resolveBufferedRotationRange(
+        RotationRangeBounds outerSafetyBounds = resolveBufferedRotationRange(
             rotationRangeMinAbsRad,
             rotationRangeMaxAbsRad,
             getRangedRotationOuterSafetyBufferRadians()
         );
-
-        double limitedOmega = limitOmegaForRange(
+        RotationRangeBounds recoveryBounds = resolveBufferedRotationRange(
+            rotationRangeMinAbsRad,
+            rotationRangeMaxAbsRad,
+            getRangedRotationRecoveryBufferRadians()
+        );
+        RecoveryBoundaryFeedforward boundaryFeedforward = applyClosingRecoveryBoundaryFeedforward(
             desiredOmega,
             current,
+            rotationRangeMinAbsRad,
+            rotationRangeMaxAbsRad,
+            recoveryBounds.minRad(),
+            recoveryBounds.maxRad(),
+            recoveryMinBoundaryVelocityRadPerSec,
+            recoveryMaxBoundaryVelocityRadPerSec,
+            drivetrainConfig.maxAngularVelocityRadiansPerSec
+        );
+
+        double limitedOmega = limitOmegaForRange(
+            boundaryFeedforward.adjustedOmega(),
+            current,
             currentOmega,
-            bounds.minRad(),
-            bounds.maxRad(),
+            outerSafetyBounds.minRad(),
+            outerSafetyBounds.maxRad(),
             drivetrainConfig.maxAngularAccelerationRadiansPerSecSec
+        );
+        Logger.recordOutput(
+            "SwerveDrive/rangedRotation/boundaryMotionFeedforward/activeBoundary",
+            boundaryFeedforward.activeBoundary()
+        );
+        Logger.recordOutput(
+            "SwerveDrive/rangedRotation/boundaryMotionFeedforward/feedforwardOmegaRadPerSec",
+            boundaryFeedforward.feedforwardOmegaRadPerSec()
+        );
+        Logger.recordOutput(
+            "SwerveDrive/rangedRotation/boundaryMotionFeedforward/adjustedDesiredOmegaRadPerSec",
+            boundaryFeedforward.adjustedOmega()
         );
         Logger.recordOutput("SwerveDrive/rangedRotation/outerSafetyLimitedOmega", limitedOmega);
         return limitedOmega;
@@ -995,6 +1030,72 @@ public class SwerveDrive extends SubsystemBase {
             safeMaxRad - effectiveBufferRad,
             effectiveBufferRad
         );
+    }
+
+    static RecoveryBoundaryFeedforward applyClosingRecoveryBoundaryFeedforward(
+        double desiredOmegaRadPerSec,
+        double currentRad,
+        double rangeMinRad,
+        double rangeMaxRad,
+        double recoveryMinRad,
+        double recoveryMaxRad,
+        double recoveryMinVelocityRadPerSec,
+        double recoveryMaxVelocityRadPerSec,
+        double maxFeedforwardOmegaMagnitudeRadPerSec
+    ) {
+        boolean inMinBuffer = currentRad >= rangeMinRad && currentRad < recoveryMinRad;
+        boolean inMaxBuffer = currentRad <= rangeMaxRad && currentRad > recoveryMaxRad;
+
+        if (!inMinBuffer && !inMaxBuffer) {
+            return new RecoveryBoundaryFeedforward(
+                desiredOmegaRadPerSec,
+                0.0,
+                RecoveryBoundaryFeedforward.NO_ACTIVE_BOUNDARY
+            );
+        }
+
+        int activeBoundary = RecoveryBoundaryFeedforward.NO_ACTIVE_BOUNDARY;
+        if (inMinBuffer && inMaxBuffer) {
+            double distToMinBoundary = Math.abs(currentRad - rangeMinRad);
+            double distToMaxBoundary = Math.abs(rangeMaxRad - currentRad);
+            activeBoundary = distToMinBoundary <= distToMaxBoundary
+                ? RecoveryBoundaryFeedforward.MIN_BOUNDARY
+                : RecoveryBoundaryFeedforward.MAX_BOUNDARY;
+        } else if (inMinBuffer) {
+            activeBoundary = RecoveryBoundaryFeedforward.MIN_BOUNDARY;
+        } else {
+            activeBoundary = RecoveryBoundaryFeedforward.MAX_BOUNDARY;
+        }
+
+        if (activeBoundary == RecoveryBoundaryFeedforward.MIN_BOUNDARY) {
+            double clampedFeedforwardOmega = MathUtil.clamp(
+                recoveryMinVelocityRadPerSec,
+                -maxFeedforwardOmegaMagnitudeRadPerSec,
+                maxFeedforwardOmegaMagnitudeRadPerSec
+            );
+            if (clampedFeedforwardOmega > 0.0) {
+                return new RecoveryBoundaryFeedforward(
+                    Math.max(desiredOmegaRadPerSec, clampedFeedforwardOmega),
+                    clampedFeedforwardOmega,
+                    activeBoundary
+                );
+            }
+            return new RecoveryBoundaryFeedforward(desiredOmegaRadPerSec, 0.0, activeBoundary);
+        }
+
+        double clampedFeedforwardOmega = MathUtil.clamp(
+            recoveryMaxVelocityRadPerSec,
+            -maxFeedforwardOmegaMagnitudeRadPerSec,
+            maxFeedforwardOmegaMagnitudeRadPerSec
+        );
+        if (clampedFeedforwardOmega < 0.0) {
+            return new RecoveryBoundaryFeedforward(
+                Math.min(desiredOmegaRadPerSec, clampedFeedforwardOmega),
+                clampedFeedforwardOmega,
+                activeBoundary
+            );
+        }
+        return new RecoveryBoundaryFeedforward(desiredOmegaRadPerSec, 0.0, activeBoundary);
     }
 
     static double limitOmegaForRange(
@@ -1181,12 +1282,58 @@ public class SwerveDrive extends SubsystemBase {
         double maxAbsDeg,
         RotationRangeFrame rotationRangeFrame
     ) {
-        rotationRangeMinAbsRad = Math.toRadians(minAbsDeg);
-        rotationRangeMaxAbsRad = Math.toRadians(maxAbsDeg);
+        double newMinAbsRad = Math.toRadians(minAbsDeg);
+        double newMaxAbsRad = Math.toRadians(maxAbsDeg);
+        updateRecoveryBoundaryVelocities(newMinAbsRad, newMaxAbsRad, rotationRangeFrame);
+
+        rotationRangeMinAbsRad = newMinAbsRad;
+        rotationRangeMaxAbsRad = newMaxAbsRad;
         
         Logger.recordOutput("SwerveDrive/rotationRange/min", Rotation2d.fromRadians(rotationRangeMinAbsRad));
         Logger.recordOutput("SwerveDrive/rotationRange/max", Rotation2d.fromRadians(rotationRangeMaxAbsRad));
         Logger.recordOutput("SwerveDrive/rotationRange/frame", rotationRangeFrame.ordinal());
+    }
+
+    private void updateRecoveryBoundaryVelocities(
+        double newMinAbsRad,
+        double newMaxAbsRad,
+        RotationRangeFrame rotationRangeFrame
+    ) {
+        RotationRangeBounds newRecoveryBounds = resolveBufferedRotationRange(
+            newMinAbsRad,
+            newMaxAbsRad,
+            RANGED_ROTATION_BUFFER_RAD
+        );
+        double nowSeconds = Timer.getTimestamp();
+        boolean canComputeVelocity = lastRotationRangeFrame == rotationRangeFrame
+            && Double.isFinite(lastRecoveryMinBoundaryRad)
+            && Double.isFinite(lastRecoveryMaxBoundaryRad)
+            && Double.isFinite(lastRotationRangeUpdateTimestampSec)
+            && nowSeconds > lastRotationRangeUpdateTimestampSec
+            && nowSeconds - lastRotationRangeUpdateTimestampSec <= RANGED_ROTATION_BOUNDARY_VELOCITY_MAX_SAMPLE_AGE_S;
+
+        if (canComputeVelocity) {
+            double dtSeconds = nowSeconds - lastRotationRangeUpdateTimestampSec;
+            recoveryMinBoundaryVelocityRadPerSec = (newRecoveryBounds.minRad() - lastRecoveryMinBoundaryRad) / dtSeconds;
+            recoveryMaxBoundaryVelocityRadPerSec = (newRecoveryBounds.maxRad() - lastRecoveryMaxBoundaryRad) / dtSeconds;
+        } else {
+            recoveryMinBoundaryVelocityRadPerSec = 0.0;
+            recoveryMaxBoundaryVelocityRadPerSec = 0.0;
+        }
+
+        lastRotationRangeFrame = rotationRangeFrame;
+        lastRecoveryMinBoundaryRad = newRecoveryBounds.minRad();
+        lastRecoveryMaxBoundaryRad = newRecoveryBounds.maxRad();
+        lastRotationRangeUpdateTimestampSec = nowSeconds;
+
+        Logger.recordOutput(
+            "SwerveDrive/rangedRotation/recoveryMinBoundaryVelocityRadPerSec",
+            recoveryMinBoundaryVelocityRadPerSec
+        );
+        Logger.recordOutput(
+            "SwerveDrive/rangedRotation/recoveryMaxBoundaryVelocityRadPerSec",
+            recoveryMaxBoundaryVelocityRadPerSec
+        );
     }
 
     record AbsoluteRotationRange(
@@ -1201,6 +1348,16 @@ public class SwerveDrive extends SubsystemBase {
         double maxRad,
         double bufferRad
     ) {}
+
+    record RecoveryBoundaryFeedforward(
+        double adjustedOmega,
+        double feedforwardOmegaRadPerSec,
+        int activeBoundary
+    ) {
+        static final int NO_ACTIVE_BOUNDARY = -1;
+        static final int MIN_BOUNDARY = 0;
+        static final int MAX_BOUNDARY = 1;
+    }
 
     record AccumulatedRotationRangeResolution(
         double minAbsDeg,
