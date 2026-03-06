@@ -246,7 +246,9 @@ public class Superstructure extends SubsystemBase {
 
         long shotReadinessStartNanos = LoopCycleProfiler.markStart();
         cachedShotReadinessData = calculateShotReadinessData(cachedShotComputationContext);
-        logShotReadinessData(cachedShotReadinessData);
+        if (Constants.VERBOSE_LOGGING_ENABLED) {
+            logShotReadinessData(cachedShotReadinessData);
+        }
         LoopCycleProfiler.endSection("Superstructure/ShotReadiness", shotReadinessStartNanos);
 
         long stateTransitionsStartNanos = LoopCycleProfiler.markStart();
@@ -757,24 +759,16 @@ public class Superstructure extends SubsystemBase {
         }
 
         ShotKinematicsUtil.ShooterKinematics shooterKinematics = cachedShotComputationContext.shooterKinematics();
-        Translation2d turretPositionInField = shooterKinematics.shooterPosition().toTranslation2d();
-        Translation2d targetToTurretVector =
-            turretPositionInField.minus(cachedShotData.compensatedTargetPosition());
-        double vectorNormSquared = targetToTurretVector.getNorm() * targetToTurretVector.getNorm();
-        if (vectorNormSquared < 1e-6) {
-            return 0.0;
-        }
-
-        // d/dt(atan2(y, x)) for relative target vector in field frame.
-        double angularVelocityInFieldRadPerSec =
-            (targetToTurretVector.getX() * shooterKinematics.shooterVyField()
-                - targetToTurretVector.getY() * shooterKinematics.shooterVxField())
-                / vectorNormSquared;
-
-        // Convert desired field-relative LOS rate to turret-relative rate in robot frame.
-        double turretDesiredAngularVelocityRadPerSec =
-            angularVelocityInFieldRadPerSec - shooterKinematics.fieldRelativeSpeeds().omegaRadiansPerSecond;
-        double turretDesiredAngularVelocityRotPerSec = turretDesiredAngularVelocityRadPerSec / (2.0 * Math.PI);
+        double angularVelocityInFieldRadPerSec = ShotKinematicsUtil.calculateLineOfSightAngularVelocityRadPerSec(
+            shooterKinematics.shooterPosition().toTranslation2d(),
+            shooterKinematics.shooterVxField(),
+            shooterKinematics.shooterVyField(),
+            cachedShotData.compensatedTargetPosition()
+        );
+        double turretDesiredAngularVelocityRotPerSec = ShotKinematicsUtil.calculateTurretAngularVelocityRotPerSec(
+            shooterKinematics,
+            cachedShotData.compensatedTargetPosition()
+        );
 
         Logger.recordOutput(
             "Superstructure/turretDesiredAngularVelocityFieldRadPerSec",

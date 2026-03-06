@@ -26,6 +26,40 @@ public final class ShotKinematicsUtil {
         double shooterVyField
     ) {}
 
+    public static double calculateLineOfSightAngularVelocityRadPerSec(
+        Translation2d shooterPositionInField,
+        double shooterVxField,
+        double shooterVyField,
+        Translation2d targetPositionInField
+    ) {
+        Translation2d targetToShooterVector = shooterPositionInField.minus(targetPositionInField);
+        double vectorNormSquared = targetToShooterVector.getNorm() * targetToShooterVector.getNorm();
+        if (vectorNormSquared < 1e-6) {
+            return 0.0;
+        }
+
+        // For the target-to-shooter vector r = [x, y] and shooter velocity v = [vx, vy],
+        // d/dt(atan2(y, x)) = (x * vy - y * vx) / ||r||^2.
+        return (targetToShooterVector.getX() * shooterVyField
+            - targetToShooterVector.getY() * shooterVxField)
+            / vectorNormSquared;
+    }
+
+    public static double calculateTurretAngularVelocityRotPerSec(
+        ShooterKinematics shooterKinematics,
+        Translation2d targetPositionInField
+    ) {
+        double angularVelocityInFieldRadPerSec = calculateLineOfSightAngularVelocityRadPerSec(
+            shooterKinematics.shooterPosition().toTranslation2d(),
+            shooterKinematics.shooterVxField(),
+            shooterKinematics.shooterVyField(),
+            targetPositionInField
+        );
+        double turretDesiredAngularVelocityRadPerSec =
+            angularVelocityInFieldRadPerSec - shooterKinematics.fieldRelativeSpeeds().omegaRadiansPerSecond;
+        return turretDesiredAngularVelocityRadPerSec / (2.0 * Math.PI);
+    }
+
     public static ShooterKinematics calculateShooterKinematics(
         Pose2d robotPose,
         Pose3d shooterRelativePose,

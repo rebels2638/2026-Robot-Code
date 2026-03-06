@@ -79,4 +79,47 @@ class ShotKinematicsUtilTest {
         assertEquals(expectedVelocity.vxMetersPerSecond(), kinematics.shooterVxField(), EPS);
         assertEquals(expectedVelocity.vyMetersPerSecond(), kinematics.shooterVyField(), EPS);
     }
+
+    @Test
+    void calculateLineOfSightAngularVelocityRadPerSec_matchesAtan2DerivativeForPureTangentialMotion() {
+        double actual = ShotKinematicsUtil.calculateLineOfSightAngularVelocityRadPerSec(
+            new Translation2d(2.0, 0.0),
+            0.0,
+            1.0,
+            new Translation2d()
+        );
+
+        assertEquals(0.5, actual, EPS);
+    }
+
+    @Test
+    void calculateLineOfSightAngularVelocityRadPerSec_returnsZeroAtCoincidentTarget() {
+        double actual = ShotKinematicsUtil.calculateLineOfSightAngularVelocityRadPerSec(
+            new Translation2d(1.0, 1.0),
+            3.0,
+            -2.0,
+            new Translation2d(1.0, 1.0)
+        );
+
+        assertEquals(0.0, actual, EPS);
+    }
+
+    @Test
+    void calculateTurretAngularVelocityRotPerSec_subtractsRobotYawRateFromFieldRate() {
+        ShotKinematicsUtil.ShooterKinematics shooterKinematics = new ShotKinematicsUtil.ShooterKinematics(
+            new Translation3d(2.0, 0.0, 0.0),
+            new Translation2d(),
+            new Rotation2d(),
+            new ChassisSpeeds(0.0, 0.0, 0.1),
+            0.0,
+            1.0
+        );
+
+        double actual = ShotKinematicsUtil.calculateTurretAngularVelocityRotPerSec(
+            shooterKinematics,
+            new Translation2d()
+        );
+
+        assertEquals(0.4 / (2.0 * Math.PI), actual, EPS);
+    }
 }
