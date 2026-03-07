@@ -13,6 +13,7 @@ import edu.wpi.first.wpilibj2.command.ConditionalCommand;
 import edu.wpi.first.wpilibj2.command.InstantCommand;
 import edu.wpi.first.wpilibj2.command.SequentialCommandGroup;
 import edu.wpi.first.wpilibj2.command.WaitUntilCommand;
+import edu.wpi.first.wpilibj2.command.button.Trigger;
 import frc.robot.constants.AlignmentConstants;
 // import frc.robot.commands.autos.tower.ScoreL1;
 import frc.robot.constants.Constants;
@@ -122,16 +123,22 @@ public class RobotContainer {
         //     ).andThen(
         //         new InstantCommand(() -> Hopper.getInstance().setSetpoint(HopperSetpoint.OFF))
         //     )
+        // );
 
-        xboxDriver.getAButton().onTrue(
-            new InstantCommand(() -> superstructure.setDesiredSystemState(Superstructure.DesiredSystemState.HOME))
-        );
-        xboxDriver.getBButton().onTrue(
+        Trigger getRightBumper = new Trigger(() -> xboxDriver.getRightTrigger() > 0.5);
+        getRightBumper.onTrue(
             new InstantCommand(() -> superstructure.setDesiredSystemState(Superstructure.DesiredSystemState.SHOOTING))
         );
-        xboxDriver.getXButton().onTrue(
-            new InstantCommand(() -> superstructure.setDesiredSystemState(Superstructure.DesiredSystemState.TRACKING))
+        getRightBumper.onFalse(
+            new InstantCommand(() -> superstructure.setDesiredSystemState(Superstructure.DesiredSystemState.HOME))
         );
+
+        // xboxDriver.getBButton().onTrue(
+        //     new InstantCommand(() -> superstructure.setDesiredSystemState(Superstructure.DesiredSystemState.SHOOTING))
+        // );
+        // xboxDriver.getXButton().onTrue(
+        //     new InstantCommand(() -> superstructure.setDesiredSystemState(Superstructure.DesiredSystemState.TRACKING))
+        // );
         // );
 
         // xboxDriver.getAButton().onTrue(
