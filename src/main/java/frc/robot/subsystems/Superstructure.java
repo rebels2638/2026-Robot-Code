@@ -270,9 +270,8 @@ public class Superstructure extends SubsystemBase {
 
         long shotReadinessStartNanos = LoopCycleProfiler.markStart();
         cachedShotReadinessData = calculateShotReadinessData(cachedShotComputationContext);
-        if (Constants.VERBOSE_LOGGING_ENABLED) {
-            logShotReadinessData(cachedShotReadinessData);
-        }
+        logShotReadinessData(cachedShotReadinessData);
+        
         LoopCycleProfiler.endSection("Superstructure/ShotReadiness", shotReadinessStartNanos);
 
         long stateTransitionsStartNanos = LoopCycleProfiler.markStart();

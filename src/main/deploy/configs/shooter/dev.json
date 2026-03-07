@@ -130,7 +130,7 @@
   "turretMaxVelocityDegPerSec": 3000.0,
   "turretMaxAccelerationDegPerSec2": 9000.0,
   "turretMaxJerkDegPerSec3": 50000.0,
-  "turretAngleToleranceRotations": 0.01388,
+  "turretAngleToleranceRotations": 0.0277,
   "flywheelCanId": 31,
   "flywheelFollowerCanId": 33,
   "isFlywheelInverted": true,

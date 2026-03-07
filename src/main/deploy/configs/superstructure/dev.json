@@ -1,5 +1,5 @@
 {
-  "shotDurationSeconds": 0.2,
+  "shotDurationSeconds": 0.1,
   "alternatingIntakeToggleSeconds": 1.0,
   "ballsPerSecond": 9.5,
   "turretRotationBufferDeg": 20.0,
