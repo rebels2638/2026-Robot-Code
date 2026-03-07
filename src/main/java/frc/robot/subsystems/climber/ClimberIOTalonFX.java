@@ -91,14 +91,27 @@ public class ClimberIOTalonFX implements ClimberIO {
             climberPositionStatusSignal, climberVelocityStatusSignal,
             climberMotorVoltage, climberTorqueCurrent, climberTemperature);
 
+        PhoenixUtil.registerSignals(
+            config.canBusName,
+            climberPositionStatusSignal,
+            climberVelocityStatusSignal,
+            climberMotorVoltage,
+            climberTorqueCurrent,
+            climberTemperature
+        );
+
         climberMotor.optimizeBusUtilization();
     }
 
     @Override
     public void updateInputs(ClimberIOInputs inputs) {
-        BaseStatusSignal.refreshAll(
-            climberPositionStatusSignal, climberVelocityStatusSignal,
-            climberMotorVoltage, climberTorqueCurrent, climberTemperature);
+        inputs.climberMotorConnected = BaseStatusSignal.isAllGood(
+            climberPositionStatusSignal,
+            climberVelocityStatusSignal,
+            climberMotorVoltage,
+            climberTorqueCurrent,
+            climberTemperature
+        );
 
         inputs.positionRotations = climberPositionStatusSignal.getValue().in(Rotations);
         inputs.velocityRotationsPerSec = climberVelocityStatusSignal.getValue().in(RotationsPerSecond);

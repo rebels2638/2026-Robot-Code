@@ -9,14 +9,17 @@ import frc.robot.lib.util.DashboardMotorControlLoopConfigurator.MotorControlLoop
 public interface ModuleIO {
     @AutoLog
     class ModuleIOInputs {
+        public boolean driveMotorConnected = false;
         public double drivePositionMeters = 0;
         public double driveVelocityMetersPerSec = 0;
         public double driveAppliedVolts = 0;
 
+        public boolean steerMotorConnected = false;
         public Rotation2d steerPosition = new Rotation2d();
         public double steerVelocityRadPerSec = 0;
         public double steerAppliedVolts = 0;
 
+        public boolean steerEncoderConnected = false;
         public Rotation2d steerEncoderAbsolutePosition = new Rotation2d();
         public Rotation2d steerEncoderPosition = new Rotation2d();
 

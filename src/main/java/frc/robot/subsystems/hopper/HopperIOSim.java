@@ -53,6 +53,7 @@ public class HopperIOSim implements HopperIO {
 
         hopperSim.update(dt);
 
+        inputs.hopperMotorConnected = true;
         inputs.velocityRotationsPerSec = hopperSim.getAngularVelocityRadPerSec() / (2 * Math.PI);
         inputs.appliedVolts = hopperSim.getInputVoltage();
         inputs.torqueCurrent = hopperSim.getCurrentDrawAmps();

@@ -144,6 +144,11 @@ public class ShooterIOSim implements ShooterIO {
             );
         }
 
+        inputs.hoodMotorConnected = true;
+        inputs.turretMotorConnected = true;
+        inputs.flywheelMotorConnected = true;
+        inputs.flywheelFollowerMotorConnected = true;
+
         inputs.hoodAngleRotations = hoodSim.getAngularPositionRotations();
         inputs.hoodVelocityRotationsPerSec = hoodSim.getAngularVelocityRadPerSec() / (2 * Math.PI);
         inputs.hoodAppliedVolts = hoodSim.getInputVoltage();

@@ -254,6 +254,27 @@ public class ShooterIOTalonFX implements ShooterIO {
             turretPositionStatusSignal, turretVelocityStatusSignal,
             flywheelVelocityStatusSignal);
 
+        PhoenixUtil.registerSignals(
+            config.canBusName,
+            hoodTorqueCurrent,
+            hoodTemperature,
+            hoodMotorVoltage,
+            turretTorqueCurrent,
+            turretTemperature,
+            turretMotorVoltage,
+            flywheelTorqueCurrent,
+            flywheelTemperature,
+            flywheelMotorVoltage,
+            flywheelFollowerTorqueCurrent,
+            flywheelFollowerTemperature,
+            flywheelFollowerMotorVoltage,
+            hoodPositionStatusSignal,
+            hoodVelocityStatusSignal,
+            turretPositionStatusSignal,
+            turretVelocityStatusSignal,
+            flywheelVelocityStatusSignal
+        );
+
         hoodMotor.optimizeBusUtilization();
         turretMotor.optimizeBusUtilization();
         flywheelMotor.optimizeBusUtilization();
@@ -262,14 +283,31 @@ public class ShooterIOTalonFX implements ShooterIO {
 
     @Override
     public void updateInputs(ShooterIOInputs inputs) {
-        BaseStatusSignal.refreshAll(
-            hoodTorqueCurrent, hoodTemperature, hoodMotorVoltage,
-            turretTorqueCurrent, turretTemperature, turretMotorVoltage,
-            flywheelTorqueCurrent, flywheelTemperature, flywheelMotorVoltage,
-            flywheelFollowerTorqueCurrent, flywheelFollowerTemperature, flywheelFollowerMotorVoltage,
-            hoodPositionStatusSignal, hoodVelocityStatusSignal,
-            turretPositionStatusSignal, turretVelocityStatusSignal,
-            flywheelVelocityStatusSignal);
+        inputs.hoodMotorConnected = BaseStatusSignal.isAllGood(
+            hoodTorqueCurrent,
+            hoodTemperature,
+            hoodMotorVoltage,
+            hoodPositionStatusSignal,
+            hoodVelocityStatusSignal
+        );
+        inputs.turretMotorConnected = BaseStatusSignal.isAllGood(
+            turretTorqueCurrent,
+            turretTemperature,
+            turretMotorVoltage,
+            turretPositionStatusSignal,
+            turretVelocityStatusSignal
+        );
+        inputs.flywheelMotorConnected = BaseStatusSignal.isAllGood(
+            flywheelTorqueCurrent,
+            flywheelTemperature,
+            flywheelMotorVoltage,
+            flywheelVelocityStatusSignal
+        );
+        inputs.flywheelFollowerMotorConnected = BaseStatusSignal.isAllGood(
+            flywheelFollowerTorqueCurrent,
+            flywheelFollowerTemperature,
+            flywheelFollowerMotorVoltage
+        );
 
         inputs.hoodAngleRotations = hoodPositionStatusSignal.getValue().in(Rotations);
         inputs.hoodVelocityRotationsPerSec = hoodVelocityStatusSignal.getValue().in(RotationsPerSecond);

@@ -141,17 +141,38 @@ public class IntakeIOTalonFX implements IntakeIO {
             pivotTorqueCurrent, pivotTemperature,
             pivotPositionStatusSignal, pivotVelocityStatusSignal, pivotMotorVoltage);
 
+        PhoenixUtil.registerSignals(
+            config.canBusName,
+            rollerTorqueCurrent,
+            rollerTemperature,
+            rollerVelocityStatusSignal,
+            rollerMotorVoltage,
+            pivotTorqueCurrent,
+            pivotTemperature,
+            pivotPositionStatusSignal,
+            pivotVelocityStatusSignal,
+            pivotMotorVoltage
+        );
+
         rollerMotor.optimizeBusUtilization();
         pivotMotor.optimizeBusUtilization();
     }
 
     @Override
     public void updateInputs(IntakeIOInputs inputs) {
-        BaseStatusSignal.refreshAll(
-            rollerTorqueCurrent, rollerTemperature,
-            rollerVelocityStatusSignal, rollerMotorVoltage,
-            pivotTorqueCurrent, pivotTemperature,
-            pivotPositionStatusSignal, pivotVelocityStatusSignal, pivotMotorVoltage);
+        inputs.rollerMotorConnected = BaseStatusSignal.isAllGood(
+            rollerTorqueCurrent,
+            rollerTemperature,
+            rollerVelocityStatusSignal,
+            rollerMotorVoltage
+        );
+        inputs.pivotMotorConnected = BaseStatusSignal.isAllGood(
+            pivotTorqueCurrent,
+            pivotTemperature,
+            pivotPositionStatusSignal,
+            pivotVelocityStatusSignal,
+            pivotMotorVoltage
+        );
 
         inputs.rollerVelocityRotationsPerSec = rollerVelocityStatusSignal.getValue().in(RotationsPerSecond);
         inputs.rollerAppliedVolts = rollerMotorVoltage.getValue().in(Volts);

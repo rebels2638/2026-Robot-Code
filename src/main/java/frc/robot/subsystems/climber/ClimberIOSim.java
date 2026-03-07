@@ -62,6 +62,7 @@ public class ClimberIOSim implements ClimberIO {
 
         climberSim.update(dt);
 
+        inputs.climberMotorConnected = true;
         inputs.positionRotations = climberSim.getAngularPositionRotations();
         inputs.velocityRotationsPerSec = climberSim.getAngularVelocityRadPerSec() / (2 * Math.PI);
         inputs.appliedVolts = climberSim.getInputVoltage();

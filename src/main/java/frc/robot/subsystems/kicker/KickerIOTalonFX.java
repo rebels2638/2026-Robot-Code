@@ -80,14 +80,25 @@ public class KickerIOTalonFX implements KickerIO {
             kickerTorqueCurrent, kickerTemperature,
             kickerVelocityStatusSignal, kickerMotorVoltage);
 
+        PhoenixUtil.registerSignals(
+            config.canBusName,
+            kickerTorqueCurrent,
+            kickerTemperature,
+            kickerVelocityStatusSignal,
+            kickerMotorVoltage
+        );
+
         kickerMotor.optimizeBusUtilization();
     }
 
     @Override
     public void updateInputs(KickerIOInputs inputs) {
-        BaseStatusSignal.refreshAll(
-            kickerTorqueCurrent, kickerTemperature,
-            kickerVelocityStatusSignal, kickerMotorVoltage);
+        inputs.kickerMotorConnected = BaseStatusSignal.isAllGood(
+            kickerTorqueCurrent,
+            kickerTemperature,
+            kickerVelocityStatusSignal,
+            kickerMotorVoltage
+        );
 
         inputs.velocityRotationsPerSec = kickerVelocityStatusSignal.getValue().in(RotationsPerSecond);
         inputs.appliedVolts = kickerMotorVoltage.getValue().in(Volts);

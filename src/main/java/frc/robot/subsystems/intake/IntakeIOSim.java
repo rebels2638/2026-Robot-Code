@@ -91,11 +91,13 @@ public class IntakeIOSim implements IntakeIO {
         rollerSim.update(dt);
         pivotSim.update(dt);
 
+        inputs.rollerMotorConnected = true;
         inputs.rollerVelocityRotationsPerSec = rollerSim.getAngularVelocityRadPerSec() / (2 * Math.PI);
         inputs.rollerAppliedVolts = rollerSim.getInputVoltage();
         inputs.rollerTorqueCurrent = rollerSim.getCurrentDrawAmps();
         inputs.rollerTemperatureFahrenheit = 70.0;
 
+        inputs.pivotMotorConnected = true;
         inputs.pivotAngleRotations = pivotSim.getAngularPositionRotations();
         inputs.pivotVelocityRotationsPerSec = pivotSim.getAngularVelocityRadPerSec() / (2 * Math.PI);
         inputs.pivotAppliedVolts = pivotSim.getInputVoltage();

@@ -9,10 +9,13 @@ package frc.robot.lib.util;
 
 import com.ctre.phoenix6.BaseStatusSignal;
 import com.ctre.phoenix6.StatusCode;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.function.Supplier;
 
 public class PhoenixUtil {
-  private static BaseStatusSignal[] registeredSignals = new BaseStatusSignal[0];
+  private static final Map<String, BaseStatusSignal[]> registeredSignalsByNetwork =
+      new LinkedHashMap<>();
 
   /** Attempts to run the command until no error is produced. */
   public static void tryUntilOk(int maxAttempts, Supplier<StatusCode> command) {
@@ -22,18 +25,23 @@ public class PhoenixUtil {
     }
   }
 
-  /** Registers a set of signals for synchronized refresh. */
-  public static void registerSignals(BaseStatusSignal... signals) {
+  /** Registers a set of signals for synchronized refresh on a specific Phoenix network. */
+  public static synchronized void registerSignals(String network, BaseStatusSignal... signals) {
+    String normalizedNetwork = network == null ? "" : network;
+    BaseStatusSignal[] registeredSignals =
+        registeredSignalsByNetwork.getOrDefault(normalizedNetwork, new BaseStatusSignal[0]);
     BaseStatusSignal[] newSignals = new BaseStatusSignal[registeredSignals.length + signals.length];
     System.arraycopy(registeredSignals, 0, newSignals, 0, registeredSignals.length);
     System.arraycopy(signals, 0, newSignals, registeredSignals.length, signals.length);
-    registeredSignals = newSignals;
+    registeredSignalsByNetwork.put(normalizedNetwork, newSignals);
   }
 
   /** Refresh all registered signals once per main robot loop. */
-  public static void refreshAll() {
-    if (registeredSignals.length > 0) {
-      BaseStatusSignal.refreshAll(registeredSignals);
+  public static synchronized void refreshAll() {
+    for (BaseStatusSignal[] registeredSignals : registeredSignalsByNetwork.values()) {
+      if (registeredSignals.length > 0) {
+        BaseStatusSignal.refreshAll(registeredSignals);
+      }
     }
   }
 }

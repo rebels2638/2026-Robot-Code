@@ -57,14 +57,25 @@ public class GyroIOPigeon2 implements GyroIO {
         odometryTimestampQueue = PhoenixOdometryThread.getInstance().makeTimestampQueue();
         yawPositionQueue = PhoenixOdometryThread.getInstance().registerSignal(yawSignal.clone());
 
-        PhoenixUtil.registerSignals(yawSignal, rollSignal, pitchSignal, yawVelocitySignal);
+        PhoenixUtil.registerSignals(
+            gyroConfig.canBusName,
+            yawSignal,
+            rollSignal,
+            pitchSignal,
+            yawVelocitySignal
+        );
 
         gyro.optimizeBusUtilization();
     }
 
     @Override
     public synchronized void updateInputs(GyroIOInputs inputs) {
-        inputs.isConnected = true;
+        inputs.isConnected = BaseStatusSignal.isAllGood(
+            yawSignal,
+            rollSignal,
+            pitchSignal,
+            yawVelocitySignal
+        );
 
         double yawRadians = MathUtil.angleModulus(
             BaseStatusSignal.getLatencyCompensatedValue(yawSignal, yawVelocitySignal).in(Radians)

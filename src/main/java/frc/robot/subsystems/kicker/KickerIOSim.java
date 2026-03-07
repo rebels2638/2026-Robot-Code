@@ -60,6 +60,7 @@ public class KickerIOSim implements KickerIO {
 
         kickerSim.update(dt);
 
+        inputs.kickerMotorConnected = true;
         inputs.velocityRotationsPerSec = kickerSim.getAngularVelocityRadPerSec() / (2 * Math.PI);
         inputs.appliedVolts = kickerSim.getInputVoltage();
         inputs.torqueCurrent = kickerSim.getCurrentDrawAmps();

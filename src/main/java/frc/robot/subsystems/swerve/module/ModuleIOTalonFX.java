@@ -223,6 +223,7 @@ public class ModuleIOTalonFX implements ModuleIO {
         );
 
         PhoenixUtil.registerSignals(
+            generalConfig.canBusName,
             driveTorqueCurrent,
             driveTemperature,
             driveMotorVoltage,
@@ -244,6 +245,25 @@ public class ModuleIOTalonFX implements ModuleIO {
 
     @Override
     public void updateInputs(ModuleIOInputs inputs) {
+        inputs.driveMotorConnected = BaseStatusSignal.isAllGood(
+            drivePositionStatusSignal,
+            driveVelocityStatusSignal,
+            driveMotorVoltage,
+            driveTorqueCurrent,
+            driveTemperature
+        );
+        inputs.steerMotorConnected = BaseStatusSignal.isAllGood(
+            steerPositionStatusSignal,
+            steerVelocityStatusSignal,
+            steerMotorVoltage,
+            steerTorqueCurrent,
+            steerTemperature
+        );
+        inputs.steerEncoderConnected = BaseStatusSignal.isAllGood(
+            steerEncoderAbsolutePosition,
+            steerEncoderPositionStatusSignal
+        );
+
         inputs.drivePositionMeters = BaseStatusSignal.getLatencyCompensatedValue(drivePositionStatusSignal, driveVelocityStatusSignal).in(Rotation);
         inputs.driveVelocityMetersPerSec = driveVelocityStatusSignal.getValue().in(RotationsPerSecond);
         inputs.driveAppliedVolts = driveMotorVoltage.getValue().in(Volts);
