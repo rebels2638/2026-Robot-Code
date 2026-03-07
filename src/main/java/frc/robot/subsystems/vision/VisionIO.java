@@ -33,5 +33,9 @@ public interface VisionIO {
         PHOTONVISION
     }
 
+    public default boolean publishRobotOrientation() {
+        return false;
+    }
+
     public default void updateInputs(VisionIOInputs inputs) {}
 }

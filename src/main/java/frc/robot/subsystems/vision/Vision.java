@@ -21,12 +21,13 @@ import frc.robot.subsystems.vision.VisionIO.PoseObservationType;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Consumer;
-import java.util.function.Supplier;
+import java.util.function.DoubleSupplier;
 
 import org.littletonrobotics.junction.Logger;
 
 public class Vision extends SubsystemBase {
     private static final double DETAILED_POSE_LOG_PERIOD_SECONDS = 0.1;
+    private static final double IMU_MODE_REASSERT_PERIOD_SECONDS = 1.0;
     private static final boolean ENABLE_DETAILED_POSE_LOGGING =
         Constants.currentMode == Constants.Mode.REPLAY || Constants.VERBOSE_LOGGING_ENABLED;
 
@@ -54,7 +55,7 @@ public class Vision extends SubsystemBase {
             }
             instance = new Vision(
                 robotState::addVisionObservation,
-                () -> Rotation2d.fromRadians(robotState.getFieldRelativeSpeeds().omegaRadiansPerSecond),
+                () -> Math.toDegrees(robotState.getRobotRelativeSpeeds().omegaRadiansPerSecond),
                 ioList.toArray(new VisionIO[0])
             );
 
@@ -62,19 +63,25 @@ public class Vision extends SubsystemBase {
         return instance;
     }
     
-    private final Consumer<VisionObservation>  consumer;
-    private final Supplier<Rotation2d> rotationRateSupplier;
+    private final Consumer<VisionObservation> consumer;
+    private final DoubleSupplier rotationRateDegreesPerSecondSupplier;
     private final VisionIO[] io;
     private final VisionIOInputsAutoLogged[] inputs;
     private final Alert[] disconnectedAlerts;
-    private final TimeInterpolatableBuffer<Rotation2d> rotationRateBuffer;
+    private final TimeInterpolatableBuffer<Double> rotationRateBuffer;
     private final String[] limelightNames;
+    private final boolean[] lastConnectedStates;
     private int lastImuMode = Integer.MIN_VALUE;
+    private double lastImuModeWriteTimestampSeconds = Double.NEGATIVE_INFINITY;
     private double lastDetailedPoseLogTimestampSeconds = Double.NEGATIVE_INFINITY;
 
-    private Vision(Consumer<VisionObservation> consumer, Supplier<Rotation2d> rotationRateSupplier, VisionIO... io) {
+    private Vision(
+        Consumer<VisionObservation> consumer,
+        DoubleSupplier rotationRateDegreesPerSecondSupplier,
+        VisionIO... io
+    ) {
         this.consumer = consumer;
-        this.rotationRateSupplier = rotationRateSupplier;
+        this.rotationRateDegreesPerSecondSupplier = rotationRateDegreesPerSecondSupplier;
         this.io = io;
 
         // Initialize inputs
@@ -92,7 +99,8 @@ public class Vision extends SubsystemBase {
         }
 
         // Initialize rotation rate buffer (keep 2 seconds of data)
-        this.rotationRateBuffer = TimeInterpolatableBuffer.createBuffer(2.0);
+        this.rotationRateBuffer = TimeInterpolatableBuffer.createDoubleBuffer(2.0);
+        this.lastConnectedStates = new boolean[io.length];
 
         List<String> limelightNameList = new ArrayList<>();
         if (config.cameras != null) {
@@ -131,18 +139,36 @@ public class Vision extends SubsystemBase {
         long imuModeStartNanos = LoopCycleProfiler.markStart();
         double currentTime = Timer.getTimestamp();
         int imuMode = DriverStation.isDisabled() ? config.disabledImuMode : config.enabledImuMode;
-        if (imuMode != lastImuMode) {
-            for (String cameraName : limelightNames) {
-                LimelightHelpers.SetIMUMode(cameraName, imuMode);
-            }
-            lastImuMode = imuMode;
+        boolean wroteImuModeThisCycle = false;
+        if (imuMode != lastImuMode
+            || currentTime - lastImuModeWriteTimestampSeconds >= IMU_MODE_REASSERT_PERIOD_SECONDS) {
+            writeImuMode(imuMode, currentTime);
+            wroteImuModeThisCycle = true;
         }
         LoopCycleProfiler.endSection("Vision/SetIMUMode", imuModeStartNanos);
 
+        long orientationPublishStartNanos = LoopCycleProfiler.markStart();
+        boolean shouldFlushRobotOrientation = false;
+        for (VisionIO ioImplementation : io) {
+            shouldFlushRobotOrientation |= ioImplementation.publishRobotOrientation();
+        }
+        if (shouldFlushRobotOrientation) {
+            LimelightHelpers.Flush();
+        }
+        LoopCycleProfiler.endSection("Vision/PublishRobotOrientation", orientationPublishStartNanos);
+
         long inputUpdateStartNanos = LoopCycleProfiler.markStart();
+        boolean sawReconnectThisCycle = false;
         for (int i = 0; i < io.length; i++) {
             io[i].updateInputs(inputs[i]);
+            if (inputs[i].connected && !lastConnectedStates[i]) {
+                sawReconnectThisCycle = true;
+            }
+            lastConnectedStates[i] = inputs[i].connected;
             Logger.processInputs("Vision/Camera" + Integer.toString(i), inputs[i]);
+        }
+        if (sawReconnectThisCycle && !wroteImuModeThisCycle) {
+            writeImuMode(imuMode, currentTime);
         }
         LoopCycleProfiler.endSection("Vision/UpdateAndProcessInputs", inputUpdateStartNanos);
 
@@ -150,7 +176,7 @@ public class Vision extends SubsystemBase {
         long rotationRateStartNanos = LoopCycleProfiler.markStart();
 
         // Store rotation rate in buffer
-        rotationRateBuffer.addSample(currentTime, rotationRateSupplier.get());
+        rotationRateBuffer.addSample(currentTime, rotationRateDegreesPerSecondSupplier.getAsDouble());
         LoopCycleProfiler.endSection("Vision/RotationRateBufferUpdate", rotationRateStartNanos);
 
         // Initialize logging values
@@ -192,7 +218,7 @@ public class Vision extends SubsystemBase {
                 boolean rotationRateTooHigh = false;
                 var rotationRateAtTime = rotationRateBuffer.getSample(observation.timestamp());
                 if (rotationRateAtTime.isPresent()) {
-                    double observationRotationRateDegreesPerSecond = Math.abs(rotationRateAtTime.get().getDegrees());
+                    double observationRotationRateDegreesPerSecond = Math.abs(rotationRateAtTime.get());
                     
                     // Use different thresholds based on observation type
                     double maxRotationRateThreshold;
@@ -318,5 +344,13 @@ public class Vision extends SubsystemBase {
         LoopCycleProfiler.endSection("Vision/SummaryLogging", summaryLogStartNanos);
 
         LoopCycleProfiler.endSection("Vision/PeriodicTotal", periodicStartNanos);
+    }
+
+    private void writeImuMode(int imuMode, double currentTime) {
+        for (String cameraName : limelightNames) {
+            LimelightHelpers.SetIMUMode(cameraName, imuMode);
+        }
+        lastImuMode = imuMode;
+        lastImuModeWriteTimestampSeconds = currentTime;
     }
 }
