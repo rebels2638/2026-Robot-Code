@@ -13,10 +13,8 @@ import edu.wpi.first.wpilibj2.command.ConditionalCommand;
 import edu.wpi.first.wpilibj2.command.InstantCommand;
 import edu.wpi.first.wpilibj2.command.SequentialCommandGroup;
 import edu.wpi.first.wpilibj2.command.WaitUntilCommand;
-import frc.robot.commands.AutoClimbCommand;
 import frc.robot.constants.AlignmentConstants;
 // import frc.robot.commands.autos.tower.ScoreL1;
-import frc.robot.constants.ClimbingConstants;
 import frc.robot.constants.Constants;
 import frc.robot.lib.BLine.FollowPath;
 import frc.robot.lib.BLine.Path;
@@ -134,7 +132,6 @@ public class RobotContainer {
         xboxDriver.getXButton().onTrue(
             new InstantCommand(() -> superstructure.setDesiredSystemState(Superstructure.DesiredSystemState.TRACKING))
         );
-        xboxDriver.getYButton().onTrue(new AutoClimbCommand(ClimbingConstants.DEFAULT_TARGET));
         // );
 
         // xboxDriver.getAButton().onTrue(
