@@ -11,6 +11,7 @@ import edu.wpi.first.networktables.NetworkTableInstance;
 import edu.wpi.first.networktables.TimestampedDoubleArray;
 import edu.wpi.first.wpilibj.RobotController;
 import frc.robot.lib.util.LimelightHelpers;
+
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -86,12 +87,15 @@ public class VisionIOLimelight implements VisionIO {
         // Read new pose observations from NetworkTables
         Set<Integer> tagIds = new HashSet<>();
         List<PoseObservation> poseObservations = new ArrayList<>();
+        int rawMegatag1ObservationCount = 0;
+        int rawMegatag2ObservationCount = 0;
         for (TimestampedDoubleArray rawSample : megatag1Subscriber.readQueue()) {
             collectTagIds(tagIds, rawSample.value);
             Optional<PoseObservation> poseObservation =
                 parsePoseObservation(rawSample, PoseObservationType.MEGATAG_1);
             if (poseObservation.isPresent()) {
                 poseObservations.add(poseObservation.get());
+                rawMegatag1ObservationCount++;
             }
         }
         for (TimestampedDoubleArray rawSample : megatag2Subscriber.readQueue()) {
@@ -100,16 +104,22 @@ public class VisionIOLimelight implements VisionIO {
                 parsePoseObservation(rawSample, PoseObservationType.MEGATAG_2);
             if (poseObservation.isPresent()) {
                 poseObservations.add(poseObservation.get());
+                rawMegatag2ObservationCount++;
             }
         }
+        VisionUtil.CoalescedObservationsResult coalescedObservations =
+            VisionUtil.coalesceCorrelatedObservations(poseObservations);
 
-        // Save pose observations to inputs object
-        inputs.robotPoseObservations = new PoseObservation[poseObservations.size()];
-        for (int i = 0; i < poseObservations.size(); i++) {
-            inputs.robotPoseObservations[i] = poseObservations.get(i);
-        }
+        inputs.robotPoseObservations = coalescedObservations.observations().toArray(new PoseObservation[0]);
+        inputs.rawMegatag1ObservationCount = rawMegatag1ObservationCount;
+        inputs.rawMegatag2ObservationCount = rawMegatag2ObservationCount;
+        inputs.rawObservationCount = coalescedObservations.rawObservationCount();
+        inputs.coalescedObservationCount = coalescedObservations.coalescedObservationCount();
+        inputs.coalescedDropCount = coalescedObservations.coalescedDropCount();
+        inputs.coalescedGroupSizes = coalescedObservations.groupSizes();
+        inputs.coalescedWinnerTypes = coalescedObservations.winnerTypes();
+        inputs.coalescedDecisionReasons = coalescedObservations.decisionReasons();
 
-        // Save tag IDs to inputs objects
         inputs.tagIds = new int[tagIds.size()];
         int i = 0;
         for (int id : tagIds) {

@@ -12,6 +12,14 @@ public interface VisionIO {
 
         public int[] tagIds = new int[0];
         public Pose3d[] tagPoses = new Pose3d[0];
+        public int rawMegatag1ObservationCount = 0;
+        public int rawMegatag2ObservationCount = 0;
+        public int rawObservationCount = 0;
+        public int coalescedObservationCount = 0;
+        public int coalescedDropCount = 0;
+        public int[] coalescedGroupSizes = new int[0];
+        public String[] coalescedWinnerTypes = new String[0];
+        public String[] coalescedDecisionReasons = new String[0];
         public TargetObservation latestTargetObservation = new TargetObservation(Rotation2d.kZero, Rotation2d.kZero);
     }
 

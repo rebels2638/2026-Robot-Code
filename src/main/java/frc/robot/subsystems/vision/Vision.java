@@ -37,6 +37,7 @@ public class Vision extends SubsystemBase {
         ConfigLoader.getModeFolder(Constants.SimOnlySubsystems.VISION),
         VisionConfig.class
     );
+
     public static Vision getInstance() {
         if (instance == null) {
             RobotState robotState = RobotState.getInstance();
@@ -191,6 +192,11 @@ public class Vision extends SubsystemBase {
         int totalAcceptedCount = 0;
         int totalRejectedCount = 0;
         int totalObservationCount = 0;
+        int totalRawMegatag1Count = 0;
+        int totalRawMegatag2Count = 0;
+        int totalRawObservationCount = 0;
+        int totalCoalescedObservationCount = 0;
+        int totalCoalescedDropCount = 0;
 
         // Loop over cameras
         for (int cameraIndex = 0; cameraIndex < io.length; cameraIndex++) {
@@ -210,17 +216,20 @@ public class Vision extends SubsystemBase {
             List<String> poseTypesRejected = shouldLogDetailedPoseArrays ? new ArrayList<>(poseObservationCount) : null;
             int acceptedCount = 0;
             int rejectedCount = 0;
+            totalRawMegatag1Count += inputs[cameraIndex].rawMegatag1ObservationCount;
+            totalRawMegatag2Count += inputs[cameraIndex].rawMegatag2ObservationCount;
+            totalRawObservationCount += inputs[cameraIndex].rawObservationCount;
+            totalCoalescedObservationCount += inputs[cameraIndex].coalescedObservationCount;
+            totalCoalescedDropCount += inputs[cameraIndex].coalescedDropCount;
 
             // Loop over pose observations
             for (var observation : inputs[cameraIndex].robotPoseObservations) {
                 totalObservationCount++;
-                // Check rotation rate at observation timestamp
                 boolean rotationRateTooHigh = false;
                 var rotationRateAtTime = rotationRateBuffer.getSample(observation.timestamp());
                 if (rotationRateAtTime.isPresent()) {
                     double observationRotationRateDegreesPerSecond = Math.abs(rotationRateAtTime.get());
-                    
-                    // Use different thresholds based on observation type
+
                     double maxRotationRateThreshold;
                     if (observation.type() == PoseObservationType.MEGATAG_1) {
                         maxRotationRateThreshold = config.maxRotationRateMegatag1DegreesPerSecond;
@@ -230,21 +239,18 @@ public class Vision extends SubsystemBase {
                         // Default to MegaTag1 threshold for other types (like PhotonVision)
                         maxRotationRateThreshold = config.maxRotationRateMegatag1DegreesPerSecond;
                     }
-                    
+
                     rotationRateTooHigh = observationRotationRateDegreesPerSecond > maxRotationRateThreshold;
                 }
-                
-                // Check whether to reject pose
-                boolean rejectPose =
-                    observation.tagCount() == 0 // Must have at least one tag
-                        || (observation.tagCount() == 1
-                            && observation.ambiguity() > config.maxAmbiguity) // Cannot be high ambiguity
-                        || Math.abs(observation.pose().getZ())
-                            > config.maxZError // Must have realistic Z coordinate
-                        || !VisionUtil.isPoseWithinField(observation.pose()) // Must be within field bounds
-                        || rotationRateTooHigh; // Must not be rotating too fast
 
-                // Add pose to log
+                boolean rejectPose =
+                    observation.tagCount() == 0
+                        || (observation.tagCount() == 1
+                            && observation.ambiguity() > config.maxAmbiguity)
+                        || Math.abs(observation.pose().getZ()) > config.maxZError
+                        || !VisionUtil.isPoseWithinField(observation.pose())
+                        || rotationRateTooHigh;
+
                 if (shouldLogDetailedPoseArrays) {
                     robotPoses.add(observation.pose());
                     poseTypes.add(observation.type().name());
@@ -258,12 +264,10 @@ public class Vision extends SubsystemBase {
                     }
                 }
 
-                // Skip if rejected
                 if (rejectPose) {
                     continue;
                 }
 
-                // Calculate standard deviations
                 double stdDevFactor =
                     Math.pow(observation.averageTagDistance(), 2.0) / observation.tagCount();
                 double linearStdDev = config.linearStdDevBaseline * stdDevFactor;
@@ -296,7 +300,6 @@ public class Vision extends SubsystemBase {
                     poseTypesAccepted.add(observation.type().name());
                 }
 
-                // Send vision observation
                 consumer.accept(
                     new VisionObservation(
                         observation.pose().toPose2d(),
@@ -306,10 +309,41 @@ public class Vision extends SubsystemBase {
                 );
             }
 
-            // Log camera datadata
             Logger.recordOutput(cameraTimingPrefix + "/PoseObservationCount", poseObservationCount);
             Logger.recordOutput(cameraTimingPrefix + "/PoseAcceptedCount", acceptedCount);
             Logger.recordOutput(cameraTimingPrefix + "/PoseRejectedCount", rejectedCount);
+            Logger.recordOutput(
+                cameraTimingPrefix + "/RawMegatag1ObservationCount",
+                inputs[cameraIndex].rawMegatag1ObservationCount
+            );
+            Logger.recordOutput(
+                cameraTimingPrefix + "/RawMegatag2ObservationCount",
+                inputs[cameraIndex].rawMegatag2ObservationCount
+            );
+            Logger.recordOutput(
+                cameraTimingPrefix + "/RawObservationCount",
+                inputs[cameraIndex].rawObservationCount
+            );
+            Logger.recordOutput(
+                cameraTimingPrefix + "/CoalescedObservationCount",
+                inputs[cameraIndex].coalescedObservationCount
+            );
+            Logger.recordOutput(
+                cameraTimingPrefix + "/CoalescedDropCount",
+                inputs[cameraIndex].coalescedDropCount
+            );
+            Logger.recordOutput(
+                cameraTimingPrefix + "/CoalescedGroupSizes",
+                inputs[cameraIndex].coalescedGroupSizes
+            );
+            Logger.recordOutput(
+                cameraTimingPrefix + "/CoalescedWinnerTypes",
+                inputs[cameraIndex].coalescedWinnerTypes
+            );
+            Logger.recordOutput(
+                cameraTimingPrefix + "/CoalescedDecisionReasons",
+                inputs[cameraIndex].coalescedDecisionReasons
+            );
             if (shouldLogDetailedPoseArrays) {
                 Logger.recordOutput(cameraTimingPrefix + "/TagPoses", inputs[cameraIndex].tagPoses);
                 Logger.recordOutput(
@@ -336,11 +370,18 @@ public class Vision extends SubsystemBase {
         }
         LoopCycleProfiler.endSection("Vision/CameraProcessing", cameraProcessingStartNanos);
 
-        // Log summary data
         long summaryLogStartNanos = LoopCycleProfiler.markStart();
         Logger.recordOutput("Vision/Summary/PoseObservationCount", totalObservationCount);
         Logger.recordOutput("Vision/Summary/PoseAcceptedCount", totalAcceptedCount);
         Logger.recordOutput("Vision/Summary/PoseRejectedCount", totalRejectedCount);
+        Logger.recordOutput("Vision/Summary/RawMegatag1ObservationCount", totalRawMegatag1Count);
+        Logger.recordOutput("Vision/Summary/RawMegatag2ObservationCount", totalRawMegatag2Count);
+        Logger.recordOutput("Vision/Summary/RawObservationCount", totalRawObservationCount);
+        Logger.recordOutput(
+            "Vision/Summary/CoalescedObservationCount",
+            totalCoalescedObservationCount
+        );
+        Logger.recordOutput("Vision/Summary/CoalescedDropCount", totalCoalescedDropCount);
         LoopCycleProfiler.endSection("Vision/SummaryLogging", summaryLogStartNanos);
 
         LoopCycleProfiler.endSection("Vision/PeriodicTotal", periodicStartNanos);
