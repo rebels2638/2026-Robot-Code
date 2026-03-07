@@ -13,7 +13,6 @@ import edu.wpi.first.wpilibj.RobotController;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Optional;
 import java.util.Set;
 import java.util.function.Supplier;
 
@@ -136,18 +135,8 @@ public class VisionIOLimelight implements VisionIO {
             inputs.tagIds[i++] = id;
         }
 
-        // Save tag poses to inputs objects
-        List<Pose3d> tagPosesList = new ArrayList<>();
-        var aprilTagLayout = frc.robot.constants.vision.VisionConstants.getAprilTagLayout();
-        if (aprilTagLayout.isPresent()) {
-            for (int id : tagIds) {
-                Optional<Pose3d> tagPose = aprilTagLayout.get().getTagPose(id);
-                if (tagPose.isPresent()) {
-                    tagPosesList.add(tagPose.get());
-                }
-            }
-        }
-        inputs.tagPoses = tagPosesList.toArray(new Pose3d[tagPosesList.size()]);
+        // Limelight bounds filtering only needs field dimensions, not an AprilTag layout load.
+        inputs.tagPoses = new Pose3d[0];
     }
 
     /** Parses the 3D pose from a Limelight botpose array. */

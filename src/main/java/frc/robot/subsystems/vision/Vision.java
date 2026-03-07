@@ -13,7 +13,6 @@ import frc.robot.RobotState;
 import frc.robot.RobotState.VisionObservation;
 import frc.robot.configs.VisionConfig;
 import frc.robot.constants.Constants;
-import frc.robot.constants.vision.VisionConstants;
 import frc.robot.lib.util.ConfigLoader;
 import frc.robot.lib.util.LimelightHelpers;
 import frc.robot.lib.util.LoopCycleProfiler;
@@ -21,13 +20,10 @@ import frc.robot.subsystems.vision.VisionIO.PoseObservationType;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Optional;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 
 import org.littletonrobotics.junction.Logger;
-
-import edu.wpi.first.apriltag.AprilTagFieldLayout;
 
 public class Vision extends SubsystemBase {
     private static final double DETAILED_POSE_LOG_PERIOD_SECONDS = 0.1;
@@ -109,6 +105,14 @@ public class Vision extends SubsystemBase {
             }
         }
         this.limelightNames = limelightNameList.toArray(new String[0]);
+
+        Logger.recordOutput("Vision/FieldLengthMeters", VisionUtil.getFieldLengthMeters());
+        Logger.recordOutput("Vision/FieldWidthMeters", VisionUtil.getFieldWidthMeters());
+        boolean fieldDimensionsMatchBLine = VisionUtil.fieldDimensionsMatchFlippingUtil();
+        Logger.recordOutput("Vision/FieldDimensionsMatchBLine", fieldDimensionsMatchBLine);
+        if (!fieldDimensionsMatchBLine) {
+            DriverStation.reportWarning(VisionUtil.getFieldDimensionMismatchSummary(), false);
+        }
     }
 
     /**
@@ -161,7 +165,6 @@ public class Vision extends SubsystemBase {
         int totalAcceptedCount = 0;
         int totalRejectedCount = 0;
         int totalObservationCount = 0;
-        Optional<AprilTagFieldLayout> aprilTagLayout = VisionConstants.getAprilTagLayout();
 
         // Loop over cameras
         for (int cameraIndex = 0; cameraIndex < io.length; cameraIndex++) {
@@ -173,7 +176,6 @@ public class Vision extends SubsystemBase {
 
             // Initialize logging values
             int poseObservationCount = inputs[cameraIndex].robotPoseObservations.length;
-            List<Pose3d> tagPoses = shouldLogDetailedPoseArrays ? new ArrayList<>(inputs[cameraIndex].tagIds.length) : null;
             List<Pose3d> robotPoses = shouldLogDetailedPoseArrays ? new ArrayList<>(poseObservationCount) : null;
             List<Pose3d> robotPosesAccepted = shouldLogDetailedPoseArrays ? new ArrayList<>(poseObservationCount) : null;
             List<Pose3d> robotPosesRejected = shouldLogDetailedPoseArrays ? new ArrayList<>(poseObservationCount) : null;
@@ -182,15 +184,6 @@ public class Vision extends SubsystemBase {
             List<String> poseTypesRejected = shouldLogDetailedPoseArrays ? new ArrayList<>(poseObservationCount) : null;
             int acceptedCount = 0;
             int rejectedCount = 0;
-
-            // Add tag poses
-            if (shouldLogDetailedPoseArrays) {
-                for (int tagId : inputs[cameraIndex].tagIds) {
-                    aprilTagLayout
-                        .flatMap(layout -> layout.getTagPose(tagId))
-                        .ifPresent(tagPoses::add);
-                }
-            }
 
             // Loop over pose observations
             for (var observation : inputs[cameraIndex].robotPoseObservations) {
@@ -222,18 +215,8 @@ public class Vision extends SubsystemBase {
                             && observation.ambiguity() > config.maxAmbiguity) // Cannot be high ambiguity
                         || Math.abs(observation.pose().getZ())
                             > config.maxZError // Must have realistic Z coordinate
+                        || !VisionUtil.isPoseWithinField(observation.pose()) // Must be within field bounds
                         || rotationRateTooHigh; // Must not be rotating too fast
-
-                if (aprilTagLayout.isPresent()) {
-                    var layout = aprilTagLayout.get();
-                    rejectPose =
-                        rejectPose
-                            // Must be within the field boundaries
-                            || observation.pose().getX() < 0.0
-                            || observation.pose().getX() > layout.getFieldLength()
-                            || observation.pose().getY() < 0.0
-                            || observation.pose().getY() > layout.getFieldWidth();
-                }
 
                 // Add pose to log
                 if (shouldLogDetailedPoseArrays) {
@@ -302,9 +285,7 @@ public class Vision extends SubsystemBase {
             Logger.recordOutput(cameraTimingPrefix + "/PoseAcceptedCount", acceptedCount);
             Logger.recordOutput(cameraTimingPrefix + "/PoseRejectedCount", rejectedCount);
             if (shouldLogDetailedPoseArrays) {
-                Logger.recordOutput(
-                    cameraTimingPrefix + "/TagPoses",
-                    tagPoses.toArray(new Pose3d[tagPoses.size()]));
+                Logger.recordOutput(cameraTimingPrefix + "/TagPoses", inputs[cameraIndex].tagPoses);
                 Logger.recordOutput(
                     cameraTimingPrefix + "/RobotPoses",
                     robotPoses.toArray(new Pose3d[robotPoses.size()]));
