@@ -13,6 +13,8 @@ import edu.wpi.first.math.numbers.N1;
 import edu.wpi.first.math.numbers.N3;
 import edu.wpi.first.math.trajectory.TrapezoidProfile;
 import edu.wpi.first.math.trajectory.TrapezoidProfile.State;
+import edu.wpi.first.wpilibj.Alert;
+import edu.wpi.first.wpilibj.Alert.AlertType;
 import edu.wpi.first.wpilibj.DriverStation;
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
 import frc.robot.RobotState;
@@ -103,6 +105,11 @@ public class Shooter extends SubsystemBase {
     private final double turretMaxAccelerationRotPerSec2;
     private State turretProfileSetpoint;
     private double lastTurretGoalDeg;
+    private final boolean enableConnectionAlerts;
+    private final Alert hoodDisconnectedAlert;
+    private final Alert turretDisconnectedAlert;
+    private final Alert flywheelDisconnectedAlert;
+    private final Alert flywheelFollowerDisconnectedAlert;
 
     private Shooter() {
         boolean useSimulation = Constants.shouldUseSimulation(Constants.SimOnlySubsystems.SHOOTER);
@@ -112,6 +119,12 @@ public class Shooter extends SubsystemBase {
             ShooterConfig.class
         );
         shooterIO = useSimulation ? new ShooterIOSim(config) : new ShooterIOTalonFX(config);
+        enableConnectionAlerts = !useSimulation && Constants.currentMode != Constants.Mode.REPLAY;
+        hoodDisconnectedAlert = new Alert("Shooter hood motor is disconnected.", AlertType.kWarning);
+        turretDisconnectedAlert = new Alert("Shooter turret motor is disconnected.", AlertType.kWarning);
+        flywheelDisconnectedAlert = new Alert("Shooter flywheel motor is disconnected.", AlertType.kWarning);
+        flywheelFollowerDisconnectedAlert =
+            new Alert("Shooter flywheel follower motor is disconnected.", AlertType.kWarning);
 
         hoodControlLoopConfigurator = new DashboardMotorControlLoopConfigurator("Shooter/hoodControlLoop", 
             new DashboardMotorControlLoopConfigurator.MotorControlLoopConfig(
@@ -161,6 +174,11 @@ public class Shooter extends SubsystemBase {
         long processInputsStartNanos = LoopCycleProfiler.markStart();
         Logger.processInputs("Shooter", shooterInputs);
         LoopCycleProfiler.endSection("Shooter/ProcessInputs", processInputsStartNanos);
+
+        hoodDisconnectedAlert.set(enableConnectionAlerts && !shooterInputs.hoodMotorConnected);
+        turretDisconnectedAlert.set(enableConnectionAlerts && !shooterInputs.turretMotorConnected);
+        flywheelDisconnectedAlert.set(enableConnectionAlerts && !shooterInputs.flywheelMotorConnected);
+        flywheelFollowerDisconnectedAlert.set(enableConnectionAlerts && !shooterInputs.flywheelFollowerMotorConnected);
 
         // Handle control loop configuration updates
         long configUpdatesStartNanos = LoopCycleProfiler.markStart();
@@ -594,13 +612,15 @@ public class Shooter extends SubsystemBase {
     // Setpoint check methods
     @AutoLogOutput(key = "Shooter/isHoodAtSetpoint")
     public boolean isHoodAtSetpoint() {
-        return Math.abs(shooterInputs.hoodAngleRotations - hoodSetpointRotations)
+        return shooterInputs.hoodMotorConnected
+            && Math.abs(shooterInputs.hoodAngleRotations - hoodSetpointRotations)
             < (config.hoodAngleToleranceDegrees / 360.0);
     }
 
     @AutoLogOutput(key = "Shooter/isTurretAtSetpoint")
     public boolean isTurretAtSetpoint() {
-        return Math.abs(shooterInputs.turretAngleRotations - turretSetpointRotations) < config.turretAngleToleranceRotations;
+        return shooterInputs.turretMotorConnected
+            && Math.abs(shooterInputs.turretAngleRotations - turretSetpointRotations) < config.turretAngleToleranceRotations;
     }
 
     public double getTurretSetpointDegrees() {
@@ -613,7 +633,28 @@ public class Shooter extends SubsystemBase {
 
     @AutoLogOutput(key = "Shooter/isFlywheelAtSetpoint")
     public boolean isFlywheelAtSetpoint() {
-        return Math.abs(shooterInputs.flywheelVelocityRotationsPerSec - flywheelSetpointRPS) < config.flywheelVelocityToleranceRPS;
+        return shooterInputs.flywheelMotorConnected
+            && Math.abs(shooterInputs.flywheelVelocityRotationsPerSec - flywheelSetpointRPS) < config.flywheelVelocityToleranceRPS;
+    }
+
+    @AutoLogOutput(key = "Shooter/isHoodMotorConnected")
+    public boolean isHoodMotorConnected() {
+        return shooterInputs.hoodMotorConnected;
+    }
+
+    @AutoLogOutput(key = "Shooter/isTurretMotorConnected")
+    public boolean isTurretMotorConnected() {
+        return shooterInputs.turretMotorConnected;
+    }
+
+    @AutoLogOutput(key = "Shooter/isFlywheelMotorConnected")
+    public boolean isFlywheelMotorConnected() {
+        return shooterInputs.flywheelMotorConnected;
+    }
+
+    @AutoLogOutput(key = "Shooter/isFlywheelFollowerMotorConnected")
+    public boolean isFlywheelFollowerMotorConnected() {
+        return shooterInputs.flywheelFollowerMotorConnected;
     }
 
     // Config getters

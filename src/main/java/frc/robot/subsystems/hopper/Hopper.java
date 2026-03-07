@@ -3,6 +3,8 @@ package frc.robot.subsystems.hopper;
 import org.littletonrobotics.junction.AutoLogOutput;
 import org.littletonrobotics.junction.Logger;
 
+import edu.wpi.first.wpilibj.Alert;
+import edu.wpi.first.wpilibj.Alert.AlertType;
 import edu.wpi.first.wpilibj.DriverStation;
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
 import frc.robot.configs.HopperConfig;
@@ -43,6 +45,8 @@ public class Hopper extends SubsystemBase {
 
     private final DashboardMotorControlLoopConfigurator hopperControlLoopConfigurator;
     private boolean pendingHopperControlLoopConfigApply = false;
+    private final boolean enableConnectionAlerts;
+    private final Alert hopperDisconnectedAlert;
 
     private double hopperSetpointRPS = 0.0;
 
@@ -54,6 +58,8 @@ public class Hopper extends SubsystemBase {
             HopperConfig.class
         );
         hopperIO = useSimulation ? new HopperIOSim(config) : new HopperIOTalonFX(config);
+        enableConnectionAlerts = !useSimulation && Constants.currentMode != Constants.Mode.REPLAY;
+        hopperDisconnectedAlert = new Alert("Hopper motor is disconnected.", AlertType.kWarning);
 
         hopperControlLoopConfigurator = new DashboardMotorControlLoopConfigurator("Hopper/hopperControlLoop",
             new DashboardMotorControlLoopConfigurator.MotorControlLoopConfig(
@@ -78,6 +84,8 @@ public class Hopper extends SubsystemBase {
         long processInputsStartNanos = LoopCycleProfiler.markStart();
         Logger.processInputs("Hopper", hopperInputs);
         LoopCycleProfiler.endSection("Hopper/ProcessInputs", processInputsStartNanos);
+
+        hopperDisconnectedAlert.set(enableConnectionAlerts && !hopperInputs.hopperMotorConnected);
 
         long configUpdatesStartNanos = LoopCycleProfiler.markStart();
         pendingHopperControlLoopConfigApply |= hopperControlLoopConfigurator.hasChanged();
@@ -117,6 +125,12 @@ public class Hopper extends SubsystemBase {
 
     @AutoLogOutput(key = "Hopper/isHopperAtSetpoint")
     public boolean isHopperAtSetpoint() {
-        return Math.abs(hopperInputs.velocityRotationsPerSec - hopperSetpointRPS) < config.hopperVelocityToleranceRPS;
+        return hopperInputs.hopperMotorConnected
+            && Math.abs(hopperInputs.velocityRotationsPerSec - hopperSetpointRPS) < config.hopperVelocityToleranceRPS;
+    }
+
+    @AutoLogOutput(key = "Hopper/isHopperMotorConnected")
+    public boolean isHopperMotorConnected() {
+        return hopperInputs.hopperMotorConnected;
     }
 }

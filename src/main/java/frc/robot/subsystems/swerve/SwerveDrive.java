@@ -22,6 +22,8 @@ import edu.wpi.first.math.kinematics.ChassisSpeeds;
 import edu.wpi.first.math.kinematics.SwerveModulePosition;
 import edu.wpi.first.math.kinematics.SwerveModuleState;
 import edu.wpi.first.math.kinematics.SwerveDriveKinematics;
+import edu.wpi.first.wpilibj.Alert;
+import edu.wpi.first.wpilibj.Alert.AlertType;
 import edu.wpi.first.wpilibj.DriverStation;
 import edu.wpi.first.wpilibj.Timer;
 import edu.wpi.first.wpilibj2.command.Command;
@@ -185,6 +187,7 @@ public class SwerveDrive extends SubsystemBase {
     public static final double ODOMETRY_FREQUENCY = 150;
 
     public static final Lock odometryLock = new ReentrantLock();
+    private static final String[] MODULE_ALERT_NAMES = {"Front Left", "Front Right", "Back Left", "Back Right"};
 
     private ModuleIO[] modules;
     private ModuleIOInputsAutoLogged[] moduleInputs = {
@@ -229,6 +232,11 @@ public class SwerveDrive extends SubsystemBase {
     private final DashboardMotorControlLoopConfigurator steerControlLoopConfigurator;
     private boolean pendingDriveControlLoopConfigApply = false;
     private boolean pendingSteerControlLoopConfigApply = false;
+    private final boolean enableConnectionAlerts;
+    private final Alert gyroDisconnectedAlert;
+    private final Alert[] driveMotorDisconnectedAlerts = new Alert[4];
+    private final Alert[] steerMotorDisconnectedAlerts = new Alert[4];
+    private final Alert[] steerEncoderDisconnectedAlerts = new Alert[4];
 
     private final SysIdRoutine driveCharacterizationSysIdRoutine;
     private final SysIdRoutine steerCharacterizationSysIdRoutine;
@@ -269,6 +277,16 @@ public class SwerveDrive extends SubsystemBase {
             };
             gyroIO = new GyroIOPigeon2(swerveConfig.gyro);
             PhoenixOdometryThread.getInstance().start();
+        }
+        enableConnectionAlerts = !useSimulation && Constants.currentMode != Constants.Mode.REPLAY;
+        gyroDisconnectedAlert = new Alert("Swerve gyro is disconnected.", AlertType.kWarning);
+        for (int i = 0; i < 4; i++) {
+            driveMotorDisconnectedAlerts[i] =
+                new Alert("Swerve " + MODULE_ALERT_NAMES[i] + " drive motor is disconnected.", AlertType.kWarning);
+            steerMotorDisconnectedAlerts[i] =
+                new Alert("Swerve " + MODULE_ALERT_NAMES[i] + " steer motor is disconnected.", AlertType.kWarning);
+            steerEncoderDisconnectedAlerts[i] =
+                new Alert("Swerve " + MODULE_ALERT_NAMES[i] + " steer encoder is disconnected.", AlertType.kWarning);
         }
 
         driveControlLoopConfigurator = new DashboardMotorControlLoopConfigurator(
@@ -401,6 +419,12 @@ public class SwerveDrive extends SubsystemBase {
         Logger.processInputs("SwerveDrive/gyro", gyroInputs);
         for (int i = 0; i < 4; i++) {
             Logger.processInputs("SwerveDrive/module" + i, moduleInputs[i]);
+        }
+        gyroDisconnectedAlert.set(enableConnectionAlerts && !gyroInputs.isConnected);
+        for (int i = 0; i < 4; i++) {
+            driveMotorDisconnectedAlerts[i].set(enableConnectionAlerts && !moduleInputs[i].driveMotorConnected);
+            steerMotorDisconnectedAlerts[i].set(enableConnectionAlerts && !moduleInputs[i].steerMotorConnected);
+            steerEncoderDisconnectedAlerts[i].set(enableConnectionAlerts && !moduleInputs[i].steerEncoderConnected);
         }
         LoopCycleProfiler.endSection("SwerveDrive/ReadInputs", inputReadStartNanos);
 
@@ -1492,6 +1516,71 @@ public class SwerveDrive extends SubsystemBase {
     @AutoLogOutput(key = "SwerveDrive/currentTranslationOverrideState")
     public CurrentTranslationOverrideState getCurrentTranslationOverrideState() {
         return currentTranslationOverrideState;
+    }
+
+    @AutoLogOutput(key = "SwerveDrive/isGyroConnected")
+    public boolean isGyroConnected() {
+        return gyroInputs.isConnected;
+    }
+
+    @AutoLogOutput(key = "SwerveDrive/isFrontLeftDriveMotorConnected")
+    public boolean isFrontLeftDriveMotorConnected() {
+        return moduleInputs[FRONT_LEFT_INDEX].driveMotorConnected;
+    }
+
+    @AutoLogOutput(key = "SwerveDrive/isFrontLeftSteerMotorConnected")
+    public boolean isFrontLeftSteerMotorConnected() {
+        return moduleInputs[FRONT_LEFT_INDEX].steerMotorConnected;
+    }
+
+    @AutoLogOutput(key = "SwerveDrive/isFrontLeftSteerEncoderConnected")
+    public boolean isFrontLeftSteerEncoderConnected() {
+        return moduleInputs[FRONT_LEFT_INDEX].steerEncoderConnected;
+    }
+
+    @AutoLogOutput(key = "SwerveDrive/isFrontRightDriveMotorConnected")
+    public boolean isFrontRightDriveMotorConnected() {
+        return moduleInputs[FRONT_RIGHT_INDEX].driveMotorConnected;
+    }
+
+    @AutoLogOutput(key = "SwerveDrive/isFrontRightSteerMotorConnected")
+    public boolean isFrontRightSteerMotorConnected() {
+        return moduleInputs[FRONT_RIGHT_INDEX].steerMotorConnected;
+    }
+
+    @AutoLogOutput(key = "SwerveDrive/isFrontRightSteerEncoderConnected")
+    public boolean isFrontRightSteerEncoderConnected() {
+        return moduleInputs[FRONT_RIGHT_INDEX].steerEncoderConnected;
+    }
+
+    @AutoLogOutput(key = "SwerveDrive/isBackLeftDriveMotorConnected")
+    public boolean isBackLeftDriveMotorConnected() {
+        return moduleInputs[BACK_LEFT_INDEX].driveMotorConnected;
+    }
+
+    @AutoLogOutput(key = "SwerveDrive/isBackLeftSteerMotorConnected")
+    public boolean isBackLeftSteerMotorConnected() {
+        return moduleInputs[BACK_LEFT_INDEX].steerMotorConnected;
+    }
+
+    @AutoLogOutput(key = "SwerveDrive/isBackLeftSteerEncoderConnected")
+    public boolean isBackLeftSteerEncoderConnected() {
+        return moduleInputs[BACK_LEFT_INDEX].steerEncoderConnected;
+    }
+
+    @AutoLogOutput(key = "SwerveDrive/isBackRightDriveMotorConnected")
+    public boolean isBackRightDriveMotorConnected() {
+        return moduleInputs[BACK_RIGHT_INDEX].driveMotorConnected;
+    }
+
+    @AutoLogOutput(key = "SwerveDrive/isBackRightSteerMotorConnected")
+    public boolean isBackRightSteerMotorConnected() {
+        return moduleInputs[BACK_RIGHT_INDEX].steerMotorConnected;
+    }
+
+    @AutoLogOutput(key = "SwerveDrive/isBackRightSteerEncoderConnected")
+    public boolean isBackRightSteerEncoderConnected() {
+        return moduleInputs[BACK_RIGHT_INDEX].steerEncoderConnected;
     }
 
     public void setDesiredTranslationOverrideState(DesiredTranslationOverrideState desiredTranslationOverrideState) {
