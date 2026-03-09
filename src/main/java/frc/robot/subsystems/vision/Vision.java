@@ -12,6 +12,7 @@ import edu.wpi.first.wpilibj2.command.SubsystemBase;
 import frc.robot.RobotState;
 import frc.robot.RobotState.VisionObservation;
 import frc.robot.configs.VisionConfig;
+import frc.robot.configs.VisionConfig.ObservationMode;
 import frc.robot.constants.Constants;
 import frc.robot.lib.util.ConfigLoader;
 import frc.robot.lib.util.LimelightHelpers;
@@ -70,6 +71,7 @@ public class Vision extends SubsystemBase {
     private final VisionIOInputsAutoLogged[] inputs;
     private final Alert[] disconnectedAlerts;
     private final TimeInterpolatableBuffer<Double> rotationRateBuffer;
+    private final ObservationMode[] cameraObservationModes;
     private final String[] limelightNames;
     private final boolean[] lastConnectedStates;
     private int lastImuMode = Integer.MIN_VALUE;
@@ -102,15 +104,25 @@ public class Vision extends SubsystemBase {
         // Initialize rotation rate buffer (keep 2 seconds of data)
         this.rotationRateBuffer = TimeInterpolatableBuffer.createDoubleBuffer(2.0);
         this.lastConnectedStates = new boolean[io.length];
+        this.cameraObservationModes = new ObservationMode[io.length];
 
         List<String> limelightNameList = new ArrayList<>();
         if (config.cameras != null) {
-            for (VisionConfig.CameraConfig camera : config.cameras) {
+            for (int i = 0; i < config.cameras.size(); i++) {
+                VisionConfig.CameraConfig camera = config.cameras.get(i);
                 if (camera.name != null
                     && !camera.name.isBlank()
                     && !limelightNameList.contains(camera.name)) {
                     limelightNameList.add(camera.name);
                 }
+                if (i < cameraObservationModes.length) {
+                    cameraObservationModes[i] = camera.getObservationMode();
+                }
+            }
+        }
+        for (int i = 0; i < cameraObservationModes.length; i++) {
+            if (cameraObservationModes[i] == null) {
+                cameraObservationModes[i] = ObservationMode.BOTH;
             }
         }
         this.limelightNames = limelightNameList.toArray(new String[0]);
@@ -192,16 +204,16 @@ public class Vision extends SubsystemBase {
         int totalAcceptedCount = 0;
         int totalRejectedCount = 0;
         int totalObservationCount = 0;
+        int totalModeFilteredCount = 0;
         int totalRawMegatag1Count = 0;
         int totalRawMegatag2Count = 0;
         int totalRawObservationCount = 0;
-        int totalCoalescedObservationCount = 0;
-        int totalCoalescedDropCount = 0;
 
         // Loop over cameras
         for (int cameraIndex = 0; cameraIndex < io.length; cameraIndex++) {
             long perCameraStartNanos = LoopCycleProfiler.markStart();
             String cameraTimingPrefix = "Vision/Camera" + Integer.toString(cameraIndex);
+            ObservationMode observationMode = cameraObservationModes[cameraIndex];
 
             // Update disconnected alert
             disconnectedAlerts[cameraIndex].set(!inputs[cameraIndex].connected);
@@ -216,26 +228,31 @@ public class Vision extends SubsystemBase {
             List<String> poseTypesRejected = shouldLogDetailedPoseArrays ? new ArrayList<>(poseObservationCount) : null;
             int acceptedCount = 0;
             int rejectedCount = 0;
+            int modeFilteredCount = 0;
             totalRawMegatag1Count += inputs[cameraIndex].rawMegatag1ObservationCount;
             totalRawMegatag2Count += inputs[cameraIndex].rawMegatag2ObservationCount;
             totalRawObservationCount += inputs[cameraIndex].rawObservationCount;
-            totalCoalescedObservationCount += inputs[cameraIndex].coalescedObservationCount;
-            totalCoalescedDropCount += inputs[cameraIndex].coalescedDropCount;
 
             // Loop over pose observations
             for (var observation : inputs[cameraIndex].robotPoseObservations) {
                 totalObservationCount++;
-                boolean translationRateTooHigh = false;
+                if (shouldLogDetailedPoseArrays) {
+                    robotPoses.add(observation.pose());
+                    poseTypes.add(observation.type().name());
+                }
+                if (!VisionUtil.isObservationTypeAllowed(observation.type(), observationMode)) {
+                    modeFilteredCount++;
+                    totalModeFilteredCount++;
+                    continue;
+                }
+
                 boolean rotationRateTooHigh = false;
                 var rotationRateAtTime = rotationRateBuffer.getSample(observation.timestamp());
                 if (rotationRateAtTime.isPresent()) {
                     double observationRotationRateDegreesPerSecond = Math.abs(rotationRateAtTime.get());
-                    translationRateTooHigh =
-                        observationRotationRateDegreesPerSecond
-                            > getMaxRotationRateThreshold(observation.type());
                     rotationRateTooHigh =
                         observationRotationRateDegreesPerSecond
-                            > getMaxRotationRateThreshold(observation.rotationType());
+                            > getMaxRotationRateThreshold(observation.type());
                 }
 
                 boolean rejectPose =
@@ -244,12 +261,7 @@ public class Vision extends SubsystemBase {
                             && observation.ambiguity() > config.maxAmbiguity)
                         || Math.abs(observation.pose().getZ()) > config.maxZError
                         || !VisionUtil.isPoseWithinField(observation.pose())
-                        || translationRateTooHigh;
-
-                if (shouldLogDetailedPoseArrays) {
-                    robotPoses.add(observation.pose());
-                    poseTypes.add(observation.type().name());
-                }
+                        || rotationRateTooHigh;
                 if (rejectPose) {
                     rejectedCount++;
                     totalRejectedCount++;
@@ -267,24 +279,10 @@ public class Vision extends SubsystemBase {
                     config.linearStdDevBaseline
                         * computeStdDevFactor(observation.averageTagDistance(), observation.tagCount())
                         * getLinearStdDevTypeFactor(observation.type());
-                boolean useMegatag1Rotation =
-                    observation.rotationType() == PoseObservationType.MEGATAG_1
-                        && observation.rotationTagCount() > 0
-                        && !(observation.rotationTagCount() == 1
-                            && observation.rotationAmbiguity() > config.maxAmbiguity)
-                        && !rotationRateTooHigh;
-                double angularSourceDistance =
-                    useMegatag1Rotation
-                        ? observation.rotationAverageTagDistance()
-                        : observation.averageTagDistance();
-                int angularSourceTagCount =
-                    useMegatag1Rotation ? observation.rotationTagCount() : observation.tagCount();
-                PoseObservationType angularSourceType =
-                    useMegatag1Rotation ? observation.rotationType() : PoseObservationType.MEGATAG_2;
                 double angularStdDev =
                     config.angularStdDevBaseline
-                        * computeStdDevFactor(angularSourceDistance, angularSourceTagCount)
-                        * getAngularStdDevTypeFactor(angularSourceType);
+                        * computeStdDevFactor(observation.averageTagDistance(), observation.tagCount())
+                        * getAngularStdDevTypeFactor(observation.type());
                 if (config.cameraStdDevFactors != null && cameraIndex < config.cameraStdDevFactors.length) {
                     linearStdDev *= config.cameraStdDevFactors[cameraIndex];
                     angularStdDev *= config.cameraStdDevFactors[cameraIndex];
@@ -318,6 +316,8 @@ public class Vision extends SubsystemBase {
             Logger.recordOutput(cameraTimingPrefix + "/PoseObservationCount", poseObservationCount);
             Logger.recordOutput(cameraTimingPrefix + "/PoseAcceptedCount", acceptedCount);
             Logger.recordOutput(cameraTimingPrefix + "/PoseRejectedCount", rejectedCount);
+            Logger.recordOutput(cameraTimingPrefix + "/ObservationMode", observationMode.name());
+            Logger.recordOutput(cameraTimingPrefix + "/ModeFilteredCount", modeFilteredCount);
             Logger.recordOutput(
                 cameraTimingPrefix + "/RawMegatag1ObservationCount",
                 inputs[cameraIndex].rawMegatag1ObservationCount
@@ -329,34 +329,6 @@ public class Vision extends SubsystemBase {
             Logger.recordOutput(
                 cameraTimingPrefix + "/RawObservationCount",
                 inputs[cameraIndex].rawObservationCount
-            );
-            Logger.recordOutput(
-                cameraTimingPrefix + "/CoalescedObservationCount",
-                inputs[cameraIndex].coalescedObservationCount
-            );
-            Logger.recordOutput(
-                cameraTimingPrefix + "/CoalescedDropCount",
-                inputs[cameraIndex].coalescedDropCount
-            );
-            Logger.recordOutput(
-                cameraTimingPrefix + "/CoalescedGroupSizes",
-                inputs[cameraIndex].coalescedGroupSizes
-            );
-            Logger.recordOutput(
-                cameraTimingPrefix + "/CoalescedTranslationSourceTypes",
-                inputs[cameraIndex].coalescedTranslationSourceTypes
-            );
-            Logger.recordOutput(
-                cameraTimingPrefix + "/CoalescedTranslationDecisionReasons",
-                inputs[cameraIndex].coalescedTranslationDecisionReasons
-            );
-            Logger.recordOutput(
-                cameraTimingPrefix + "/CoalescedRotationSourceTypes",
-                inputs[cameraIndex].coalescedRotationSourceTypes
-            );
-            Logger.recordOutput(
-                cameraTimingPrefix + "/CoalescedRotationDecisionReasons",
-                inputs[cameraIndex].coalescedRotationDecisionReasons
             );
             if (shouldLogDetailedPoseArrays) {
                 Logger.recordOutput(cameraTimingPrefix + "/TagPoses", inputs[cameraIndex].tagPoses);
@@ -388,14 +360,10 @@ public class Vision extends SubsystemBase {
         Logger.recordOutput("Vision/Summary/PoseObservationCount", totalObservationCount);
         Logger.recordOutput("Vision/Summary/PoseAcceptedCount", totalAcceptedCount);
         Logger.recordOutput("Vision/Summary/PoseRejectedCount", totalRejectedCount);
+        Logger.recordOutput("Vision/Summary/ModeFilteredCount", totalModeFilteredCount);
         Logger.recordOutput("Vision/Summary/RawMegatag1ObservationCount", totalRawMegatag1Count);
         Logger.recordOutput("Vision/Summary/RawMegatag2ObservationCount", totalRawMegatag2Count);
         Logger.recordOutput("Vision/Summary/RawObservationCount", totalRawObservationCount);
-        Logger.recordOutput(
-            "Vision/Summary/CoalescedObservationCount",
-            totalCoalescedObservationCount
-        );
-        Logger.recordOutput("Vision/Summary/CoalescedDropCount", totalCoalescedDropCount);
         LoopCycleProfiler.endSection("Vision/SummaryLogging", summaryLogStartNanos);
 
         LoopCycleProfiler.endSection("Vision/PeriodicTotal", periodicStartNanos);
