@@ -80,6 +80,10 @@ public class ModuleIOSim implements ModuleIO {
 
         steerSim.update(dt);
         driveSim.update(dt);
+
+        inputs.driveMotorConnected = true;
+        inputs.steerMotorConnected = true;
+        inputs.steerEncoderConnected = true;
         
         inputs.drivePositionMeters = driveSim.getAngularPositionRad() * 0.0485614385; // wheel radius in meters
         inputs.driveVelocityMetersPerSec = driveSim.getAngularVelocityRadPerSec() * 0.0485614385;

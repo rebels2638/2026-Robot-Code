@@ -18,7 +18,10 @@ import edu.wpi.first.wpilibj.Filesystem;
 import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.CommandScheduler;
 import frc.robot.constants.Constants;
+import frc.robot.constants.FieldConstants;
 import frc.robot.lib.BLine.FollowPath;
+import frc.robot.lib.util.LoopCycleProfiler;
+import frc.robot.lib.util.PhoenixUtil;
 
 /**
  * The VM is configured to automatically run this class, and to call the
@@ -30,6 +33,8 @@ import frc.robot.lib.BLine.FollowPath;
  * project.
  */
 public class Robot extends LoggedRobot {
+    private static final double SLOW_LOOP_WARNING_THRESHOLD_MS = 200.0;
+
     private Command m_autonomousCommand;
     private RobotContainer m_robotContainer;
 
@@ -110,6 +115,13 @@ public class Robot extends LoggedRobot {
      */
     @Override
     public void robotPeriodic() {
+        LoopCycleProfiler.beginCycle();
+
+        long phoenixRefreshStartNanos = LoopCycleProfiler.markStart();
+        PhoenixUtil.refreshAll();
+        LoopCycleProfiler.endSection("Robot/PhoenixRefresh", phoenixRefreshStartNanos);
+
+        long schedulerStartNanos = LoopCycleProfiler.markStart();
         // Runs the Scheduler. This is responsible for polling buttons, adding
         // newly-scheduled
         // commands, running already-scheduled commands, removing finished or
@@ -118,6 +130,13 @@ public class Robot extends LoggedRobot {
         // robot's periodic
         // block in order for anything in the Command-based framework to work.
         CommandScheduler.getInstance().run();
+        LoopCycleProfiler.endSection("Robot/CommandSchedulerRun", schedulerStartNanos);
+
+        long shotDistanceLogStartNanos = LoopCycleProfiler.markStart();
+        Logger.recordOutput("shot/shotDistanceMeters", RobotState.getInstance().getEstimatedPose().getTranslation().getDistance(FieldConstants.Hub.hubCenter.toTranslation2d()));
+        LoopCycleProfiler.endSection("Robot/SuperstructureShotDistanceLog", shotDistanceLogStartNanos);
+
+        LoopCycleProfiler.finishCycle(SLOW_LOOP_WARNING_THRESHOLD_MS);
 
         // Dashboard updates
         Dashboard.updateData();
@@ -137,22 +156,30 @@ public class Robot extends LoggedRobot {
     private void linkFollowPathLogging() {
         // Pose logging consumer
         FollowPath.setPoseLoggingConsumer(pair -> {
-            Logger.recordOutput(pair.getFirst(), pair.getSecond());
+            if (Constants.VERBOSE_LOGGING_ENABLED) {
+                Logger.recordOutput(pair.getFirst(), pair.getSecond());
+            }
         });
 
         // Translation list logging consumer
         FollowPath.setTranslationListLoggingConsumer(pair -> {
-            Logger.recordOutput(pair.getFirst(), pair.getSecond());
+            if (Constants.VERBOSE_LOGGING_ENABLED) {
+                Logger.recordOutput(pair.getFirst(), pair.getSecond());
+            }
         });
 
         // Double logging consumer
         FollowPath.setDoubleLoggingConsumer(pair -> {
-            Logger.recordOutput(pair.getFirst(), pair.getSecond());
+            if (Constants.VERBOSE_LOGGING_ENABLED) {
+                Logger.recordOutput(pair.getFirst(), pair.getSecond());
+            }
         });
 
         // Boolean logging consumer
         FollowPath.setBooleanLoggingConsumer(pair -> {
-            Logger.recordOutput(pair.getFirst(), pair.getSecond());
+            if (Constants.VERBOSE_LOGGING_ENABLED) {
+                Logger.recordOutput(pair.getFirst(), pair.getSecond());
+            }
         });
     }
     

@@ -74,10 +74,25 @@ public class FieldConstants {
         public static final Translation3d hubCenter = new Translation3d(
                 Units.inchesToMeters(182.105),
                 Units.inchesToMeters(158.845),
-                Units.inchesToMeters(71.0)); // receded inside of the hub hood 
+                Units.inchesToMeters(72.0));
 
         public static final double sideLength = Units.inchesToMeters(47.5);
         public static final double topHeight = Units.inchesToMeters(44.25);
+    }
+
+    public static class Passing {
+        private Passing() {}
+
+        // Pass targets are defined in blue-origin field coordinates and mirrored for red alliance at runtime.
+        public static final double passTargetHeightMeters = 0.0;
+
+        public static final Translation3d allianceTop = new Translation3d(0.245, 7.782, passTargetHeightMeters);
+        public static final Translation3d allianceCenter = new Translation3d(1.345, 4.018, passTargetHeightMeters);
+        public static final Translation3d allianceBottom = new Translation3d(0.288, 0.269, passTargetHeightMeters);
+
+        public static final Translation3d neutralTop = new Translation3d(6.108, 5.632, passTargetHeightMeters);
+        public static final Translation3d neutralCenter = new Translation3d(5.729, 4.045, passTargetHeightMeters);
+        public static final Translation3d neutralBottom = new Translation3d(6.028, 0.688, passTargetHeightMeters);
     }
 
     public static class AllianceBounds {

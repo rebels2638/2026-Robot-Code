@@ -34,6 +34,14 @@
     "followPathCrossTrackKI": 0.0,
     "followPathCrossTrackKD": 0.0
   },
+  "gyro": {
+    "canId": 2,
+    "canBusName": "drivetrain",
+    "mountPoseYaw": 88.42582702636719,
+    "mountPosePitch": 0.6793335676193237,
+    "mountPoseRoll": 3.79,
+    "gyroScalarZ": 0.0
+  },
   "moduleGeneral": {
     "canBusName": "drivetrain",
     "driveStatorCurrentLimit": 45.0,

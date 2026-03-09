@@ -15,6 +15,7 @@ import edu.wpi.first.math.geometry.Rotation3d;
 import edu.wpi.first.units.measure.Angle;
 import edu.wpi.first.units.measure.AngularVelocity;
 import java.util.Queue;
+import frc.robot.configs.SwerveGyroConfig;
 import frc.robot.lib.util.PhoenixUtil;
 import frc.robot.subsystems.swerve.PhoenixOdometryThread;
 import frc.robot.subsystems.swerve.SwerveDrive;
@@ -30,13 +31,13 @@ public class GyroIOPigeon2 implements GyroIO {
     private final Queue<Double> odometryTimestampQueue;
     private final Queue<Double> yawPositionQueue;
 
-    public GyroIOPigeon2() {
-        gyro = new Pigeon2(2, new CANBus("drivetrain"));
+    public GyroIOPigeon2(SwerveGyroConfig gyroConfig) {
+        gyro = new Pigeon2(gyroConfig.canId, new CANBus(gyroConfig.canBusName));
         Pigeon2Configuration config = new Pigeon2Configuration();
-        config.MountPose.MountPoseYaw = 88.42582702636719;
-        config.MountPose.MountPosePitch = 0.6793335676193237;
-        config.MountPose.MountPoseRoll = -176.21868896484375;
-        config.GyroTrim.GyroScalarZ = 0;
+        config.MountPose.MountPoseYaw = gyroConfig.mountPoseYaw;
+        config.MountPose.MountPosePitch = gyroConfig.mountPosePitch;
+        config.MountPose.MountPoseRoll = gyroConfig.mountPoseRoll;
+        config.GyroTrim.GyroScalarZ = gyroConfig.gyroScalarZ;
 
         PhoenixUtil.tryUntilOk(5, () -> gyro.getConfigurator().apply(config, 0.25));
 
@@ -56,14 +57,25 @@ public class GyroIOPigeon2 implements GyroIO {
         odometryTimestampQueue = PhoenixOdometryThread.getInstance().makeTimestampQueue();
         yawPositionQueue = PhoenixOdometryThread.getInstance().registerSignal(yawSignal.clone());
 
+        PhoenixUtil.registerSignals(
+            gyroConfig.canBusName,
+            yawSignal,
+            rollSignal,
+            pitchSignal,
+            yawVelocitySignal
+        );
+
         gyro.optimizeBusUtilization();
     }
 
     @Override
     public synchronized void updateInputs(GyroIOInputs inputs) {
-        BaseStatusSignal.refreshAll(yawSignal, rollSignal, pitchSignal, yawVelocitySignal);
-
-        inputs.isConnected = true;
+        inputs.isConnected = BaseStatusSignal.isAllGood(
+            yawSignal,
+            rollSignal,
+            pitchSignal,
+            yawVelocitySignal
+        );
 
         double yawRadians = MathUtil.angleModulus(
             BaseStatusSignal.getLatencyCompensatedValue(yawSignal, yawVelocitySignal).in(Radians)
@@ -75,11 +87,29 @@ public class GyroIOPigeon2 implements GyroIO {
         );
         inputs.yawVelocityRadPerSec = yawVelocitySignal.getValue().in(RadiansPerSecond);
 
-        inputs.odometryTimestampsSeconds = odometryTimestampQueue.stream().mapToDouble(Double::doubleValue).toArray();
-        inputs.odometryYawPositions = yawPositionQueue.stream().map((Double value) -> Rotation2d.fromDegrees(value)).toArray(Rotation2d[]::new);
+        inputs.odometryTimestampsSeconds = copyDoubleQueue(odometryTimestampQueue);
+        inputs.odometryYawPositions = copyYawQueue(yawPositionQueue);
 
         odometryTimestampQueue.clear();
         yawPositionQueue.clear();
+    }
+
+    private static double[] copyDoubleQueue(Queue<Double> queue) {
+        double[] values = new double[queue.size()];
+        int index = 0;
+        for (Double value : queue) {
+            values[index++] = value;
+        }
+        return values;
+    }
+
+    private static Rotation2d[] copyYawQueue(Queue<Double> queue) {
+        Rotation2d[] values = new Rotation2d[queue.size()];
+        int index = 0;
+        for (Double value : queue) {
+            values[index++] = Rotation2d.fromDegrees(value);
+        }
+        return values;
     }
 
     @Override

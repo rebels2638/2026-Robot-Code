@@ -33,7 +33,7 @@ public class HopperIOTalonFX implements HopperIO {
     private final StatusSignal<Current> hopperTorqueCurrent;
     private final StatusSignal<Temperature> hopperTemperature;
 
-    private final VelocityVoltage hopperMotorRequest = new VelocityVoltage(0).withSlot(0);
+    private final VelocityVoltage hopperMotorRequest = new VelocityVoltage(0).withSlot(0).withEnableFOC(true);
 
     private final TalonFXConfiguration hopperConfig;
 
@@ -78,14 +78,25 @@ public class HopperIOTalonFX implements HopperIO {
             hopperTorqueCurrent, hopperTemperature,
             hopperVelocityStatusSignal, hopperMotorVoltage);
 
+        PhoenixUtil.registerSignals(
+            config.canBusName,
+            hopperTorqueCurrent,
+            hopperTemperature,
+            hopperVelocityStatusSignal,
+            hopperMotorVoltage
+        );
+
         hopperMotor.optimizeBusUtilization();
     }
 
     @Override
     public void updateInputs(HopperIOInputs inputs) {
-        BaseStatusSignal.refreshAll(
-            hopperTorqueCurrent, hopperTemperature,
-            hopperVelocityStatusSignal, hopperMotorVoltage);
+        inputs.hopperMotorConnected = BaseStatusSignal.isAllGood(
+            hopperTorqueCurrent,
+            hopperTemperature,
+            hopperVelocityStatusSignal,
+            hopperMotorVoltage
+        );
 
         inputs.velocityRotationsPerSec = hopperVelocityStatusSignal.getValue().in(RotationsPerSecond);
         inputs.appliedVolts = hopperMotorVoltage.getValue().in(Volts);

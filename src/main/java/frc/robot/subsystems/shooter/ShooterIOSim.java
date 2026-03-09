@@ -2,11 +2,9 @@ package frc.robot.subsystems.shooter;
 
 import edu.wpi.first.math.MathUtil;
 import edu.wpi.first.math.controller.PIDController;
-import edu.wpi.first.math.controller.ProfiledPIDController;
 import edu.wpi.first.math.controller.SimpleMotorFeedforward;
 import edu.wpi.first.math.system.plant.DCMotor;
 import edu.wpi.first.math.system.plant.LinearSystemId;
-import edu.wpi.first.math.trajectory.TrapezoidProfile;
 import edu.wpi.first.wpilibj.Timer;
 import edu.wpi.first.wpilibj.simulation.DCMotorSim;
 import frc.robot.configs.ShooterConfig;
@@ -35,9 +33,10 @@ public class ShooterIOSim implements ShooterIO {
         );
 
     private PIDController hoodFeedback;
-    private ProfiledPIDController turretFeedback;
+    private PIDController turretFeedback;
     private PIDController flywheelFeedback;
 
+    private SimpleMotorFeedforward turretFeedforward;
     private SimpleMotorFeedforward flywheelFeedforward;
 
     private boolean isHoodClosedLoop = true;
@@ -47,6 +46,8 @@ public class ShooterIOSim implements ShooterIO {
     private boolean isTurretEStopped = false;
     private boolean isFlywheelEStopped = false;
 
+    private double desiredTurretAngleRotations;
+    private double desiredTurretVelocityRotationsPerSec = 0.0;
     private double desiredFlywheelVelocityRotationsPerSec = 0;
 
     private double lastTimeInputs = Timer.getTimestamp();
@@ -59,28 +60,21 @@ public class ShooterIOSim implements ShooterIO {
         // Initialize PID controllers with config values
         hoodFeedback = new PIDController(config.hoodKP, config.hoodKI, config.hoodKD);
 
-        // Turret uses a profiled PID controller in radians with trapezoidal constraints
-        double turretMaxVelRadPerSec = Math.toRadians(config.turretMaxVelocityDegPerSec);
-        double turretMaxAccelRadPerSec2 = Math.toRadians(config.turretMaxAccelerationDegPerSec2);
-        turretFeedback =
-            new ProfiledPIDController(
-                config.turretKP,
-                config.turretKI,
-                config.turretKD,
-                new TrapezoidProfile.Constraints(turretMaxVelRadPerSec, turretMaxAccelRadPerSec2)
-            );
+        turretFeedback = new PIDController(config.turretKP, config.turretKI, config.turretKD);
 
         flywheelFeedback = new PIDController(config.flywheelKP, config.flywheelKI, config.flywheelKD);
 
         // Initialize feedforward controllers with config values
+        turretFeedforward = new SimpleMotorFeedforward(config.turretKS, config.turretKV, config.turretKA);
         flywheelFeedforward = new SimpleMotorFeedforward(config.flywheelKS, config.flywheelKV, config.flywheelKA);
 
-        // Initialize hood position to starting angle (config gives rotations)
-        hoodSim.setState(config.hoodStartingAngleRotations * 2 * Math.PI, 0);
+        // Initialize hood position to starting angle (config gives degrees)
+        hoodSim.setState(Math.toRadians(config.hoodStartingAngleDegrees), 0);
 
         // Initialize turret position to starting angle (config gives degrees)
         double turretStartRad = Math.toRadians(config.turretStartingAngleDeg);
         turretSim.setState(turretStartRad, 0);
+        desiredTurretAngleRotations = config.turretStartingAngleDeg / 360.0;
     }
 
     @Override
@@ -103,13 +97,13 @@ public class ShooterIOSim implements ShooterIO {
         if (isTurretEStopped) {
             turretSim.setInputVoltage(0);
         } else if (isTurretClosedLoop) {
-            turretSim.setInputVoltage(
-                MathUtil.clamp(
-                    turretFeedback.calculate(turretSim.getAngularPositionRad()),
-                    -12,
-                    12
-                )
-            );
+            turretSim.setInputVoltage(calculateTurretControlVoltage(
+                turretSim.getAngularPositionRotations(),
+                desiredTurretAngleRotations,
+                desiredTurretVelocityRotationsPerSec,
+                turretFeedback,
+                turretFeedforward
+            ));
         }
 
         if (isFlywheelEStopped) {
@@ -118,7 +112,7 @@ public class ShooterIOSim implements ShooterIO {
             flywheelSim.setInputVoltage(
                 MathUtil.clamp(
                     flywheelFeedforward.calculate(desiredFlywheelVelocityRotationsPerSec) +
-                    flywheelFeedback.calculate(flywheelSim.getAngularVelocityRadPerSec()),
+                    flywheelFeedback.calculate(flywheelSim.getAngularVelocityRadPerSec() / (2 * Math.PI)),
                     -12,
                     12
                 )
@@ -129,15 +123,41 @@ public class ShooterIOSim implements ShooterIO {
         turretSim.update(dt);
         flywheelSim.update(dt);
 
+        // Mirror Talon soft-limit behavior in sim so turret cannot run past configured bounds.
+        double turretMinRot = config.turretMinAngleDeg / 360.0;
+        double turretMaxRot = config.turretMaxAngleDeg / 360.0;
+        double turretPositionRot = turretSim.getAngularPositionRotations();
+        double turretVelocityRotPerSec = turretSim.getAngularVelocityRadPerSec() / (2 * Math.PI);
+        SoftLimitedState turretLimitedState = applySoftLimit(
+            turretPositionRot,
+            turretVelocityRotPerSec,
+            turretMinRot,
+            turretMaxRot
+        );
+        if (
+            turretLimitedState.positionRotations() != turretPositionRot
+                || turretLimitedState.velocityRotationsPerSec() != turretVelocityRotPerSec
+        ) {
+            turretSim.setState(
+                turretLimitedState.positionRotations() * (2 * Math.PI),
+                turretLimitedState.velocityRotationsPerSec() * (2 * Math.PI)
+            );
+        }
+
+        inputs.hoodMotorConnected = true;
+        inputs.turretMotorConnected = true;
+        inputs.flywheelMotorConnected = true;
+        inputs.flywheelFollowerMotorConnected = true;
+
         inputs.hoodAngleRotations = hoodSim.getAngularPositionRotations();
         inputs.hoodVelocityRotationsPerSec = hoodSim.getAngularVelocityRadPerSec() / (2 * Math.PI);
         inputs.hoodAppliedVolts = hoodSim.getInputVoltage();
 
-        inputs.turretAngleRotations = turretSim.getAngularPositionRotations();
-        inputs.turretVelocityRotationsPerSec = turretSim.getAngularVelocityRadPerSec() / (2 * Math.PI);
+        inputs.turretAngleRotations = turretLimitedState.positionRotations();
+        inputs.turretVelocityRotationsPerSec = turretLimitedState.velocityRotationsPerSec();
         inputs.turretAppliedVolts = turretSim.getInputVoltage();
 
-        inputs.flywheelVelocityRotationsPerSec = flywheelSim.getAngularVelocityRadPerSec();
+        inputs.flywheelVelocityRotationsPerSec = flywheelSim.getAngularVelocityRadPerSec() / (2 * Math.PI);
         inputs.flywheelAppliedVolts = flywheelSim.getInputVoltage();
         inputs.flywheelTorqueCurrent = flywheelSim.getCurrentDrawAmps();
 
@@ -162,15 +182,20 @@ public class ShooterIOSim implements ShooterIO {
             return;
         }
         // Clamp angle within software limits
-        double clampedAngle = MathUtil.clamp(angleRotations,
-            config.hoodMinAngleRotations,
-            config.hoodMaxAngleRotations);
+        double minRot = config.hoodMinAngleDegrees / 360.0;
+        double maxRot = config.hoodMaxAngleDegrees / 360.0;
+        double clampedAngle = MathUtil.clamp(angleRotations, minRot, maxRot);
         hoodFeedback.setSetpoint(clampedAngle * (2 * Math.PI));
         isHoodClosedLoop = true;
     }
 
     @Override
     public void setTurretAngle(double angleRotations) {
+        setTurretAngle(angleRotations, 0.0);
+    }
+
+    @Override
+    public void setTurretAngle(double angleRotations, double velocityRotationsPerSec) {
         if (isTurretEStopped) {
             turretSim.setInputVoltage(0);
             isTurretClosedLoop = false;
@@ -179,8 +204,10 @@ public class ShooterIOSim implements ShooterIO {
         double minRot = config.turretMinAngleDeg / 360.0;
         double maxRot = config.turretMaxAngleDeg / 360.0;
         double clampedAngle = MathUtil.clamp(angleRotations, minRot, maxRot);
-        double goalRadians = clampedAngle * (2 * Math.PI);
-        turretFeedback.setGoal(goalRadians);
+        desiredTurretAngleRotations = clampedAngle;
+        desiredTurretVelocityRotationsPerSec =
+            Double.isFinite(velocityRotationsPerSec) ? velocityRotationsPerSec : 0.0;
+        turretFeedback.setSetpoint(desiredTurretAngleRotations);
         isTurretClosedLoop = true;
     }
 
@@ -226,6 +253,9 @@ public class ShooterIOSim implements ShooterIO {
         turretFeedback.setP(config.kP());
         turretFeedback.setI(config.kI());
         turretFeedback.setD(config.kD());
+        turretFeedforward.setKs(config.kS());
+        turretFeedforward.setKv(config.kV());
+        turretFeedforward.setKa(config.kA());
     }
 
     @Override
@@ -274,4 +304,41 @@ public class ShooterIOSim implements ShooterIO {
     public void disableFlywheelEStop() {
         isFlywheelEStopped = false;
     }
+
+    static SoftLimitedState applySoftLimit(
+        double positionRotations,
+        double velocityRotationsPerSec,
+        double minRotations,
+        double maxRotations
+    ) {
+        double clampedPositionRotations = MathUtil.clamp(positionRotations, minRotations, maxRotations);
+
+        if (clampedPositionRotations <= minRotations && velocityRotationsPerSec < 0.0) {
+            return new SoftLimitedState(clampedPositionRotations, 0.0);
+        }
+        if (clampedPositionRotations >= maxRotations && velocityRotationsPerSec > 0.0) {
+            return new SoftLimitedState(clampedPositionRotations, 0.0);
+        }
+        return new SoftLimitedState(clampedPositionRotations, velocityRotationsPerSec);
+    }
+
+    static double calculateTurretControlVoltage(
+        double currentPositionRotations,
+        double desiredPositionRotations,
+        double desiredVelocityRotationsPerSec,
+        PIDController turretFeedback,
+        SimpleMotorFeedforward turretFeedforward
+    ) {
+        return MathUtil.clamp(
+            turretFeedforward.calculate(desiredVelocityRotationsPerSec)
+                + turretFeedback.calculate(currentPositionRotations, desiredPositionRotations),
+            -12,
+            12
+        );
+    }
+
+    static record SoftLimitedState(
+        double positionRotations,
+        double velocityRotationsPerSec
+    ) {}
 }

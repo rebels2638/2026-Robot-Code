@@ -3,11 +3,15 @@ package frc.robot.subsystems.kicker;
 import org.littletonrobotics.junction.AutoLogOutput;
 import org.littletonrobotics.junction.Logger;
 
+import edu.wpi.first.wpilibj.Alert;
+import edu.wpi.first.wpilibj.Alert.AlertType;
+import edu.wpi.first.wpilibj.DriverStation;
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
 import frc.robot.configs.KickerConfig;
 import frc.robot.constants.Constants;
 import frc.robot.lib.util.ConfigLoader;
 import frc.robot.lib.util.DashboardMotorControlLoopConfigurator;
+import frc.robot.lib.util.LoopCycleProfiler;
 
 public class Kicker extends SubsystemBase {
     private static Kicker instance = null;
@@ -21,7 +25,7 @@ public class Kicker extends SubsystemBase {
 
     public enum KickerSetpoint {
         OFF(0.0),
-        FEEDING(Double.NaN),
+        REVERSE(Double.NaN),
         KICKING(Double.NaN);
 
         private final double rps;
@@ -40,6 +44,9 @@ public class Kicker extends SubsystemBase {
     private final KickerConfig config;
 
     private final DashboardMotorControlLoopConfigurator kickerControlLoopConfigurator;
+    private boolean pendingKickerControlLoopConfigApply = false;
+    private final boolean enableConnectionAlerts;
+    private final Alert kickerDisconnectedAlert;
 
     private double kickerSetpointRPS = 0.0;
 
@@ -51,6 +58,8 @@ public class Kicker extends SubsystemBase {
             KickerConfig.class
         );
         kickerIO = useSimulation ? new KickerIOSim(config) : new KickerIOTalonFX(config);
+        enableConnectionAlerts = !useSimulation && Constants.currentMode != Constants.Mode.REPLAY;
+        kickerDisconnectedAlert = new Alert("Kicker motor is disconnected.", AlertType.kWarning);
 
         kickerControlLoopConfigurator = new DashboardMotorControlLoopConfigurator("Kicker/kickerControlLoop",
             new DashboardMotorControlLoopConfigurator.MotorControlLoopConfig(
@@ -66,14 +75,28 @@ public class Kicker extends SubsystemBase {
 
     @Override
     public void periodic() {
+        long periodicStartNanos = LoopCycleProfiler.markStart();
+
+        long updateInputsStartNanos = LoopCycleProfiler.markStart();
         kickerIO.updateInputs(kickerInputs);
+        LoopCycleProfiler.endSection("Kicker/UpdateInputs", updateInputsStartNanos);
+
+        long processInputsStartNanos = LoopCycleProfiler.markStart();
         Logger.processInputs("Kicker", kickerInputs);
+        LoopCycleProfiler.endSection("Kicker/ProcessInputs", processInputsStartNanos);
+
+        kickerDisconnectedAlert.set(enableConnectionAlerts && !kickerInputs.kickerMotorConnected);
 
         // Handle control loop configuration updates
-        if (kickerControlLoopConfigurator.hasChanged()) {
+        long configUpdatesStartNanos = LoopCycleProfiler.markStart();
+        pendingKickerControlLoopConfigApply |= kickerControlLoopConfigurator.hasChanged();
+        if (DriverStation.isDisabled() && pendingKickerControlLoopConfigApply) {
             kickerIO.configureControlLoop(kickerControlLoopConfigurator.getConfig());
+            pendingKickerControlLoopConfigApply = false;
         }
+        LoopCycleProfiler.endSection("Kicker/ControlLoopConfigUpdates", configUpdatesStartNanos);
 
+        LoopCycleProfiler.endSection("Kicker/PeriodicTotal", periodicStartNanos);
     }
 
     public void setKickerVelocity(double velocityRotationsPerSec) {
@@ -83,8 +106,8 @@ public class Kicker extends SubsystemBase {
     }
 
     public void setSetpoint(KickerSetpoint setpoint) {
-        double targetRps = setpoint == KickerSetpoint.FEEDING
-            ? config.feedingVelocityRPS
+        double targetRps = setpoint == KickerSetpoint.REVERSE
+            ? config.reverseVelocityRPS
             : setpoint == KickerSetpoint.KICKING ? config.kickingVelocityRPS : setpoint.getRps();
         setKickerVelocity(targetRps);
     }
@@ -105,7 +128,13 @@ public class Kicker extends SubsystemBase {
     // Setpoint check methods
     @AutoLogOutput(key = "Kicker/isKickerAtSetpoint")
     public boolean isKickerAtSetpoint() {
-        return Math.abs(kickerInputs.velocityRotationsPerSec - kickerSetpointRPS) < config.kickerVelocityToleranceRPS;
+        return kickerInputs.kickerMotorConnected
+            && Math.abs(kickerInputs.velocityRotationsPerSec - kickerSetpointRPS) < config.kickerVelocityToleranceRPS;
+    }
+
+    @AutoLogOutput(key = "Kicker/isKickerMotorConnected")
+    public boolean isKickerMotorConnected() {
+        return kickerInputs.kickerMotorConnected;
     }
 
 }
