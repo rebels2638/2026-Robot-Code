@@ -40,11 +40,26 @@ class ShooterTurretResolutionTest {
     }
 
     @Test
-    // If no wrapped angle is legal, fallback should choose the limit with lower aim error.
-    void resolveTurretTargetDegrees_usesUnwindFallbackTowardNearestAimBoundWhenNoWrappedEquivalent() {
+    // If no wrapped angle is legal, fallback should clamp the requested branch nearest the current goal.
+    void resolveTurretTargetDegrees_usesUnwindFallbackTowardNearestBoundOnCurrentBranchWhenNoWrappedEquivalent() {
         Shooter.TurretResolution resolution = Shooter.resolveTurretTargetDegrees(
-            330.0,
+            -30.0,
             100.0,
+            90.0,
+            270.0
+        );
+
+        assertTrue(resolution.usedUnwindFallback());
+        assertEquals(90.0, resolution.targetAngleDeg(), EPS);
+        assertEquals(90.0, resolution.unwindTargetDeg(), EPS);
+    }
+
+    @Test
+    // Regression: wrapped aim-error comparison could pick the opposite limit from the active branch.
+    void resolveTurretTargetDegrees_unwindFallbackDoesNotCrossToOppositeBound() {
+        Shooter.TurretResolution resolution = Shooter.resolveTurretTargetDegrees(
+            20.0,
+            250.0,
             90.0,
             270.0
         );
@@ -55,8 +70,8 @@ class ShooterTurretResolutionTest {
     }
 
     @Test
-    // When both bounds have equal aim error, fallback should use the bound closest to the previous goal.
-    void resolveTurretTargetDegrees_unwindFallbackBreaksAimErrorTieUsingCurrentAngle() {
+    // When the requested branch is above the legal range, fallback should clamp to the upper bound.
+    void resolveTurretTargetDegrees_unwindFallbackClampsUpperBranchToUpperBound() {
         Shooter.TurretResolution resolution = Shooter.resolveTurretTargetDegrees(
             0.0,
             250.0,
@@ -119,7 +134,7 @@ class ShooterTurretResolutionTest {
         );
 
         assertTrue(goalState.usedUnwindFallback());
-        assertEquals(270.0, goalState.targetAngleDeg(), EPS);
+        assertEquals(90.0, goalState.targetAngleDeg(), EPS);
         assertEquals(0.0, goalState.targetVelocityRotPerSec(), EPS);
     }
 

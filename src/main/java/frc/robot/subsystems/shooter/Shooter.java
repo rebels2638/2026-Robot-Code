@@ -435,11 +435,9 @@ public class Shooter extends SubsystemBase {
             usedUnwindFallback = false;
         } else {
             unwindTargetDeg = selectFallbackTurretBoundDegrees(
-                requestedDeg,
-                referenceDeg,
+                currentBranchTargetDeg,
                 minDeg,
-                maxDeg,
-                currentBranchClampedDeg
+                maxDeg
             );
             targetAngleDeg = unwindTargetDeg;
             usedUnwindFallback = true;
@@ -449,31 +447,11 @@ public class Shooter extends SubsystemBase {
     }
 
     static double selectFallbackTurretBoundDegrees(
-        double requestedDeg,
-        double referenceDeg,
+        double currentBranchTargetDeg,
         double minDeg,
-        double maxDeg,
-        double currentBranchClampedDeg
+        double maxDeg
     ) {
-        double minAimErrorDeg = Math.abs(MathUtil.inputModulus(requestedDeg - minDeg, -180.0, 180.0));
-        double maxAimErrorDeg = Math.abs(MathUtil.inputModulus(requestedDeg - maxDeg, -180.0, 180.0));
-        if (minAimErrorDeg < maxAimErrorDeg) {
-            return minDeg;
-        }
-        if (maxAimErrorDeg < minAimErrorDeg) {
-            return maxDeg;
-        }
-
-        double minCurrentDistanceDeg = Math.abs(minDeg - referenceDeg);
-        double maxCurrentDistanceDeg = Math.abs(maxDeg - referenceDeg);
-        if (minCurrentDistanceDeg < maxCurrentDistanceDeg) {
-            return minDeg;
-        }
-        if (maxCurrentDistanceDeg < minCurrentDistanceDeg) {
-            return maxDeg;
-        }
-
-        return currentBranchClampedDeg;
+        return MathUtil.clamp(currentBranchTargetDeg, minDeg, maxDeg);
     }
 
     static record TurretResolution(
