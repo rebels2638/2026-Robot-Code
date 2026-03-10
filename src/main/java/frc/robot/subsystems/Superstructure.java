@@ -88,16 +88,14 @@ public class Superstructure extends SubsystemBase {
         DISABLED,
         RETRACTED,
         EXTENDED,
-        CLIMBING
+        CLIMBED
     }
 
     public enum CurrentClimbState {
         DISABLED,
-        HOME,
-        RETRACTING,
-        EXTENDING,
+        RETRACTED,
         EXTENDED,
-        CLIMBING
+        CLIMBED
     }
 
     public enum TargetState {
@@ -356,10 +354,6 @@ public class Superstructure extends SubsystemBase {
             currentIntakeState = CurrentIntakeState.DISABLED;
             return;
         }
-        // if (currentSystemState == CurrentSystemState.HOME) {
-        //     currentIntakeState = CurrentIntakeState.STOWED;
-        //     return;
-        // }
 
         currentIntakeState = switch (desiredIntakeState) {
             case DISABLED -> CurrentIntakeState.DISABLED;
@@ -576,8 +570,8 @@ public class Superstructure extends SubsystemBase {
             case EXTENDED:
                 climber.setDesiredState(Climber.DesiredState.EXTENDED);
                 break;
-            case CLIMBING:
-                climber.setDesiredState(Climber.DesiredState.CLIMBING);
+            case CLIMBED:
+                climber.setDesiredState(Climber.DesiredState.CLIMBED);
                 break;
         }
     }
@@ -1057,11 +1051,9 @@ public class Superstructure extends SubsystemBase {
     private static CurrentClimbState mapClimberCurrentState(Climber.CurrentState climberCurrentState) {
         return switch (climberCurrentState) {
             case DISABLED -> CurrentClimbState.DISABLED;
-            case HOME -> CurrentClimbState.HOME;
-            case RETRACTING -> CurrentClimbState.RETRACTING;
-            case EXTENDING -> CurrentClimbState.EXTENDING;
+            case RETRACTED -> CurrentClimbState.RETRACTED;
             case EXTENDED -> CurrentClimbState.EXTENDED;
-            case CLIMBING -> CurrentClimbState.CLIMBING;
+            case CLIMBED -> CurrentClimbState.CLIMBED;
         };
     }
 
@@ -1139,9 +1131,9 @@ public class Superstructure extends SubsystemBase {
     public boolean isClimbAtDesiredState() {
         return switch (desiredClimbState) {
             case DISABLED -> currentClimbState == CurrentClimbState.DISABLED;
-            case RETRACTED -> currentClimbState == CurrentClimbState.HOME;
+            case RETRACTED -> currentClimbState == CurrentClimbState.RETRACTED;
             case EXTENDED -> currentClimbState == CurrentClimbState.EXTENDED;
-            case CLIMBING -> currentClimbState == CurrentClimbState.CLIMBING;
+            case CLIMBED -> currentClimbState == CurrentClimbState.CLIMBED;
         };
     }
 }
