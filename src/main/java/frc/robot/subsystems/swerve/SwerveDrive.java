@@ -305,7 +305,7 @@ public class SwerveDrive extends SubsystemBase {
             this,
             RobotState.getInstance()::getEstimatedPose,
             RobotState.getInstance()::getRobotRelativeSpeeds,
-            this::driveRobotRelative,
+            speeds -> driveRobotRelative(speeds, RobotState.getInstance().getEstimatedPose()),
             new PIDController(
                 drivetrainConfig.followPathTranslationKP,
                 drivetrainConfig.followPathTranslationKI,
@@ -344,8 +344,9 @@ public class SwerveDrive extends SubsystemBase {
 
     @Override
     public void periodic() {
-        double dt = Timer.getTimestamp() - prevLoopTime; 
-        prevLoopTime = Timer.getTimestamp();
+        double now = Timer.getFPGATimestamp();
+        double dt = now - prevLoopTime; 
+        prevLoopTime = now;
 
         Logger.recordOutput("SwerveDrive/dtPeriodic", dt);
 
@@ -418,9 +419,12 @@ public class SwerveDrive extends SubsystemBase {
         Logger.recordOutput("SwerveDrive/measuredModuleStates", moduleStates);
         Logger.recordOutput("SwerveDrive/measuredModulePositions", modulePositions);
 
+        // Pose is stable after all odometry samples are consumed — cache once for this cycle
+        Pose2d currentPose = RobotState.getInstance().getEstimatedPose();
+
         // FSM processing
-        handleStateTransitions();
-        handleCurrentState();
+        handleStateTransitions(currentPose);
+        handleCurrentState(currentPose);
 
         Logger.recordOutput("SwerveDrive/CurrentCommand", this.getCurrentCommand() == null ? "" : this.getCurrentCommand().toString());
     }
@@ -428,7 +432,7 @@ public class SwerveDrive extends SubsystemBase {
     /**
      * Determines the next measured state based on the desired state.
      */
-    private void handleStateTransitions() {
+    private void handleStateTransitions(Pose2d currentPose) {
         switch (desiredSystemState) {
             case DISABLED:
                 currentSystemState = CurrentSystemState.DISABLED;
@@ -471,14 +475,14 @@ public class SwerveDrive extends SubsystemBase {
                 currentOmegaOverrideState = CurrentOmegaOverrideState.NONE;
                 break;
             case RANGED_ROTATION:
-                if (isWithinRotationRange()) {
+                if (isWithinRotationRange(currentPose)) {
                     currentOmegaOverrideState = CurrentOmegaOverrideState.RANGED_NOMINAL;
                 } else {
                     currentOmegaOverrideState = CurrentOmegaOverrideState.RANGED_RETURNING;
                 }
                 break;
             case SNAPPED:
-                if (isAtSnapTarget()) {
+                if (isAtSnapTarget(currentPose)) {
                     currentOmegaOverrideState = CurrentOmegaOverrideState.SNAPPED_NOMINAL;
                 } else {
                     currentOmegaOverrideState = CurrentOmegaOverrideState.SNAPPED_RETURNING;
@@ -502,16 +506,16 @@ public class SwerveDrive extends SubsystemBase {
     /**
      * Executes behavior for the current state.
      */
-    private void handleCurrentState() {
+    private void handleCurrentState(Pose2d currentPose) {
         switch (currentSystemState) {
             case DISABLED:
-                handleDISABLEDSystemState();
+                handleDISABLEDSystemState(currentPose);
                 break;
             case IDLE:
-                handleIdleSystemState();
+                handleIdleSystemState(currentPose);
                 break;
             case TELEOP:
-                handleTeleopSystemState();
+                handleTeleopSystemState(currentPose);
                 break;
             case FOLLOW_PATH:
                 handleFollowPathSystemState();
@@ -532,16 +536,16 @@ public class SwerveDrive extends SubsystemBase {
                 handleNoneOmegaOverrideState();
                 break;
             case RANGED_NOMINAL:
-                handleRangedRotationNominalOmegaOverrideState();
+                handleRangedRotationNominalOmegaOverrideState(currentPose);
                 break;
             case RANGED_RETURNING:
-                handleRangedRotationReturningOmegaOverrideState();
+                handleRangedRotationReturningOmegaOverrideState(currentPose);
                 break;
             case SNAPPED_NOMINAL:
-                handleSnappedNominalOmegaOverrideState();
+                handleSnappedNominalOmegaOverrideState(heading);
                 break;
             case SNAPPED_RETURNING:
-                handleSnappedReturningOmegaOverrideState();
+                handleSnappedReturningOmegaOverrideState(heading);
                 break;
         }
 
@@ -566,34 +570,34 @@ public class SwerveDrive extends SubsystemBase {
         currentPathCommand = null;
     }
 
-    private void handleDISABLEDSystemState() {
+    private void handleDISABLEDSystemState(Pose2d currentPose) {
         if (previousSystemState != CurrentSystemState.DISABLED) {
             setWheelCoast(true);
         }
         cancelPathCommand();
-        
-        driveFieldRelative(new ChassisSpeeds(0, 0, 0));
+
+        driveFieldRelative(new ChassisSpeeds(0, 0, 0), currentPose);
 
         previousSystemState = CurrentSystemState.DISABLED;
     }
 
-    private void handleIdleSystemState() {
+    private void handleIdleSystemState(Pose2d currentPose) {
         if (previousSystemState == CurrentSystemState.DISABLED) {
             setWheelCoast(false);
         }
-        cancelPathCommand();
+        cancelPathCommand(); // TODO: defeats the ENTIRE point of the block under it
 
         // Only cancel running commands, but don't null out finished commands
         // This prevents re-scheduling when path completes while desired state is still FOLLOW_PATH
         if (currentPathCommand != null && currentPathCommand.isScheduled()) {
             currentPathCommand.cancel();
         }
-        driveFieldRelative(new ChassisSpeeds(0, 0, 0));
+        driveFieldRelative(new ChassisSpeeds(0, 0, 0), currentPose);
 
         previousSystemState = CurrentSystemState.IDLE;
     }
 
-    private void handleTeleopSystemState() {
+    private void handleTeleopSystemState(Pose2d currentPose) {
         if (previousSystemState == CurrentSystemState.DISABLED) {
             setWheelCoast(false);
         }
@@ -606,7 +610,7 @@ public class SwerveDrive extends SubsystemBase {
             vyNormalizedSupplier.getAsDouble() * drivetrainConfig.maxTranslationalVelocityMetersPerSec * invert,
             omegaNormalizedSupplier.getAsDouble() * drivetrainConfig.maxAngularVelocityRadiansPerSec
         );
-        driveFieldRelative(desiredFieldRelativeSpeeds);
+        driveFieldRelative(desiredFieldRelativeSpeeds, currentPose);
 
         previousSystemState = CurrentSystemState.TELEOP;
     }
@@ -665,37 +669,37 @@ public class SwerveDrive extends SubsystemBase {
         previousOmegaOverrideState = CurrentOmegaOverrideState.NONE;
     }
     
-    private void handleRangedRotationOmegaOverrideState() {
+    private void handleRangedRotationOmegaOverrideState(Pose2d currentPose) {
         shouldOverrideOmega = true;
-        if (isWithinRotationRange(RANGED_ROTATION_BUFFER_RAD - Math.toRadians(drivetrainConfig.rangedRotationToleranceDeg))) {
-            omegaOverride = limitOmegaForRange(lastUnoverriddenOmega); // TODO: BAD FIX
+        if (isWithinRotationRange(RANGED_ROTATION_BUFFER_RAD - Math.toRadians(drivetrainConfig.rangedRotationToleranceDeg), currentPose)) {
+            omegaOverride = limitOmegaForRange(lastUnoverriddenOmega, currentPose); // TODO: BAD FIX
         } else {
-            omegaOverride = calculateReturnToRangeOmega();
+            omegaOverride = calculateReturnToRangeOmega(currentPose);
         }
     }
 
-    private void handleRangedRotationNominalOmegaOverrideState() {
-        handleRangedRotationOmegaOverrideState();
+    private void handleRangedRotationNominalOmegaOverrideState(Pose2d currentPose) {
+        handleRangedRotationOmegaOverrideState(currentPose);
         previousOmegaOverrideState = CurrentOmegaOverrideState.RANGED_NOMINAL;
     }
-    
-    private void handleRangedRotationReturningOmegaOverrideState() {
-        handleRangedRotationOmegaOverrideState();
+
+    private void handleRangedRotationReturningOmegaOverrideState(Pose2d currentPose) {
+        handleRangedRotationOmegaOverrideState(currentPose);
         previousOmegaOverrideState = CurrentOmegaOverrideState.RANGED_RETURNING;
     }
 
-    private void handleSnappedOmegaOverrideState() {
+    private void handleSnappedOmegaOverrideState(Pose2d currentPose) {
         shouldOverrideOmega = true;
-        omegaOverride = calculateSnapOmega();
+        omegaOverride = calculateSnapOmega(currentPose);
     }
 
-    private void handleSnappedNominalOmegaOverrideState() {
-        handleSnappedOmegaOverrideState();
+    private void handleSnappedNominalOmegaOverrideState(Pose2d currentPose) {
+        handleSnappedOmegaOverrideState(currentPose);
         previousOmegaOverrideState = CurrentOmegaOverrideState.SNAPPED_NOMINAL;
     }
 
-    private void handleSnappedReturningOmegaOverrideState() {
-        handleSnappedOmegaOverrideState();
+    private void handleSnappedReturningOmegaOverrideState(Pose2d currentPose) {
+        handleSnappedOmegaOverrideState(currentPose);
         previousOmegaOverrideState = CurrentOmegaOverrideState.SNAPPED_RETURNING;
     }
 
@@ -738,13 +742,12 @@ public class SwerveDrive extends SubsystemBase {
     /**
      * Checks if robot rotation is within the specified range.
      */
-    private boolean isWithinRotationRange() {
-        return isWithinRotationRange(0);
+    private boolean isWithinRotationRange(Pose2d currentPose) {
+        return isWithinRotationRange(0, currentPose);
     }
 
-    private boolean isAtSnapTarget() {
-        Rotation2d currentRotation = RobotState.getInstance().getEstimatedPose().getRotation();
-        double errorRad = MathUtil.angleModulus(snapTargetAngle.getRadians() - currentRotation.getRadians());
+    private boolean isAtSnapTarget(Pose2d currentPose) {
+        double errorRad = MathUtil.angleModulus(snapTargetAngle.getRadians() - currentPose.getRotation().getRadians());
         return Math.abs(errorRad) <= Math.toRadians(drivetrainConfig.snappedToleranceDeg);
     }
 
@@ -752,11 +755,9 @@ public class SwerveDrive extends SubsystemBase {
      * Checks if robot rotation is within the specified range with an optional buffer.
      * @param buffer The buffer in radians to constrict the range by (applied to both min and max)
      */
-    private boolean isWithinRotationRange(double buffer) {
-        Rotation2d currentRotation = RobotState.getInstance().getEstimatedPose().getRotation();
-        
+    private boolean isWithinRotationRange(double buffer, Pose2d currentPose) {
         // Normalize angles to -PI to PI for comparison
-        double current = MathUtil.angleModulus(currentRotation.getRadians());
+        double current = MathUtil.angleModulus(currentPose.getRotation().getRadians());
         double min = MathUtil.angleModulus(rotationRangeMin.getRadians() + buffer);
         double max = MathUtil.angleModulus(rotationRangeMax.getRadians() - buffer);
         
@@ -775,11 +776,10 @@ public class SwerveDrive extends SubsystemBase {
      * Accounts for current robot angular velocity to be more conservative when already
      * moving towards a boundary.
      */
-    private double limitOmegaForRange(double desiredOmega) {
-        Rotation2d currentRotation = RobotState.getInstance().getEstimatedPose().getRotation();
+    private double limitOmegaForRange(double desiredOmega, Pose2d currentPose) {
         double currentOmega = RobotState.getInstance().getYawVelocityRadPerSec();
-        
-        double current = currentRotation.getRadians();
+
+        double current = currentPose.getRotation().getRadians();
         // Use padded range bounds (constricted by buffer)
         double min = rotationRangeMin.getRadians() + RANGED_ROTATION_BUFFER_RAD;
         double max = rotationRangeMax.getRadians() - RANGED_ROTATION_BUFFER_RAD;
@@ -810,10 +810,10 @@ public class SwerveDrive extends SubsystemBase {
         double maxOmegaToMin = Math.sqrt(2 * maxAngularAccel * effectiveDistToMin);
         double maxOmegaToMax = Math.sqrt(2 * maxAngularAccel * effectiveDistToMax);
 
-        if (currentRotation.getRadians() < min) {
+        if (current < min) {
             return Math.max(desiredOmega, 0);
         }
-        if (currentRotation.getRadians() > max) {
+        if (current > max) {
             return Math.min(desiredOmega, 0);
         }        
 
@@ -831,10 +831,8 @@ public class SwerveDrive extends SubsystemBase {
      * Calculates omega to return to rotation range using PID with velocity limiting.
      * Uses an internal buffer to target slightly inside the range to prevent oscillation at boundaries.
      */
-    private double calculateReturnToRangeOmega() {
-        Rotation2d currentRotation = RobotState.getInstance().getEstimatedPose().getRotation();
-        
-        double current = currentRotation.getRadians();
+    private double calculateReturnToRangeOmega(Pose2d currentPose) {
+        double current = currentPose.getRotation().getRadians();
         double min = rotationRangeMin.getRadians();
         double max = rotationRangeMax.getRadians();
         
@@ -862,9 +860,8 @@ public class SwerveDrive extends SubsystemBase {
         return MathUtil.clamp(pidOutput, -maxOmega, maxOmega);
     }
 
-    private double calculateSnapOmega() {
-        Rotation2d currentRotation = RobotState.getInstance().getEstimatedPose().getRotation();
-        double current = currentRotation.getRadians();
+    private double calculateSnapOmega(Pose2d currentPose) {
+        double current = currentPose.getRotation().getRadians();
         double target = snapTargetAngle.getRadians();
 
         snappedOmegaOverridePIDController.setSetpoint(target);
@@ -962,17 +959,18 @@ public class SwerveDrive extends SubsystemBase {
     }
 
     // Existing drive methods
-    private ChassisSpeeds compensateRobotRelativeSpeeds(ChassisSpeeds speeds) {
+    private ChassisSpeeds compensateRobotRelativeSpeeds(ChassisSpeeds speeds, Pose2d currentPose) {
         Rotation2d angularVelocity = new Rotation2d(speeds.omegaRadiansPerSecond * drivetrainConfig.rotationCompensationCoefficient);
         if (angularVelocity.getRadians() != 0.0) {
+            Rotation2d heading = currentPose.getRotation();
             speeds = ChassisSpeeds.fromFieldRelativeSpeeds(
                 ChassisSpeeds.fromRobotRelativeSpeeds( // why should this be split into two?
                     speeds.vxMetersPerSecond,
                     speeds.vyMetersPerSecond,
                     speeds.omegaRadiansPerSecond,
-                    RobotState.getInstance().getEstimatedPose().getRotation().plus(angularVelocity)
+                    heading.plus(angularVelocity)
                 ),
-                RobotState.getInstance().getEstimatedPose().getRotation()
+                heading
             );
         }
 
@@ -1000,9 +998,12 @@ public class SwerveDrive extends SubsystemBase {
         return true;
     }
 
-    public void driveRobotRelative(ChassisSpeeds speeds) {
-        double dt = Timer.getTimestamp() - prevDriveTime; 
-        prevDriveTime = Timer.getTimestamp();
+    public void driveRobotRelative(ChassisSpeeds speeds, Pose2d curr) {
+        double now = Timer.getFPGATimestamp();
+        double dt = now - prevDriveTime;
+        prevDriveTime = now;
+
+        Rotation2d robotHeading = curr.getRotation();
 
         lastUnoverriddenOmega = speeds.omegaRadiansPerSecond;
         desiredRobotRelativeSpeeds = speeds;
@@ -1035,10 +1036,10 @@ public class SwerveDrive extends SubsystemBase {
                 desiredRobotRelativeSpeeds.omegaRadiansPerSecond
             );
 
-            desiredRobotRelativeSpeeds = ChassisSpeeds.fromFieldRelativeSpeeds(frozenFieldRelativeSpeeds, RobotState.getInstance().getEstimatedPose().getRotation());
+            desiredRobotRelativeSpeeds = ChassisSpeeds.fromFieldRelativeSpeeds(frozenFieldRelativeSpeeds, robotHeading);
         }
 
-        ChassisSpeeds desiredFieldRelativeSpeeds = ChassisSpeeds.fromRobotRelativeSpeeds(desiredRobotRelativeSpeeds, RobotState.getInstance().getEstimatedPose().getRotation());
+        ChassisSpeeds desiredFieldRelativeSpeeds = ChassisSpeeds.fromRobotRelativeSpeeds(desiredRobotRelativeSpeeds, robotHeading);
         Logger.recordOutput("SwerveDrive/desiredFieldRelativeSpeeds", desiredFieldRelativeSpeeds);
         Logger.recordOutput("SwerveDrive/desiredRobotRelativeSpeeds", desiredRobotRelativeSpeeds);
         
@@ -1055,7 +1056,7 @@ public class SwerveDrive extends SubsystemBase {
         
         Logger.recordOutput("SwerveDrive/obtainableFieldRelativeSpeeds", obtainableFieldRelativeSpeeds);
 
-        ChassisSpeeds obtainableRobotRelativeSpeeds = ChassisSpeeds.fromFieldRelativeSpeeds(obtainableFieldRelativeSpeeds, RobotState.getInstance().getEstimatedPose().getRotation());
+        ChassisSpeeds obtainableRobotRelativeSpeeds = ChassisSpeeds.fromFieldRelativeSpeeds(obtainableFieldRelativeSpeeds, robotHeading);
         Logger.recordOutput("SwerveDrive/obtainableRobotRelativeSpeeds", obtainableRobotRelativeSpeeds);
 
         SwerveModuleState[] moduleSetpoints = kinematics.toSwerveModuleStates(obtainableRobotRelativeSpeeds);
@@ -1073,9 +1074,8 @@ public class SwerveDrive extends SubsystemBase {
         Logger.recordOutput("SwerveDrive/optimizedModuleSetpoints", moduleSetpoints);
     }
 
-    public void driveFieldRelative(ChassisSpeeds speeds) {
-        speeds = ChassisSpeeds.fromFieldRelativeSpeeds(speeds, RobotState.getInstance().getEstimatedPose().getRotation());
-        driveRobotRelative(speeds);
+    public void driveFieldRelative(ChassisSpeeds speeds, Pose2d curr) {
+        driveRobotRelative(ChassisSpeeds.fromFieldRelativeSpeeds(speeds, curr.getRotation()), curr);
     }
 
     public void resetGyro(Rotation2d yaw) {
