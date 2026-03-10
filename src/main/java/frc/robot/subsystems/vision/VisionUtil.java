@@ -46,10 +46,11 @@ final class VisionUtil {
 
     static boolean isObservationTypeAllowed(
         PoseObservationType observationType,
-        ObservationMode observationMode
+        ObservationMode observationMode,
+        boolean isDisabled
     ) {
         ObservationMode effectiveObservationMode =
-            observationMode != null ? observationMode : ObservationMode.BOTH;
+            getEffectiveObservationMode(observationMode, isDisabled);
         if (observationType == PoseObservationType.PHOTONVISION) {
             return true;
         }
@@ -58,6 +59,21 @@ final class VisionUtil {
             case BOTH -> true;
             case MT1_ONLY -> observationType == PoseObservationType.MEGATAG_1;
             case MT2_ONLY -> observationType == PoseObservationType.MEGATAG_2;
+            case MT2_WHILE_ENABLED_MT1_WHILE_DISABLED -> false;
+        };
+    }
+
+    static ObservationMode getEffectiveObservationMode(
+        ObservationMode observationMode,
+        boolean isDisabled
+    ) {
+        ObservationMode configuredObservationMode =
+            observationMode != null ? observationMode : ObservationMode.BOTH;
+
+        return switch (configuredObservationMode) {
+            case MT2_WHILE_ENABLED_MT1_WHILE_DISABLED ->
+                isDisabled ? ObservationMode.MT1_ONLY : ObservationMode.MT2_ONLY;
+            case BOTH, MT1_ONLY, MT2_ONLY -> configuredObservationMode;
         };
     }
 }

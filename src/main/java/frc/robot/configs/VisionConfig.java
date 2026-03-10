@@ -8,7 +8,8 @@ public class VisionConfig {
     public static enum ObservationMode {
         BOTH,
         MT1_ONLY,
-        MT2_ONLY
+        MT2_ONLY,
+        MT2_WHILE_ENABLED_MT1_WHILE_DISABLED
     }
 
     public static class CameraConfig {

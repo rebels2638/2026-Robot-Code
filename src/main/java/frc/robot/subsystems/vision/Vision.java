@@ -29,8 +29,8 @@ import org.littletonrobotics.junction.Logger;
 public class Vision extends SubsystemBase {
     private static final double DETAILED_POSE_LOG_PERIOD_SECONDS = 0.1;
     private static final double IMU_MODE_REASSERT_PERIOD_SECONDS = 1.0;
-    private static final boolean ENABLE_DETAILED_POSE_LOGGING =
-        Constants.currentMode == Constants.Mode.REPLAY || Constants.VERBOSE_LOGGING_ENABLED;
+    private static final boolean ENABLE_DETAILED_POSE_LOGGING = true;
+        // Constants.currentMode == Constants.Mode.REPLAY || Constants.VERBOSE_LOGGING_ENABLED;
 
     private static Vision instance = null;
     private static final VisionConfig config = ConfigLoader.load(
@@ -151,7 +151,8 @@ public class Vision extends SubsystemBase {
 
         long imuModeStartNanos = LoopCycleProfiler.markStart();
         double currentTime = Timer.getTimestamp();
-        int imuMode = DriverStation.isDisabled() ? config.disabledImuMode : config.enabledImuMode;
+        boolean isDisabled = DriverStation.isDisabled();
+        int imuMode = isDisabled ? config.disabledImuMode : config.enabledImuMode;
         boolean wroteImuModeThisCycle = false;
         if (imuMode != lastImuMode
             || currentTime - lastImuModeWriteTimestampSeconds >= IMU_MODE_REASSERT_PERIOD_SECONDS) {
@@ -213,7 +214,9 @@ public class Vision extends SubsystemBase {
         for (int cameraIndex = 0; cameraIndex < io.length; cameraIndex++) {
             long perCameraStartNanos = LoopCycleProfiler.markStart();
             String cameraTimingPrefix = "Vision/Camera" + Integer.toString(cameraIndex);
-            ObservationMode observationMode = cameraObservationModes[cameraIndex];
+            ObservationMode configuredObservationMode = cameraObservationModes[cameraIndex];
+            ObservationMode effectiveObservationMode =
+                VisionUtil.getEffectiveObservationMode(configuredObservationMode, isDisabled);
 
             // Update disconnected alert
             disconnectedAlerts[cameraIndex].set(!inputs[cameraIndex].connected);
@@ -240,7 +243,11 @@ public class Vision extends SubsystemBase {
                     robotPoses.add(observation.pose());
                     poseTypes.add(observation.type().name());
                 }
-                if (!VisionUtil.isObservationTypeAllowed(observation.type(), observationMode)) {
+                if (!VisionUtil.isObservationTypeAllowed(
+                    observation.type(),
+                    configuredObservationMode,
+                    isDisabled
+                )) {
                     modeFilteredCount++;
                     totalModeFilteredCount++;
                     continue;
@@ -313,10 +320,17 @@ public class Vision extends SubsystemBase {
                 );
             }
 
+            Logger.recordOutput(
+                cameraTimingPrefix + "/ConfiguredObservationMode",
+                configuredObservationMode.name()
+            );
+            Logger.recordOutput(
+                cameraTimingPrefix + "/ObservationMode",
+                effectiveObservationMode.name()
+            );
             Logger.recordOutput(cameraTimingPrefix + "/PoseObservationCount", poseObservationCount);
             Logger.recordOutput(cameraTimingPrefix + "/PoseAcceptedCount", acceptedCount);
             Logger.recordOutput(cameraTimingPrefix + "/PoseRejectedCount", rejectedCount);
-            Logger.recordOutput(cameraTimingPrefix + "/ObservationMode", observationMode.name());
             Logger.recordOutput(cameraTimingPrefix + "/ModeFilteredCount", modeFilteredCount);
             Logger.recordOutput(
                 cameraTimingPrefix + "/RawMegatag1ObservationCount",

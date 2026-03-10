@@ -55,19 +55,22 @@ class VisionUtilTest {
         assertTrue(
             VisionUtil.isObservationTypeAllowed(
                 VisionIO.PoseObservationType.MEGATAG_1,
-                VisionConfig.ObservationMode.BOTH
+                VisionConfig.ObservationMode.BOTH,
+                false
             )
         );
         assertTrue(
             VisionUtil.isObservationTypeAllowed(
                 VisionIO.PoseObservationType.MEGATAG_2,
-                VisionConfig.ObservationMode.BOTH
+                VisionConfig.ObservationMode.BOTH,
+                false
             )
         );
         assertTrue(
             VisionUtil.isObservationTypeAllowed(
                 VisionIO.PoseObservationType.PHOTONVISION,
-                VisionConfig.ObservationMode.BOTH
+                VisionConfig.ObservationMode.BOTH,
+                false
             )
         );
     }
@@ -77,19 +80,22 @@ class VisionUtilTest {
         assertTrue(
             VisionUtil.isObservationTypeAllowed(
                 VisionIO.PoseObservationType.MEGATAG_1,
-                VisionConfig.ObservationMode.MT1_ONLY
+                VisionConfig.ObservationMode.MT1_ONLY,
+                false
             )
         );
         assertFalse(
             VisionUtil.isObservationTypeAllowed(
                 VisionIO.PoseObservationType.MEGATAG_2,
-                VisionConfig.ObservationMode.MT1_ONLY
+                VisionConfig.ObservationMode.MT1_ONLY,
+                false
             )
         );
         assertTrue(
             VisionUtil.isObservationTypeAllowed(
                 VisionIO.PoseObservationType.PHOTONVISION,
-                VisionConfig.ObservationMode.MT1_ONLY
+                VisionConfig.ObservationMode.MT1_ONLY,
+                false
             )
         );
     }
@@ -99,19 +105,72 @@ class VisionUtilTest {
         assertFalse(
             VisionUtil.isObservationTypeAllowed(
                 VisionIO.PoseObservationType.MEGATAG_1,
-                VisionConfig.ObservationMode.MT2_ONLY
+                VisionConfig.ObservationMode.MT2_ONLY,
+                false
             )
         );
         assertTrue(
             VisionUtil.isObservationTypeAllowed(
                 VisionIO.PoseObservationType.MEGATAG_2,
-                VisionConfig.ObservationMode.MT2_ONLY
+                VisionConfig.ObservationMode.MT2_ONLY,
+                false
             )
         );
         assertTrue(
             VisionUtil.isObservationTypeAllowed(
                 VisionIO.PoseObservationType.PHOTONVISION,
-                VisionConfig.ObservationMode.MT2_ONLY
+                VisionConfig.ObservationMode.MT2_ONLY,
+                false
+            )
+        );
+    }
+
+    @Test
+    void hybridObservationModeUsesMt2WhenEnabled() {
+        assertFalse(
+            VisionUtil.isObservationTypeAllowed(
+                VisionIO.PoseObservationType.MEGATAG_1,
+                VisionConfig.ObservationMode.MT2_WHILE_ENABLED_MT1_WHILE_DISABLED,
+                false
+            )
+        );
+        assertTrue(
+            VisionUtil.isObservationTypeAllowed(
+                VisionIO.PoseObservationType.MEGATAG_2,
+                VisionConfig.ObservationMode.MT2_WHILE_ENABLED_MT1_WHILE_DISABLED,
+                false
+            )
+        );
+        assertTrue(
+            VisionUtil.isObservationTypeAllowed(
+                VisionIO.PoseObservationType.PHOTONVISION,
+                VisionConfig.ObservationMode.MT2_WHILE_ENABLED_MT1_WHILE_DISABLED,
+                false
+            )
+        );
+    }
+
+    @Test
+    void hybridObservationModeUsesMt1WhenDisabled() {
+        assertTrue(
+            VisionUtil.isObservationTypeAllowed(
+                VisionIO.PoseObservationType.MEGATAG_1,
+                VisionConfig.ObservationMode.MT2_WHILE_ENABLED_MT1_WHILE_DISABLED,
+                true
+            )
+        );
+        assertFalse(
+            VisionUtil.isObservationTypeAllowed(
+                VisionIO.PoseObservationType.MEGATAG_2,
+                VisionConfig.ObservationMode.MT2_WHILE_ENABLED_MT1_WHILE_DISABLED,
+                true
+            )
+        );
+        assertTrue(
+            VisionUtil.isObservationTypeAllowed(
+                VisionIO.PoseObservationType.PHOTONVISION,
+                VisionConfig.ObservationMode.MT2_WHILE_ENABLED_MT1_WHILE_DISABLED,
+                true
             )
         );
     }

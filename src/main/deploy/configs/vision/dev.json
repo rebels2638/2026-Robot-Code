@@ -2,7 +2,7 @@
   "cameras": [
     {
       "name": "limelight-fl",
-      "observationMode": "MT2_ONLY",
+      "observationMode": "MT2_WHILE_ENABLED_MT1_WHILE_DISABLED",
       "x": 0.071188,
       "y": 0.36293,
       "z": 0.50849,
@@ -22,7 +22,7 @@
     },
     {
       "name": "limelight-bl",
-      "observationMode": "MT2_ONLY",
+      "observationMode": "MT2_WHILE_ENABLED_MT1_WHILE_DISABLED",
       "x": -0.15338,
       "y": 0.306,
       "z": 0.50849,
@@ -32,7 +32,7 @@
     },
     {
       "name": "limelight-br",
-      "observationMode": "MT2_ONLY",
+      "observationMode": "MT2_WHILE_ENABLED_MT1_WHILE_DISABLED",
       "x": -0.071188,
       "y": -0.36293,
       "z": 0.50849,
