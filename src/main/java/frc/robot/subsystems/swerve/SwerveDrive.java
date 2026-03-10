@@ -8,6 +8,7 @@ import java.util.ArrayList;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.DoubleSupplier;
+import java.util.function.Supplier;
 
 import org.littletonrobotics.junction.AutoLogOutput;
 import org.littletonrobotics.junction.Logger;
@@ -22,6 +23,7 @@ import edu.wpi.first.math.kinematics.SwerveModulePosition;
 import edu.wpi.first.math.kinematics.SwerveModuleState;
 import edu.wpi.first.math.kinematics.SwerveDriveKinematics;
 import edu.wpi.first.wpilibj.Timer;
+import edu.wpi.first.wpilibj.RobotBase;
 import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.CommandScheduler;
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
@@ -34,7 +36,6 @@ import frc.robot.configs.SwerveConfig;
 import frc.robot.configs.SwerveDrivetrainConfig;
 import frc.robot.configs.SwerveModuleGeneralConfig;
 import frc.robot.lib.util.ConfigLoader;
-import frc.robot.lib.util.DashboardMotorControlLoopConfigurator;
 import frc.robot.lib.BLine.ChassisRateLimiter;
 import frc.robot.lib.BLine.FollowPath;
 import frc.robot.lib.BLine.Path;
@@ -79,15 +80,12 @@ public class SwerveDrive extends SubsystemBase {
     public enum DesiredOmegaOverrideState {
         NONE,
         RANGED_ROTATION,
-        SNAPPED,
     }
 
     public enum CurrentOmegaOverrideState {
         NONE,
-        RANGED_NOMINAL,
-        RANGED_RETURNING,
-        SNAPPED_NOMINAL,
-        SNAPPED_RETURNING,
+        RANGED_ROTATION_NOMINAL,
+        RANGED_ROTATION_RETURNING,
     }
 
     public enum DesiredTranslationOverrideState {
@@ -122,17 +120,15 @@ public class SwerveDrive extends SubsystemBase {
     private DoubleSupplier omegaNormalizedSupplier = () -> 0.0;
 
     // Path following
-    private Path currentPath = null;
-    private boolean shouldResetPose = false;
+    private Supplier<Path> pathSupplier = () -> null;
+    private Supplier<Boolean> shouldPoseResetSupplier = () -> false;
     private Command currentPathCommand = null;
     private FollowPath.Builder followPathBuilder;
 
-    // Omega override rotation
+    // Ranged rotation
     private Rotation2d rotationRangeMin = Rotation2d.fromDegrees(-180);
     private Rotation2d rotationRangeMax = Rotation2d.fromDegrees(180);
-    private Rotation2d snapTargetAngle = Rotation2d.fromDegrees(0);
-    private PIDController omegaOverridePIDController;
-    private PIDController snappedOmegaOverridePIDController;
+    private PIDController rangedRotationPIDController;
     private static final double RANGED_ROTATION_MAX_VELOCITY_FACTOR = 0.6;
     private static final double RANGED_ROTATION_BUFFER_RAD = Math.toRadians(15.0); // Buffer to prevent oscillation at boundaries
 
@@ -193,24 +189,16 @@ public class SwerveDrive extends SubsystemBase {
     private final SwerveDrivetrainConfig drivetrainConfig;
     private SwerveDriveKinematics kinematics;
 
-    private final DashboardMotorControlLoopConfigurator driveControlLoopConfigurator;
-    private final DashboardMotorControlLoopConfigurator steerControlLoopConfigurator;
-
     private final SysIdRoutine driveCharacterizationSysIdRoutine;
     private final SysIdRoutine steerCharacterizationSysIdRoutine;
 
     @SuppressWarnings("static-access")
     private SwerveDrive() {
-        boolean useSimulation = Constants.shouldUseSimulation(Constants.SimOnlySubsystems.SWERVE);
-        SwerveConfig swerveConfig = ConfigLoader.load(
-            "swerve",
-            ConfigLoader.getModeFolder(Constants.SimOnlySubsystems.SWERVE),
-            SwerveConfig.class
-        );
+        SwerveConfig swerveConfig = ConfigLoader.load("swerve", SwerveConfig.class);
         drivetrainConfig = swerveConfig.drivetrain;
         moduleGeneralConfig = swerveConfig.moduleGeneral;
 
-        if (useSimulation) {
+        if (RobotBase.isSimulation()) {
             modules = new ModuleIO[] {
                 new ModuleIOSim(moduleGeneralConfig, 0),
                 new ModuleIOSim(moduleGeneralConfig, 1),
@@ -236,29 +224,6 @@ public class SwerveDrive extends SubsystemBase {
             gyroIO = new GyroIOPigeon2();
             PhoenixOdometryThread.getInstance().start();
         }
-
-        driveControlLoopConfigurator = new DashboardMotorControlLoopConfigurator(
-            "Swerve/driveControlLoop",
-            new DashboardMotorControlLoopConfigurator.MotorControlLoopConfig(
-                moduleGeneralConfig.driveKP,
-                moduleGeneralConfig.driveKI,
-                moduleGeneralConfig.driveKD,
-                moduleGeneralConfig.driveKS,
-                moduleGeneralConfig.driveKV,
-                moduleGeneralConfig.driveKA
-            )
-        );
-        steerControlLoopConfigurator = new DashboardMotorControlLoopConfigurator(
-            "Swerve/steerControlLoop",
-            new DashboardMotorControlLoopConfigurator.MotorControlLoopConfig(
-                moduleGeneralConfig.steerKP,
-                moduleGeneralConfig.steerKI,
-                moduleGeneralConfig.steerKD,
-                moduleGeneralConfig.steerKS,
-                moduleGeneralConfig.steerKV,
-                moduleGeneralConfig.steerKA
-            )
-        );
 
         kinematics = new SwerveDriveKinematics(
             drivetrainConfig.getFrontLeftPositionMeters(),
@@ -323,22 +288,14 @@ public class SwerveDrive extends SubsystemBase {
             )
         ).withDefaultShouldFlip();
 
-        // Configure omega override PID controllers with velocity limiting
-        omegaOverridePIDController = new PIDController(
-            drivetrainConfig.omegaOverrideKP,
-            drivetrainConfig.omegaOverrideKI,
-            drivetrainConfig.omegaOverrideKD
+        // Configure ranged rotation PID controller with velocity limiting
+        rangedRotationPIDController = new PIDController(
+            drivetrainConfig.rangedRotationKP,
+            drivetrainConfig.rangedRotationKI,
+            drivetrainConfig.rangedRotationKD
         );
-        omegaOverridePIDController.enableContinuousInput(-Math.PI, Math.PI);
-        omegaOverridePIDController.setTolerance(Math.toRadians(drivetrainConfig.rangedRotationToleranceDeg));
-
-        snappedOmegaOverridePIDController = new PIDController(
-            drivetrainConfig.omegaOverrideKP,
-            drivetrainConfig.omegaOverrideKI,
-            drivetrainConfig.omegaOverrideKD
-        );
-        snappedOmegaOverridePIDController.enableContinuousInput(-Math.PI, Math.PI);
-        snappedOmegaOverridePIDController.setTolerance(Math.toRadians(drivetrainConfig.snappedToleranceDeg));
+        rangedRotationPIDController.enableContinuousInput(-Math.PI, Math.PI);
+        // rangedRotationPIDController.setTolerance(Math.toRadians(drivetrainConfig.getRangedRotationToleranceDeg()));
 
     }
 
@@ -370,17 +327,6 @@ public class SwerveDrive extends SubsystemBase {
                 moduleInputs[i].driveVelocityMetersPerSec,
                 moduleInputs[i].steerPosition
             );
-        }
-
-        if (driveControlLoopConfigurator.hasChanged()) {
-            for (ModuleIO module : modules) {
-                module.configureDriveControlLoop(driveControlLoopConfigurator.getConfig());
-            }
-        }
-        if (steerControlLoopConfigurator.hasChanged()) {
-            for (ModuleIO module : modules) {
-                module.configureSteerControlLoop(steerControlLoopConfigurator.getConfig());
-            }
         }
 
         ArrayList<Pose2d> updatedPoses = new ArrayList<Pose2d>();
@@ -450,8 +396,8 @@ public class SwerveDrive extends SubsystemBase {
                 break;
                 
             case PREPARE_FOR_AUTO:
-                if (currentPath != null) {
-                    modulesAlignmentTargetRotation = currentPath.getInitialModuleDirection();
+                if (pathSupplier.get() != null) {
+                    modulesAlignmentTargetRotation = pathSupplier.get().getInitialModuleDirection();
                     modulesAlignmentToleranceDeg = 15;
                 }
                 if (areModulesAligned()) {
@@ -472,16 +418,9 @@ public class SwerveDrive extends SubsystemBase {
                 break;
             case RANGED_ROTATION:
                 if (isWithinRotationRange()) {
-                    currentOmegaOverrideState = CurrentOmegaOverrideState.RANGED_NOMINAL;
+                    currentOmegaOverrideState = CurrentOmegaOverrideState.RANGED_ROTATION_NOMINAL;
                 } else {
-                    currentOmegaOverrideState = CurrentOmegaOverrideState.RANGED_RETURNING;
-                }
-                break;
-            case SNAPPED:
-                if (isAtSnapTarget()) {
-                    currentOmegaOverrideState = CurrentOmegaOverrideState.SNAPPED_NOMINAL;
-                } else {
-                    currentOmegaOverrideState = CurrentOmegaOverrideState.SNAPPED_RETURNING;
+                    currentOmegaOverrideState = CurrentOmegaOverrideState.RANGED_ROTATION_RETURNING;
                 }
                 break;
         }
@@ -531,17 +470,11 @@ public class SwerveDrive extends SubsystemBase {
             case NONE:
                 handleNoneOmegaOverrideState();
                 break;
-            case RANGED_NOMINAL:
+            case RANGED_ROTATION_NOMINAL:
                 handleRangedRotationNominalOmegaOverrideState();
                 break;
-            case RANGED_RETURNING:
+            case RANGED_ROTATION_RETURNING:
                 handleRangedRotationReturningOmegaOverrideState();
-                break;
-            case SNAPPED_NOMINAL:
-                handleSnappedNominalOmegaOverrideState();
-                break;
-            case SNAPPED_RETURNING:
-                handleSnappedReturningOmegaOverrideState();
                 break;
         }
 
@@ -617,8 +550,9 @@ public class SwerveDrive extends SubsystemBase {
         }
         
         // Schedule path command if not already running
-        if (currentPath != null && (currentPathCommand == null || (!currentPathCommand.isScheduled() && !currentPathCommand.isFinished()))) {
-            currentPathCommand = buildPathCommand(currentPath);
+        Path path = pathSupplier.get();
+        if (path != null && (currentPathCommand == null || (!currentPathCommand.isScheduled() && !currentPathCommand.isFinished()))) {
+            currentPathCommand = buildPathCommand(path);
             CommandScheduler.getInstance().schedule(currentPathCommand);
         }
         // The path command handles driving via the callback
@@ -632,8 +566,8 @@ public class SwerveDrive extends SubsystemBase {
         }
         cancelPathCommand();
 
-        if (currentPath != null) {
-            alignModules(currentPath.getInitialModuleDirection(), 15);
+        if (pathSupplier.get() != null) {
+            alignModules(pathSupplier.get().getInitialModuleDirection(), 15);
         }
     }
 
@@ -676,27 +610,12 @@ public class SwerveDrive extends SubsystemBase {
 
     private void handleRangedRotationNominalOmegaOverrideState() {
         handleRangedRotationOmegaOverrideState();
-        previousOmegaOverrideState = CurrentOmegaOverrideState.RANGED_NOMINAL;
+        previousOmegaOverrideState = CurrentOmegaOverrideState.RANGED_ROTATION_NOMINAL;
     }
     
     private void handleRangedRotationReturningOmegaOverrideState() {
         handleRangedRotationOmegaOverrideState();
-        previousOmegaOverrideState = CurrentOmegaOverrideState.RANGED_RETURNING;
-    }
-
-    private void handleSnappedOmegaOverrideState() {
-        shouldOverrideOmega = true;
-        omegaOverride = calculateSnapOmega();
-    }
-
-    private void handleSnappedNominalOmegaOverrideState() {
-        handleSnappedOmegaOverrideState();
-        previousOmegaOverrideState = CurrentOmegaOverrideState.SNAPPED_NOMINAL;
-    }
-
-    private void handleSnappedReturningOmegaOverrideState() {
-        handleSnappedOmegaOverrideState();
-        previousOmegaOverrideState = CurrentOmegaOverrideState.SNAPPED_RETURNING;
+        previousOmegaOverrideState = CurrentOmegaOverrideState.RANGED_ROTATION_RETURNING;
     }
 
     private void handleNoneTranslationOverrideState() {
@@ -729,23 +648,19 @@ public class SwerveDrive extends SubsystemBase {
      * Builds a path command using the followPathBuilder, applying pose reset if configured.
      */
     private Command buildPathCommand(Path path) {
-        if (shouldResetPose) {
+        if (shouldPoseResetSupplier.get()) {
             return followPathBuilder.withPoseReset(RobotState.getInstance()::resetPose).build(path);
         }
         return followPathBuilder.withPoseReset((Pose2d pose) -> {}).build(path);
     }
+
+    
 
     /**
      * Checks if robot rotation is within the specified range.
      */
     private boolean isWithinRotationRange() {
         return isWithinRotationRange(0);
-    }
-
-    private boolean isAtSnapTarget() {
-        Rotation2d currentRotation = RobotState.getInstance().getEstimatedPose().getRotation();
-        double errorRad = MathUtil.angleModulus(snapTargetAngle.getRadians() - currentRotation.getRadians());
-        return Math.abs(errorRad) <= Math.toRadians(drivetrainConfig.snappedToleranceDeg);
     }
 
     /**
@@ -767,6 +682,14 @@ public class SwerveDrive extends SubsystemBase {
             // Range wraps around (e.g., min=170deg, max=-170deg)
             return current >= min || current <= max;
         }
+    }
+
+    /**
+     * Checks if robot rotation is within the padded/constricted range.
+     * The padded range is the user-supplied range reduced by RANGED_ROTATION_BUFFER_RAD on each side.
+     */
+    private boolean isWithinPaddedRotationRange() {
+        return isWithinRotationRange(RANGED_ROTATION_BUFFER_RAD);
     }
 
     /**
@@ -852,25 +775,13 @@ public class SwerveDrive extends SubsystemBase {
         }
         
         // Calculate PID output
-        omegaOverridePIDController.setSetpoint(targetAngle);
-        double pidOutput = omegaOverridePIDController.calculate(current);
+        rangedRotationPIDController.setSetpoint(targetAngle);
+        double pidOutput = rangedRotationPIDController.calculate(current);
         
         // Apply velocity limit (0.6 of max omega)
         double maxOmega = drivetrainConfig.maxAngularVelocityRadiansPerSec * RANGED_ROTATION_MAX_VELOCITY_FACTOR;
 
         
-        return MathUtil.clamp(pidOutput, -maxOmega, maxOmega);
-    }
-
-    private double calculateSnapOmega() {
-        Rotation2d currentRotation = RobotState.getInstance().getEstimatedPose().getRotation();
-        double current = currentRotation.getRadians();
-        double target = snapTargetAngle.getRadians();
-
-        snappedOmegaOverridePIDController.setSetpoint(target);
-        double pidOutput = snappedOmegaOverridePIDController.calculate(current);
-
-        double maxOmega = drivetrainConfig.maxAngularVelocityRadiansPerSec;
         return MathUtil.clamp(pidOutput, -maxOmega, maxOmega);
     }
 
@@ -885,16 +796,16 @@ public class SwerveDrive extends SubsystemBase {
         this.omegaNormalizedSupplier = omegaNormalized;
     }
 
-    public void setCurrentPath(Path path) {
-        this.currentPath = path;
-        this.shouldResetPose = false;
+    public void setPathSupplier(Supplier<Path> pathSupplier) {
+        this.pathSupplier = pathSupplier;
+        this.shouldPoseResetSupplier = () -> false;
         // Clear existing command to allow fresh path to be scheduled
         cancelPathCommand();
     }
 
-    public void setCurrentPath(Path path, boolean shouldResetPose) {
-        this.currentPath = path;
-        this.shouldResetPose = shouldResetPose;
+    public void setPathSupplier(Supplier<Path> pathSupplier, Supplier<Boolean> shouldPoseResetSupplier) {
+        this.pathSupplier = pathSupplier;
+        this.shouldPoseResetSupplier = shouldPoseResetSupplier;
         // Clear existing command to allow fresh path to be scheduled
         cancelPathCommand();
     }
@@ -905,11 +816,6 @@ public class SwerveDrive extends SubsystemBase {
 
         Logger.recordOutput("SwerveDrive/rotationRangeMin", min);
         Logger.recordOutput("SwerveDrive/rotationRangeMax", max);
-    }
-
-    public void setSnapTargetAngle(Rotation2d angle) {
-        this.snapTargetAngle = angle;
-        Logger.recordOutput("SwerveDrive/snapTargetAngle", angle);
     }
 
     public void setVelocityCapMaxVelocityMetersPerSec(double maxVelocity) {
@@ -1015,6 +921,7 @@ public class SwerveDrive extends SubsystemBase {
             );
         }
 
+        // TODO: SIM BUG WERE robot kind of goes off in a direction and then control comes back. happens randomly in capped state?
         if (shouldOverrideVelocityCap) {
             double maxVelocity = velocityCapMaxVelocityMetersPerSec;
             double currentMagnitude = Math.hypot(desiredRobotRelativeSpeeds.vxMetersPerSecond, desiredRobotRelativeSpeeds.vyMetersPerSecond);

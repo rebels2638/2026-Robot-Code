@@ -10,13 +10,11 @@ public interface ShooterIO {
         // Hood
         public double hoodAngleRotations = 0;
         public double hoodVelocityRotationsPerSec = 0;
-        public double hoodAppliedVolts = 0;
         public double hoodTorqueCurrent = 0;
 
         // Turret
         public double turretAngleRotations = 0;
         public double turretVelocityRotationsPerSec = 0;
-        public double turretAppliedVolts = 0;
         public double turretTorqueCurrent = 0;
 
         // Flywheel (leader)
@@ -25,7 +23,6 @@ public interface ShooterIO {
         public double flywheelTorqueCurrent = 0;
 
         // Flywheel (follower)
-        public double flywheelFollowerAppliedVolts = 0;
         public double flywheelFollowerTorqueCurrent = 0;
 
         // Temperatures

@@ -4,8 +4,8 @@ import org.littletonrobotics.junction.AutoLogOutput;
 import org.littletonrobotics.junction.Logger;
 
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
+import edu.wpi.first.wpilibj.RobotBase;
 import frc.robot.configs.KickerConfig;
-import frc.robot.constants.Constants;
 import frc.robot.lib.util.ConfigLoader;
 import frc.robot.lib.util.DashboardMotorControlLoopConfigurator;
 
@@ -19,20 +19,24 @@ public class Kicker extends SubsystemBase {
         return instance;
     }
 
-    public enum KickerSetpoint {
-        OFF(0.0),
-        FEEDING(Double.NaN),
-        KICKING(Double.NaN);
-
-        private final double rps;
-        KickerSetpoint(double rps) {
-            this.rps = rps;
-        }
-
-        public double getRps() {
-            return rps;
-        }
+    // FSM State Enums
+    public enum KickerCurrentState {
+        DISABLED,
+        HOME,
+        FEEDING,
+        KICKING
     }
+
+    public enum KickerDesiredState {
+        DISABLED,
+        HOME,
+        FEEDING,
+        KICKING
+    }
+
+    // FSM State Variables
+    private KickerCurrentState currentState = KickerCurrentState.DISABLED;
+    private KickerDesiredState desiredState = KickerDesiredState.DISABLED;
 
     private final KickerIO kickerIO;
     private final KickerIOInputsAutoLogged kickerInputs = new KickerIOInputsAutoLogged();
@@ -44,13 +48,8 @@ public class Kicker extends SubsystemBase {
     private double kickerSetpointRPS = 0.0;
 
     private Kicker() {
-        boolean useSimulation = Constants.shouldUseSimulation(Constants.SimOnlySubsystems.KICKER);
-        config = ConfigLoader.load(
-            "kicker",
-            ConfigLoader.getModeFolder(Constants.SimOnlySubsystems.KICKER),
-            KickerConfig.class
-        );
-        kickerIO = useSimulation ? new KickerIOSim(config) : new KickerIOTalonFX(config);
+        config = ConfigLoader.load("kicker", KickerConfig.class);
+        kickerIO = RobotBase.isSimulation() ? new KickerIOSim(config) : new KickerIOTalonFX(config);
 
         kickerControlLoopConfigurator = new DashboardMotorControlLoopConfigurator("Kicker/kickerControlLoop",
             new DashboardMotorControlLoopConfigurator.MotorControlLoopConfig(
@@ -74,6 +73,69 @@ public class Kicker extends SubsystemBase {
             kickerIO.configureControlLoop(kickerControlLoopConfigurator.getConfig());
         }
 
+        // FSM processing
+        handleStateTransitions();
+        handleCurrentState();
+    }
+
+    /**
+     * Determines the next measured state based on the desired state.
+     * Handles transitions between states with proper validation.
+     */
+    private void handleStateTransitions() {
+        switch (desiredState) {
+            case DISABLED:
+                currentState = KickerCurrentState.DISABLED;
+                break;
+
+            case HOME:
+                currentState = KickerCurrentState.HOME;
+                break;
+
+            case FEEDING:
+                currentState = KickerCurrentState.FEEDING;
+                break;
+
+            case KICKING:
+                currentState = KickerCurrentState.KICKING;
+                break;
+        }
+    }
+
+    /**
+     * Executes behavior for the current state.
+     */
+    private void handleCurrentState() {
+        switch (currentState) {
+            case DISABLED:
+                handleDISABLEDState();
+                break;
+            case HOME:
+                handleHomeState();
+                break;
+            case FEEDING:
+                handleFeedingState();
+                break;
+            case KICKING:
+                handleKickingState();
+                break;
+        }
+    }
+
+    private void handleDISABLEDState() {
+        setKickerVelocity(0);
+    }
+
+    private void handleHomeState() {
+        setKickerVelocity(0);
+    }
+
+    private void handleFeedingState() {
+        setKickerVelocity(config.feedingVelocityRPS);
+    }
+
+    private void handleKickingState() {
+        setKickerVelocity(config.kickingVelocityRPS);
     }
 
     private void setKickerVelocity(double velocityRotationsPerSec) {
@@ -82,11 +144,19 @@ public class Kicker extends SubsystemBase {
         kickerIO.setVelocity(velocityRotationsPerSec);
     }
 
-    public void setSetpoint(KickerSetpoint setpoint) {
-        double targetRps = setpoint == KickerSetpoint.FEEDING
-            ? config.feedingVelocityRPS
-            : setpoint == KickerSetpoint.KICKING ? config.kickingVelocityRPS : setpoint.getRps();
-        setKickerVelocity(targetRps);
+    // State getters/setters
+    @AutoLogOutput(key = "Kicker/currentState")
+    public KickerCurrentState getCurrentState() {
+        return currentState;
+    }
+
+    @AutoLogOutput(key = "Kicker/desiredState")
+    public KickerDesiredState getDesiredState() {
+        return desiredState;
+    }
+
+    public void setDesiredState(KickerDesiredState desiredState) {
+        this.desiredState = desiredState;
     }
 
     // Mechanism getters
@@ -100,4 +170,10 @@ public class Kicker extends SubsystemBase {
         return Math.abs(kickerInputs.velocityRotationsPerSec - kickerSetpointRPS) < config.kickerVelocityToleranceRPS;
     }
 
+    /**
+     * Returns true if the kicker is ready for kicking (feeding state and at setpoint).
+     */
+    public boolean isReadyForKicking() {
+        return currentState == KickerCurrentState.FEEDING && isKickerAtSetpoint();
+    }
 }

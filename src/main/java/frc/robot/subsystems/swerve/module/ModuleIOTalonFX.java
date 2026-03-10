@@ -6,7 +6,6 @@ import static edu.wpi.first.units.Units.RadiansPerSecond;
 import static edu.wpi.first.units.Units.Radians;
 import static edu.wpi.first.units.Units.Rotation;
 import static edu.wpi.first.units.Units.RotationsPerSecond;
-import static edu.wpi.first.units.Units.Volts;
 
 import java.util.Queue;
 
@@ -15,9 +14,9 @@ import com.ctre.phoenix6.CANBus;
 import com.ctre.phoenix6.StatusSignal;
 import com.ctre.phoenix6.configs.CANcoderConfiguration;
 import com.ctre.phoenix6.configs.TalonFXConfiguration;
-import com.ctre.phoenix6.controls.PositionVoltage;
+import com.ctre.phoenix6.controls.MotionMagicExpoTorqueCurrentFOC;
 import com.ctre.phoenix6.controls.TorqueCurrentFOC;
-import com.ctre.phoenix6.controls.VelocityVoltage;
+import com.ctre.phoenix6.controls.VelocityTorqueCurrentFOC;
 import com.ctre.phoenix6.hardware.CANcoder;
 import com.ctre.phoenix6.hardware.TalonFX;
 import com.ctre.phoenix6.signals.InvertedValue;
@@ -30,11 +29,9 @@ import edu.wpi.first.units.measure.Angle;
 import edu.wpi.first.units.measure.AngularVelocity;
 import edu.wpi.first.units.measure.Current;
 import edu.wpi.first.units.measure.Temperature;
-import edu.wpi.first.units.measure.Voltage;
 import edu.wpi.first.wpilibj.Timer;
 import frc.robot.configs.SwerveModuleGeneralConfig;
 import frc.robot.configs.SwerveModuleSpecificConfig;
-import frc.robot.lib.util.DashboardMotorControlLoopConfigurator.MotorControlLoopConfig;
 import frc.robot.lib.util.RebelUtil;
 import frc.robot.subsystems.swerve.PhoenixOdometryThread;
 import frc.robot.lib.util.PhoenixUtil;
@@ -51,11 +48,9 @@ public class ModuleIOTalonFX implements ModuleIO {
 
     private final StatusSignal<Angle> drivePositionStatusSignal;
     private final StatusSignal<AngularVelocity> driveVelocityStatusSignal;
-    private final StatusSignal<Voltage> driveMotorVoltage;
 
     private final StatusSignal<Angle> steerPositionStatusSignal;
     private final StatusSignal<AngularVelocity> steerVelocityStatusSignal;
-    private final StatusSignal<Voltage> steerMotorVoltage;
 
     private final StatusSignal<Angle> steerEncoderPositionStatusSignal;
     private final StatusSignal<Angle> steerEncoderAbsolutePosition;
@@ -66,17 +61,11 @@ public class ModuleIOTalonFX implements ModuleIO {
     private final StatusSignal<Current> steerTorqueCurrent;
     private final StatusSignal<Temperature> steerTemperature;
 
-    // private final VelocityTorqueCurrentFOC driveMotorRequest = new VelocityTorqueCurrentFOC(0).withSlot(0);
-    private final VelocityVoltage driveMotorRequest = new VelocityVoltage(0).withSlot(0);
-
-    // private final MotionMagicExpoTorqueCurrentFOC steerMotorRequest = new MotionMagicExpoTorqueCurrentFOC(0).withSlot(0);
-    private final PositionVoltage steerMotorRequest = new PositionVoltage(0).withSlot(0);
-
+    private final VelocityTorqueCurrentFOC driveMotorRequest = new VelocityTorqueCurrentFOC(0).withSlot(0);
+    private final MotionMagicExpoTorqueCurrentFOC steerMotorRequest = new MotionMagicExpoTorqueCurrentFOC(0).withSlot(0);
     private final TorqueCurrentFOC torqueCurrentFOCRequest = new TorqueCurrentFOC(0);
 
     private final SwerveModuleGeneralConfig generalConfig;
-    private final TalonFXConfiguration driveConfig;
-    private final TalonFXConfiguration steerConfig;
 
     private Rotation2d lastSteerAngleRad = new Rotation2d();
     private SwerveModuleState lastRequestedState = new SwerveModuleState();
@@ -85,7 +74,7 @@ public class ModuleIOTalonFX implements ModuleIO {
     public ModuleIOTalonFX(SwerveModuleGeneralConfig generalConfig, SwerveModuleSpecificConfig specificConfig) {
         this.generalConfig = generalConfig;
 
-        driveConfig = new TalonFXConfiguration();
+        TalonFXConfiguration driveConfig = new TalonFXConfiguration();
 
         driveConfig.Slot0.kP = generalConfig.driveKP;
         driveConfig.Slot0.kI = generalConfig.driveKI;
@@ -94,6 +83,9 @@ public class ModuleIOTalonFX implements ModuleIO {
         driveConfig.Slot0.kV = generalConfig.driveKV;
         driveConfig.Slot0.kA = generalConfig.driveKA;
         driveConfig.Slot0.StaticFeedforwardSign = StaticFeedforwardSignValue.UseVelocitySign;
+
+        driveConfig.MotionMagic.MotionMagicAcceleration = generalConfig.driveMotionMagicVelocityAccelerationMetersPerSecSec;
+        driveConfig.MotionMagic.MotionMagicJerk = generalConfig.driveMotionMagicVelocityJerkMetersPerSecSecSec;
 
         // Cancoder + encoder
         driveConfig.ClosedLoopGeneral.ContinuousWrap = false;
@@ -112,7 +104,11 @@ public class ModuleIOTalonFX implements ModuleIO {
                 InvertedValue.CounterClockwise_Positive;
 
         // Current and torque limiting
-        driveConfig.CurrentLimits.SupplyCurrentLimitEnable = false;
+        driveConfig.CurrentLimits.SupplyCurrentLimitEnable = true;
+        driveConfig.CurrentLimits.SupplyCurrentLimit = generalConfig.driveSupplyCurrentLimit;
+        driveConfig.CurrentLimits.SupplyCurrentLowerLimit = generalConfig.driveSupplyCurrentLimitLowerLimit;
+        driveConfig.CurrentLimits.SupplyCurrentLowerTime = generalConfig.driveSupplyCurrentLimitLowerTime;
+
         driveConfig.CurrentLimits.StatorCurrentLimitEnable = true;
         driveConfig.CurrentLimits.StatorCurrentLimit = generalConfig.driveStatorCurrentLimit;
 
@@ -137,8 +133,9 @@ public class ModuleIOTalonFX implements ModuleIO {
         PhoenixUtil.tryUntilOk(5, () -> steerEncoder.getConfigurator().apply(encoderConfig, 0.25));
 
         // Steer motor
-        steerConfig = new TalonFXConfiguration();
+        TalonFXConfiguration steerConfig = new TalonFXConfiguration();
 
+        // Motion magic expo
         steerConfig.Slot0.kP = generalConfig.steerKP;
         steerConfig.Slot0.kI = generalConfig.steerKI;
         steerConfig.Slot0.kD = generalConfig.steerKD;
@@ -146,6 +143,10 @@ public class ModuleIOTalonFX implements ModuleIO {
         steerConfig.Slot0.kV = generalConfig.steerKV;
         steerConfig.Slot0.kA = generalConfig.steerKA;
         steerConfig.Slot0.StaticFeedforwardSign = StaticFeedforwardSignValue.UseVelocitySign;
+
+        steerConfig.MotionMagic.MotionMagicExpo_kA = generalConfig.steerMotionMagicExpoKA;
+        steerConfig.MotionMagic.MotionMagicExpo_kV = generalConfig.steerMotionMagicExpoKV;
+        steerConfig.MotionMagic.MotionMagicCruiseVelocity = generalConfig.steerMotionMagicCruiseVelocityRotationsPerSec;
 
         steerConfig.MotorOutput.NeutralMode = 
             generalConfig.isSteerNeutralModeBrake ? 
@@ -165,7 +166,11 @@ public class ModuleIOTalonFX implements ModuleIO {
         steerConfig.Feedback.RotorToSensorRatio = generalConfig.steerRotorToSensorRatio;
 
         // current and torque limiting
-        steerConfig.CurrentLimits.SupplyCurrentLimitEnable = false;
+        steerConfig.CurrentLimits.SupplyCurrentLimitEnable = true;
+        steerConfig.CurrentLimits.SupplyCurrentLimit = generalConfig.steerSupplyCurrentLimit;
+        steerConfig.CurrentLimits.SupplyCurrentLowerLimit = generalConfig.steerSupplyCurrentLimitLowerLimit;
+        steerConfig.CurrentLimits.SupplyCurrentLowerTime = generalConfig.steerSupplyCurrentLimitLowerTime;
+
         steerConfig.CurrentLimits.StatorCurrentLimitEnable = true;
         steerConfig.CurrentLimits.StatorCurrentLimit = generalConfig.steerStatorCurrentLimit;
 
@@ -180,11 +185,9 @@ public class ModuleIOTalonFX implements ModuleIO {
         // status signals
         driveTorqueCurrent = driveMotor.getTorqueCurrent().clone();
         driveTemperature = driveMotor.getDeviceTemp().clone();
-        driveMotorVoltage = driveMotor.getMotorVoltage().clone();
 
         steerTorqueCurrent = steerMotor.getTorqueCurrent().clone();
         steerTemperature = steerMotor.getDeviceTemp().clone();
-        steerMotorVoltage = steerMotor.getMotorVoltage().clone();
 
         steerEncoderAbsolutePosition = steerEncoder.getAbsolutePosition().clone();
         steerEncoderPositionStatusSignal = steerEncoder.getPosition().clone();
@@ -203,11 +206,9 @@ public class ModuleIOTalonFX implements ModuleIO {
             100,
             driveTorqueCurrent,
             driveTemperature,
-            driveMotorVoltage,
 
             steerTorqueCurrent,
             steerTemperature,
-            steerMotorVoltage,
 
             steerEncoderAbsolutePosition,
             steerEncoderPositionStatusSignal
@@ -232,11 +233,9 @@ public class ModuleIOTalonFX implements ModuleIO {
         BaseStatusSignal.refreshAll(
             driveTorqueCurrent,
             driveTemperature,
-            driveMotorVoltage,
 
             steerTorqueCurrent,
             steerTemperature,
-            steerMotorVoltage,
 
             steerEncoderAbsolutePosition,
             steerEncoderPositionStatusSignal,
@@ -250,11 +249,9 @@ public class ModuleIOTalonFX implements ModuleIO {
 
         inputs.drivePositionMeters = BaseStatusSignal.getLatencyCompensatedValue(drivePositionStatusSignal, driveVelocityStatusSignal).in(Rotation);
         inputs.driveVelocityMetersPerSec = driveVelocityStatusSignal.getValue().in(RotationsPerSecond);
-        inputs.driveAppliedVolts = driveMotorVoltage.getValue().in(Volts);
 
         inputs.steerPosition = new Rotation2d(BaseStatusSignal.getLatencyCompensatedValue(steerPositionStatusSignal, steerVelocityStatusSignal).in(Radians));
         inputs.steerVelocityRadPerSec = steerVelocityStatusSignal.getValue().in(RadiansPerSecond);
-        inputs.steerAppliedVolts = steerMotorVoltage.getValue().in(Volts);
 
         inputs.steerEncoderAbsolutePosition = new Rotation2d(steerEncoderAbsolutePosition.getValue().in(Radians));
         inputs.steerEncoderPosition = new Rotation2d(steerEncoderPositionStatusSignal.getValue().in(Radians));
@@ -326,30 +323,6 @@ public class ModuleIOTalonFX implements ModuleIO {
                 steerAngle.getRotations()
             )
         );
-    }
-
-    @Override
-    public void configureDriveControlLoop(MotorControlLoopConfig config) {
-        driveConfig.Slot0.kP = config.kP();
-        driveConfig.Slot0.kI = config.kI();
-        driveConfig.Slot0.kD = config.kD();
-        driveConfig.Slot0.kS = config.kS();
-        driveConfig.Slot0.kV = config.kV();
-        driveConfig.Slot0.kA = config.kA();
-
-        PhoenixUtil.tryUntilOk(5, () -> driveMotor.getConfigurator().apply(driveConfig, 0.25));
-    }
-
-    @Override
-    public void configureSteerControlLoop(MotorControlLoopConfig config) {
-        steerConfig.Slot0.kP = config.kP();
-        steerConfig.Slot0.kI = config.kI();
-        steerConfig.Slot0.kD = config.kD();
-        steerConfig.Slot0.kS = config.kS();
-        steerConfig.Slot0.kV = config.kV();
-        steerConfig.Slot0.kA = config.kA();
-
-        PhoenixUtil.tryUntilOk(5, () -> steerMotor.getConfigurator().apply(steerConfig, 0.25));
     }
 
     @Override

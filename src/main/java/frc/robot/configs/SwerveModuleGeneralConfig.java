@@ -5,6 +5,10 @@ import com.ctre.phoenix6.signals.SensorDirectionValue;
 
 public class SwerveModuleGeneralConfig {
     public String canBusName;
+
+    public double driveSupplyCurrentLimit;
+    public double driveSupplyCurrentLimitLowerTime;
+    public double driveSupplyCurrentLimitLowerLimit;
     public double driveStatorCurrentLimit;
     public double drivePeakForwardTorqueCurrent;
     public double drivePeakReverseTorqueCurrent;
@@ -16,12 +20,19 @@ public class SwerveModuleGeneralConfig {
     public double driveKI;
     public double driveKD;
 
+    public double driveMotionMagicVelocityAccelerationMetersPerSecSec;
+    public double driveMotionMagicVelocityDecelerationMetersPerSecSec;
+    public double driveMotionMagicVelocityJerkMetersPerSecSecSec;
+
     public double driveMaxVelocityMetersPerSec;
     public boolean isDriveNeutralModeBrake;
 
     public double driveMotorToOutputShaftRatio;
     public double driveWheelRadiusMeters;
 
+    public double steerSupplyCurrentLimit;
+    public double steerSupplyCurrentLimitLowerTime;
+    public double steerSupplyCurrentLimitLowerLimit;
     public double steerStatorCurrentLimit;
     public double steerPeakForwardTorqueCurrent;
     public double steerPeakReverseTorqueCurrent;
@@ -32,6 +43,10 @@ public class SwerveModuleGeneralConfig {
     public double steerKP;
     public double steerKI;
     public double steerKD;
+
+    public double steerMotionMagicExpoKA;
+    public double steerMotionMagicExpoKV;
+    public double steerMotionMagicCruiseVelocityRotationsPerSec;
 
     public boolean isSteerNeutralModeBrake;
 

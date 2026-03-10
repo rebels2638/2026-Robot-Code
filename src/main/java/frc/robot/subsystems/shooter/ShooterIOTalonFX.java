@@ -4,7 +4,6 @@ import static edu.wpi.first.units.Units.Amps;
 import static edu.wpi.first.units.Units.Fahrenheit;
 import static edu.wpi.first.units.Units.Rotations;
 import static edu.wpi.first.units.Units.RotationsPerSecond;
-import static edu.wpi.first.units.Units.Volts;
 
 import org.littletonrobotics.junction.Logger;
 
@@ -28,7 +27,6 @@ import edu.wpi.first.units.measure.Angle;
 import edu.wpi.first.units.measure.AngularVelocity;
 import edu.wpi.first.units.measure.Current;
 import edu.wpi.first.units.measure.Temperature;
-import edu.wpi.first.units.measure.Voltage;
 import frc.robot.configs.ShooterConfig;
 import frc.robot.lib.util.DashboardMotorControlLoopConfigurator.MotorControlLoopConfig;
 import frc.robot.lib.util.PhoenixUtil;
@@ -41,14 +39,11 @@ public class ShooterIOTalonFX implements ShooterIO {
 
     private final StatusSignal<Angle> hoodPositionStatusSignal;
     private final StatusSignal<AngularVelocity> hoodVelocityStatusSignal;
-    private final StatusSignal<Voltage> hoodMotorVoltage;
 
     private final StatusSignal<Angle> turretPositionStatusSignal;
     private final StatusSignal<AngularVelocity> turretVelocityStatusSignal;
-    private final StatusSignal<Voltage> turretMotorVoltage;
 
     private final StatusSignal<AngularVelocity> flywheelVelocityStatusSignal;
-    private final StatusSignal<Voltage> flywheelMotorVoltage;
 
     private final StatusSignal<Current> hoodTorqueCurrent;
     private final StatusSignal<Temperature> hoodTemperature;
@@ -61,7 +56,6 @@ public class ShooterIOTalonFX implements ShooterIO {
 
     private final StatusSignal<Current> flywheelFollowerTorqueCurrent;
     private final StatusSignal<Temperature> flywheelFollowerTemperature;
-    private final StatusSignal<Voltage> flywheelFollowerMotorVoltage;
 
     private final PositionVoltage hoodMotorRequest = new PositionVoltage(0).withSlot(0);
     private final MotionMagicVoltage turretMotorRequest = new MotionMagicVoltage(0).withSlot(0);
@@ -95,7 +89,11 @@ public class ShooterIOTalonFX implements ShooterIO {
             InvertedValue.Clockwise_Positive : InvertedValue.CounterClockwise_Positive;
 
         // Current and torque limiting
-        hoodConfig.CurrentLimits.SupplyCurrentLimitEnable = false;
+        hoodConfig.CurrentLimits.SupplyCurrentLimitEnable = true;
+        hoodConfig.CurrentLimits.SupplyCurrentLimit = config.hoodSupplyCurrentLimit;
+        hoodConfig.CurrentLimits.SupplyCurrentLowerLimit = config.hoodSupplyCurrentLimitLowerLimit;
+        hoodConfig.CurrentLimits.SupplyCurrentLowerTime = config.hoodSupplyCurrentLimitLowerTime;
+
         hoodConfig.CurrentLimits.StatorCurrentLimitEnable = true;
         hoodConfig.CurrentLimits.StatorCurrentLimit = config.hoodStatorCurrentLimit;
 
@@ -132,7 +130,11 @@ public class ShooterIOTalonFX implements ShooterIO {
             InvertedValue.Clockwise_Positive : InvertedValue.CounterClockwise_Positive;
 
         // Current and torque limiting
-        turretConfig.CurrentLimits.SupplyCurrentLimitEnable = false;
+        turretConfig.CurrentLimits.SupplyCurrentLimitEnable = true;
+        turretConfig.CurrentLimits.SupplyCurrentLimit = config.turretSupplyCurrentLimit;
+        turretConfig.CurrentLimits.SupplyCurrentLowerLimit = config.turretSupplyCurrentLimitLowerLimit;
+        turretConfig.CurrentLimits.SupplyCurrentLowerTime = config.turretSupplyCurrentLimitLowerTime;
+
         turretConfig.CurrentLimits.StatorCurrentLimitEnable = true;
         turretConfig.CurrentLimits.StatorCurrentLimit = config.turretStatorCurrentLimit;
 
@@ -176,7 +178,11 @@ public class ShooterIOTalonFX implements ShooterIO {
             InvertedValue.Clockwise_Positive : InvertedValue.CounterClockwise_Positive;
 
         // Current and torque limiting
-        flywheelConfig.CurrentLimits.SupplyCurrentLimitEnable = false;
+        flywheelConfig.CurrentLimits.SupplyCurrentLimitEnable = true;
+        flywheelConfig.CurrentLimits.SupplyCurrentLimit = config.flywheelSupplyCurrentLimit;
+        flywheelConfig.CurrentLimits.SupplyCurrentLowerLimit = config.flywheelSupplyCurrentLimitLowerLimit;
+        flywheelConfig.CurrentLimits.SupplyCurrentLowerTime = config.flywheelSupplyCurrentLimitLowerTime;
+
         flywheelConfig.CurrentLimits.StatorCurrentLimitEnable = true;
         flywheelConfig.CurrentLimits.StatorCurrentLimit = config.flywheelStatorCurrentLimit;
 
@@ -195,7 +201,11 @@ public class ShooterIOTalonFX implements ShooterIO {
         // Follower inverted state will be handled by the Follower control request
 
         // Current and torque limiting (same as leader)
-        flywheelFollowerConfig.CurrentLimits.SupplyCurrentLimitEnable = false;
+        flywheelFollowerConfig.CurrentLimits.SupplyCurrentLimitEnable = true;
+        flywheelFollowerConfig.CurrentLimits.SupplyCurrentLimit = config.flywheelSupplyCurrentLimit;
+        flywheelFollowerConfig.CurrentLimits.SupplyCurrentLowerLimit = config.flywheelSupplyCurrentLimitLowerLimit;
+        flywheelFollowerConfig.CurrentLimits.SupplyCurrentLowerTime = config.flywheelSupplyCurrentLimitLowerTime;
+
         flywheelFollowerConfig.CurrentLimits.StatorCurrentLimitEnable = true;
         flywheelFollowerConfig.CurrentLimits.StatorCurrentLimit = config.flywheelStatorCurrentLimit;
 
@@ -214,19 +224,15 @@ public class ShooterIOTalonFX implements ShooterIO {
         // Status signals
         hoodTorqueCurrent = hoodMotor.getTorqueCurrent().clone();
         hoodTemperature = hoodMotor.getDeviceTemp().clone();
-        hoodMotorVoltage = hoodMotor.getMotorVoltage().clone();
 
         turretTorqueCurrent = turretMotor.getTorqueCurrent().clone();
         turretTemperature = turretMotor.getDeviceTemp().clone();
-        turretMotorVoltage = turretMotor.getMotorVoltage().clone();
 
         flywheelTorqueCurrent = flywheelMotor.getTorqueCurrent().clone();
         flywheelTemperature = flywheelMotor.getDeviceTemp().clone();
-        flywheelMotorVoltage = flywheelMotor.getMotorVoltage().clone();
 
         flywheelFollowerTorqueCurrent = flywheelFollowerMotor.getTorqueCurrent().clone();
         flywheelFollowerTemperature = flywheelFollowerMotor.getDeviceTemp().clone();
-        flywheelFollowerMotorVoltage = flywheelFollowerMotor.getMotorVoltage().clone();
 
         hoodPositionStatusSignal = hoodMotor.getPosition().clone();
         hoodVelocityStatusSignal = hoodMotor.getVelocity().clone();
@@ -237,10 +243,10 @@ public class ShooterIOTalonFX implements ShooterIO {
         flywheelVelocityStatusSignal = flywheelMotor.getVelocity().clone();
 
         BaseStatusSignal.setUpdateFrequencyForAll(100,
-            hoodTorqueCurrent, hoodTemperature, hoodMotorVoltage,
-            turretTorqueCurrent, turretTemperature, turretMotorVoltage,
-            flywheelTorqueCurrent, flywheelTemperature, flywheelMotorVoltage,
-            flywheelFollowerTorqueCurrent, flywheelFollowerTemperature, flywheelFollowerMotorVoltage,
+            hoodTorqueCurrent, hoodTemperature,
+            turretTorqueCurrent, turretTemperature,
+            flywheelTorqueCurrent, flywheelTemperature,
+            flywheelFollowerTorqueCurrent, flywheelFollowerTemperature,
             hoodPositionStatusSignal, hoodVelocityStatusSignal,
             turretPositionStatusSignal, turretVelocityStatusSignal,
             flywheelVelocityStatusSignal);
@@ -254,27 +260,24 @@ public class ShooterIOTalonFX implements ShooterIO {
     @Override
     public void updateInputs(ShooterIOInputs inputs) {
         BaseStatusSignal.refreshAll(
-            hoodTorqueCurrent, hoodTemperature, hoodMotorVoltage,
-            turretTorqueCurrent, turretTemperature, turretMotorVoltage,
-            flywheelTorqueCurrent, flywheelTemperature, flywheelMotorVoltage,
-            flywheelFollowerTorqueCurrent, flywheelFollowerTemperature, flywheelFollowerMotorVoltage,
+            hoodTorqueCurrent, hoodTemperature,
+            turretTorqueCurrent, turretTemperature,
+            flywheelTorqueCurrent, flywheelTemperature,
+            flywheelFollowerTorqueCurrent, flywheelFollowerTemperature,
             hoodPositionStatusSignal, hoodVelocityStatusSignal,
             turretPositionStatusSignal, turretVelocityStatusSignal,
             flywheelVelocityStatusSignal);
 
         inputs.hoodAngleRotations = hoodPositionStatusSignal.getValue().in(Rotations);
         inputs.hoodVelocityRotationsPerSec = hoodVelocityStatusSignal.getValue().in(RotationsPerSecond);
-        inputs.hoodAppliedVolts = hoodMotorVoltage.getValue().in(Volts);
 
         inputs.turretAngleRotations = turretPositionStatusSignal.getValue().in(Rotations);
         inputs.turretVelocityRotationsPerSec = turretVelocityStatusSignal.getValue().in(RotationsPerSecond);
-        inputs.turretAppliedVolts = turretMotorVoltage.getValue().in(Volts);
 
         inputs.flywheelVelocityRotationsPerSec = flywheelVelocityStatusSignal.getValue().in(RotationsPerSecond);
-        inputs.flywheelAppliedVolts = flywheelMotorVoltage.getValue().in(Volts);
+        inputs.flywheelAppliedVolts = flywheelMotor.getMotorVoltage().getValueAsDouble();
         inputs.flywheelTorqueCurrent = flywheelTorqueCurrent.getValue().in(Amps);
 
-        inputs.flywheelFollowerAppliedVolts = flywheelFollowerMotorVoltage.getValue().in(Volts);
         inputs.flywheelFollowerTorqueCurrent = flywheelFollowerTorqueCurrent.getValue().in(Amps);
 
         inputs.hoodTorqueCurrent = hoodTorqueCurrent.getValue().in(Amps);

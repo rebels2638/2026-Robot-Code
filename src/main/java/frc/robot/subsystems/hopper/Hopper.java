@@ -3,9 +3,9 @@ package frc.robot.subsystems.hopper;
 import org.littletonrobotics.junction.AutoLogOutput;
 import org.littletonrobotics.junction.Logger;
 
+import edu.wpi.first.wpilibj.RobotBase;
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
 import frc.robot.configs.HopperConfig;
-import frc.robot.constants.Constants;
 import frc.robot.lib.util.ConfigLoader;
 import frc.robot.lib.util.DashboardMotorControlLoopConfigurator;
 
@@ -19,20 +19,22 @@ public class Hopper extends SubsystemBase {
         return instance;
     }
 
-    public enum HopperSetpoint {
-        OFF(0.0),
-        FEEDING(Double.NaN),
-        REVERSE(Double.NaN);
-
-        private final double rps;
-        HopperSetpoint(double rps) {
-            this.rps = rps;
-        }
-
-        public double getRps() {
-            return rps;
-        }
+    public enum HopperCurrentState {
+        DISABLED,
+        HOME,
+        FEEDING,
+        REVERSE
     }
+
+    public enum HopperDesiredState {
+        DISABLED,
+        HOME,
+        FEEDING,
+        REVERSE
+    }
+
+    private HopperCurrentState currentState = HopperCurrentState.DISABLED;
+    private HopperDesiredState desiredState = HopperDesiredState.DISABLED;
 
     private final HopperIO hopperIO;
     private final HopperIOInputsAutoLogged hopperInputs = new HopperIOInputsAutoLogged();
@@ -44,13 +46,8 @@ public class Hopper extends SubsystemBase {
     private double hopperSetpointRPS = 0.0;
 
     private Hopper() {
-        boolean useSimulation = Constants.shouldUseSimulation(Constants.SimOnlySubsystems.HOPPER);
-        config = ConfigLoader.load(
-            "hopper",
-            ConfigLoader.getModeFolder(Constants.SimOnlySubsystems.HOPPER),
-            HopperConfig.class
-        );
-        hopperIO = useSimulation ? new HopperIOSim(config) : new HopperIOTalonFX(config);
+        config = ConfigLoader.load("hopper", HopperConfig.class);
+        hopperIO = RobotBase.isSimulation() ? new HopperIOSim(config) : new HopperIOTalonFX(config);
 
         hopperControlLoopConfigurator = new DashboardMotorControlLoopConfigurator("Hopper/hopperControlLoop",
             new DashboardMotorControlLoopConfigurator.MotorControlLoopConfig(
@@ -73,6 +70,58 @@ public class Hopper extends SubsystemBase {
             hopperIO.configureControlLoop(hopperControlLoopConfigurator.getConfig());
         }
 
+        handleStateTransitions();
+        handleCurrentState();
+    }
+
+    private void handleStateTransitions() {
+        switch (desiredState) {
+            case DISABLED:
+                currentState = HopperCurrentState.DISABLED;
+                break;
+            case HOME:
+                currentState = HopperCurrentState.HOME;
+                break;
+            case FEEDING:
+                currentState = HopperCurrentState.FEEDING;
+                break;
+            case REVERSE:
+                currentState = HopperCurrentState.REVERSE;
+                break;
+        }
+    }
+
+    private void handleCurrentState() {
+        switch (currentState) {
+            case DISABLED:
+                handleDISABLEDState();
+                break;
+            case HOME:
+                handleHomeState();
+                break;
+            case FEEDING:
+                handleFeedingState();
+                break;
+            case REVERSE:
+                handleReverseState();
+                break;
+        }
+    }
+
+    private void handleDISABLEDState() {
+        setHopperVelocity(0);
+    }
+
+    private void handleHomeState() {
+        setHopperVelocity(0);
+    }
+
+    private void handleFeedingState() {
+        setHopperVelocity(config.feedingVelocityRPS);
+    }
+
+    private void handleReverseState() {
+        setHopperVelocity(config.reverseVelocityRPS);
     }
 
     private void setHopperVelocity(double velocityRotationsPerSec) {
@@ -81,11 +130,18 @@ public class Hopper extends SubsystemBase {
         hopperIO.setVelocity(velocityRotationsPerSec);
     }
 
-    public void setSetpoint(HopperSetpoint setpoint) {
-        double targetRps = setpoint == HopperSetpoint.FEEDING
-            ? config.feedingVelocityRPS
-            : setpoint == HopperSetpoint.REVERSE ? config.reverseVelocityRPS : setpoint.getRps();
-        setHopperVelocity(targetRps);
+    @AutoLogOutput(key = "Hopper/currentState")
+    public HopperCurrentState getCurrentState() {
+        return currentState;
+    }
+
+    @AutoLogOutput(key = "Hopper/desiredState")
+    public HopperDesiredState getDesiredState() {
+        return desiredState;
+    }
+
+    public void setDesiredState(HopperDesiredState desiredState) {
+        this.desiredState = desiredState;
     }
 
     public double getHopperVelocityRotationsPerSec() {

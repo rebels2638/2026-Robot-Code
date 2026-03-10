@@ -3,9 +3,9 @@ package frc.robot.subsystems.climber;
 import org.littletonrobotics.junction.AutoLogOutput;
 import org.littletonrobotics.junction.Logger;
 
+import edu.wpi.first.wpilibj.RobotBase;
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
 import frc.robot.configs.ClimberConfig;
-import frc.robot.constants.Constants;
 import frc.robot.lib.util.ConfigLoader;
 import frc.robot.lib.util.DashboardMotorControlLoopConfigurator;
 
@@ -19,11 +19,25 @@ public class Climber extends SubsystemBase {
         return instance;
     }
 
-    public enum ClimberSetpoint {
+    public enum ClimberCurrentState {
+        DISABLED,
+        HOME,
+        TRANSITIONING_TO_HOME,
+        READY,
+        TRANSITIONING_TO_READY,
+        LIFTED,
+        TRANSITIONING_TO_LIFTED
+    }
+
+    public enum ClimberDesiredState {
+        DISABLED,
         HOME,
         READY,
         LIFTED
     }
+
+    private ClimberCurrentState currentState = ClimberCurrentState.DISABLED;
+    private ClimberDesiredState desiredState = ClimberDesiredState.DISABLED;
 
     private final ClimberIO climberIO;
     private final ClimberIOInputsAutoLogged climberInputs = new ClimberIOInputsAutoLogged();
@@ -35,13 +49,8 @@ public class Climber extends SubsystemBase {
     private double targetPositionRotations = 0.0;
 
     private Climber() {
-        boolean useSimulation = Constants.shouldUseSimulation(Constants.SimOnlySubsystems.CLIMBER);
-        config = ConfigLoader.load(
-            "climber",
-            ConfigLoader.getModeFolder(Constants.SimOnlySubsystems.CLIMBER),
-            ClimberConfig.class
-        );
-        climberIO = useSimulation ? new ClimberIOSim(config) : new ClimberIOTalonFX(config);
+        config = ConfigLoader.load("climber", ClimberConfig.class);
+        climberIO = RobotBase.isSimulation() ? new ClimberIOSim(config) : new ClimberIOTalonFX(config);
 
         climberControlLoopConfigurator = new DashboardMotorControlLoopConfigurator("Climber/climberControlLoop",
             new DashboardMotorControlLoopConfigurator.MotorControlLoopConfig(
@@ -64,6 +73,67 @@ public class Climber extends SubsystemBase {
             climberIO.configureControlLoop(climberControlLoopConfigurator.getConfig());
         }
 
+        handleStateTransitions();
+        handleCurrentState();
+    }
+
+    private void handleStateTransitions() {
+        switch (desiredState) {
+            case DISABLED:
+                currentState = ClimberCurrentState.DISABLED;
+                break;
+            case HOME:
+                currentState = isAtPosition(config.climberHomePositionRotations)
+                    ? ClimberCurrentState.HOME
+                    : ClimberCurrentState.TRANSITIONING_TO_HOME;
+                break;
+            case READY:
+                currentState = isAtPosition(config.climberReadyPositionRotations)
+                    ? ClimberCurrentState.READY
+                    : ClimberCurrentState.TRANSITIONING_TO_READY;
+                break;
+            case LIFTED:
+                currentState = isAtPosition(config.climberLiftedPositionRotations)
+                    ? ClimberCurrentState.LIFTED
+                    : ClimberCurrentState.TRANSITIONING_TO_LIFTED;
+                break;
+        }
+    }
+
+    private void handleCurrentState() {
+        switch (currentState) {
+            case DISABLED:
+                handleDISABLEDState();
+                break;
+            case HOME:
+            case TRANSITIONING_TO_HOME:
+                handleHomeState();
+                break;
+            case READY:
+            case TRANSITIONING_TO_READY:
+                handleReadyState();
+                break;
+            case LIFTED:
+            case TRANSITIONING_TO_LIFTED:
+                handleLiftedState();
+                break;
+        }
+    }
+
+    private void handleDISABLEDState() {
+        climberIO.setVoltage(0);
+    }
+
+    private void handleHomeState() {
+        setClimberPosition(config.climberHomePositionRotations);
+    }
+
+    private void handleReadyState() {
+        setClimberPosition(config.climberReadyPositionRotations);
+    }
+
+    private void handleLiftedState() {
+        setClimberPosition(config.climberLiftedPositionRotations);
     }
 
     private void setClimberPosition(double positionRotations) {
@@ -76,22 +146,18 @@ public class Climber extends SubsystemBase {
         return Math.abs(climberInputs.positionRotations - positionRotations) < config.climberPositionToleranceRotations;
     }
 
-    public void setSetpoint(ClimberSetpoint setpoint) {
-        switch (setpoint) {
-            case HOME:
-                setClimberPosition(config.climberHomePositionRotations);
-                break;
-            case READY:
-                setClimberPosition(config.climberReadyPositionRotations);
-                break;
-            case LIFTED:
-                setClimberPosition(config.climberLiftedPositionRotations);
-                break;
-        }
+    @AutoLogOutput(key = "Climber/currentState")
+    public ClimberCurrentState getCurrentState() {
+        return currentState;
     }
 
-    public void setDisabled() {
-        climberIO.setVoltage(0);
+    @AutoLogOutput(key = "Climber/desiredState")
+    public ClimberDesiredState getDesiredState() {
+        return desiredState;
+    }
+
+    public void setDesiredState(ClimberDesiredState desiredState) {
+        this.desiredState = desiredState;
     }
 
     public double getClimberPositionRotations() {

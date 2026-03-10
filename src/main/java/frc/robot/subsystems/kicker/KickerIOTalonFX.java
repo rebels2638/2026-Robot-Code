@@ -3,7 +3,6 @@ package frc.robot.subsystems.kicker;
 import static edu.wpi.first.units.Units.Amps;
 import static edu.wpi.first.units.Units.Fahrenheit;
 import static edu.wpi.first.units.Units.RotationsPerSecond;
-import static edu.wpi.first.units.Units.Volts;
 
 import com.ctre.phoenix6.BaseStatusSignal;
 import com.ctre.phoenix6.CANBus;
@@ -19,7 +18,6 @@ import com.ctre.phoenix6.signals.StaticFeedforwardSignValue;
 import edu.wpi.first.units.measure.AngularVelocity;
 import edu.wpi.first.units.measure.Current;
 import edu.wpi.first.units.measure.Temperature;
-import edu.wpi.first.units.measure.Voltage;
 import frc.robot.configs.KickerConfig;
 import frc.robot.lib.util.DashboardMotorControlLoopConfigurator.MotorControlLoopConfig;
 import frc.robot.lib.util.PhoenixUtil;
@@ -28,15 +26,17 @@ public class KickerIOTalonFX implements KickerIO {
     private final TalonFX kickerMotor;
 
     private final StatusSignal<AngularVelocity> kickerVelocityStatusSignal;
-    private final StatusSignal<Voltage> kickerMotorVoltage;
     private final StatusSignal<Current> kickerTorqueCurrent;
     private final StatusSignal<Temperature> kickerTemperature;
 
     private final VelocityVoltage kickerMotorRequest = new VelocityVoltage(0).withSlot(0);
 
+    private final KickerConfig config;
     private final TalonFXConfiguration kickerConfig;
 
     public KickerIOTalonFX(KickerConfig config) {
+        this.config = config;
+
         // Kicker motor configuration (velocity control)
         kickerConfig = new TalonFXConfiguration();
 
@@ -56,7 +56,11 @@ public class KickerIOTalonFX implements KickerIO {
             InvertedValue.Clockwise_Positive : InvertedValue.CounterClockwise_Positive;
 
         // Current and torque limiting
-        kickerConfig.CurrentLimits.SupplyCurrentLimitEnable = false;
+        kickerConfig.CurrentLimits.SupplyCurrentLimitEnable = true;
+        kickerConfig.CurrentLimits.SupplyCurrentLimit = config.kickerSupplyCurrentLimit;
+        kickerConfig.CurrentLimits.SupplyCurrentLowerLimit = config.kickerSupplyCurrentLimitLowerLimit;
+        kickerConfig.CurrentLimits.SupplyCurrentLowerTime = config.kickerSupplyCurrentLimitLowerTime;
+
         kickerConfig.CurrentLimits.StatorCurrentLimitEnable = true;
         kickerConfig.CurrentLimits.StatorCurrentLimit = config.kickerStatorCurrentLimit;
 
@@ -72,11 +76,10 @@ public class KickerIOTalonFX implements KickerIO {
         kickerTorqueCurrent = kickerMotor.getTorqueCurrent().clone();
         kickerTemperature = kickerMotor.getDeviceTemp().clone();
         kickerVelocityStatusSignal = kickerMotor.getVelocity().clone();
-        kickerMotorVoltage = kickerMotor.getMotorVoltage().clone();
 
         BaseStatusSignal.setUpdateFrequencyForAll(100,
             kickerTorqueCurrent, kickerTemperature,
-            kickerVelocityStatusSignal, kickerMotorVoltage);
+            kickerVelocityStatusSignal);
 
         kickerMotor.optimizeBusUtilization();
     }
@@ -85,10 +88,10 @@ public class KickerIOTalonFX implements KickerIO {
     public void updateInputs(KickerIOInputs inputs) {
         BaseStatusSignal.refreshAll(
             kickerTorqueCurrent, kickerTemperature,
-            kickerVelocityStatusSignal, kickerMotorVoltage);
+            kickerVelocityStatusSignal);
 
         inputs.velocityRotationsPerSec = kickerVelocityStatusSignal.getValue().in(RotationsPerSecond);
-        inputs.appliedVolts = kickerMotorVoltage.getValue().in(Volts);
+        inputs.appliedVolts = kickerMotor.getMotorVoltage().getValueAsDouble();
         inputs.torqueCurrent = kickerTorqueCurrent.getValue().in(Amps);
         inputs.temperatureFahrenheit = kickerTemperature.getValue().in(Fahrenheit);
     }

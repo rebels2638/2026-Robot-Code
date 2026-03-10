@@ -3,7 +3,6 @@ package frc.robot.subsystems.hopper;
 import static edu.wpi.first.units.Units.Amps;
 import static edu.wpi.first.units.Units.Fahrenheit;
 import static edu.wpi.first.units.Units.RotationsPerSecond;
-import static edu.wpi.first.units.Units.Volts;
 
 import com.ctre.phoenix6.BaseStatusSignal;
 import com.ctre.phoenix6.CANBus;
@@ -19,7 +18,6 @@ import com.ctre.phoenix6.signals.StaticFeedforwardSignValue;
 import edu.wpi.first.units.measure.AngularVelocity;
 import edu.wpi.first.units.measure.Current;
 import edu.wpi.first.units.measure.Temperature;
-import edu.wpi.first.units.measure.Voltage;
 import frc.robot.configs.HopperConfig;
 import frc.robot.lib.util.DashboardMotorControlLoopConfigurator.MotorControlLoopConfig;
 import frc.robot.lib.util.PhoenixUtil;
@@ -28,7 +26,6 @@ public class HopperIOTalonFX implements HopperIO {
     private final TalonFX hopperMotor;
 
     private final StatusSignal<AngularVelocity> hopperVelocityStatusSignal;
-    private final StatusSignal<Voltage> hopperMotorVoltage;
     private final StatusSignal<Current> hopperTorqueCurrent;
     private final StatusSignal<Temperature> hopperTemperature;
 
@@ -55,7 +52,11 @@ public class HopperIOTalonFX implements HopperIO {
             ? InvertedValue.Clockwise_Positive
             : InvertedValue.CounterClockwise_Positive;
 
-        hopperConfig.CurrentLimits.SupplyCurrentLimitEnable = false;
+        hopperConfig.CurrentLimits.SupplyCurrentLimitEnable = true;
+        hopperConfig.CurrentLimits.SupplyCurrentLimit = config.hopperSupplyCurrentLimit;
+        hopperConfig.CurrentLimits.SupplyCurrentLowerLimit = config.hopperSupplyCurrentLimitLowerLimit;
+        hopperConfig.CurrentLimits.SupplyCurrentLowerTime = config.hopperSupplyCurrentLimitLowerTime;
+
         hopperConfig.CurrentLimits.StatorCurrentLimitEnable = true;
         hopperConfig.CurrentLimits.StatorCurrentLimit = config.hopperStatorCurrentLimit;
 
@@ -70,11 +71,10 @@ public class HopperIOTalonFX implements HopperIO {
         hopperTorqueCurrent = hopperMotor.getTorqueCurrent().clone();
         hopperTemperature = hopperMotor.getDeviceTemp().clone();
         hopperVelocityStatusSignal = hopperMotor.getVelocity().clone();
-        hopperMotorVoltage = hopperMotor.getMotorVoltage().clone();
 
         BaseStatusSignal.setUpdateFrequencyForAll(100,
             hopperTorqueCurrent, hopperTemperature,
-            hopperVelocityStatusSignal, hopperMotorVoltage);
+            hopperVelocityStatusSignal);
 
         hopperMotor.optimizeBusUtilization();
     }
@@ -83,10 +83,10 @@ public class HopperIOTalonFX implements HopperIO {
     public void updateInputs(HopperIOInputs inputs) {
         BaseStatusSignal.refreshAll(
             hopperTorqueCurrent, hopperTemperature,
-            hopperVelocityStatusSignal, hopperMotorVoltage);
+            hopperVelocityStatusSignal);
 
         inputs.velocityRotationsPerSec = hopperVelocityStatusSignal.getValue().in(RotationsPerSecond);
-        inputs.appliedVolts = hopperMotorVoltage.getValue().in(Volts);
+        inputs.appliedVolts = hopperMotor.getMotorVoltage().getValueAsDouble();
         inputs.torqueCurrent = hopperTorqueCurrent.getValue().in(Amps);
         inputs.temperatureFahrenheit = hopperTemperature.getValue().in(Fahrenheit);
     }
