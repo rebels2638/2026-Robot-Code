@@ -356,10 +356,10 @@ public class Superstructure extends SubsystemBase {
             currentIntakeState = CurrentIntakeState.DISABLED;
             return;
         }
-        if (currentSystemState == CurrentSystemState.HOME) {
-            currentIntakeState = CurrentIntakeState.STOWED;
-            return;
-        }
+        // if (currentSystemState == CurrentSystemState.HOME) {
+        //     currentIntakeState = CurrentIntakeState.STOWED;
+        //     return;
+        // }
 
         currentIntakeState = switch (desiredIntakeState) {
             case DISABLED -> CurrentIntakeState.DISABLED;
@@ -625,7 +625,7 @@ public class Superstructure extends SubsystemBase {
         boolean distanceInRange = isDistanceInRange(effectiveDistance, minShotDistance, maxShotDistance);
         boolean readyForShot = shooterReady
             && distanceInRange
-            && context.lineOfSightClear()
+            // && context.lineOfSightClear()
             && context.zoneAllowsTarget();
 
         return new ShotReadinessData(

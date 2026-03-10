@@ -52,10 +52,11 @@ public class RobotContainer {
 
     private final RobotState robotState = RobotState.getInstance();
     private final SwerveDrive swerveDrive = SwerveDrive.getInstance();
-    private final Superstructure superstructure = Superstructure.getInstance();
     private final Vision vision = Vision.getInstance();
     private final Shooter shooter = Shooter.getInstance();
     private final Hopper hopper = Hopper.getInstance();
+    private final Intake intake = Intake.getInstance();
+    private final Superstructure superstructure = Superstructure.getInstance();
 
     LoggedNetworkNumber shooterFlywheelSet = new LoggedNetworkNumber("flywheelSet", 0);
     LoggedNetworkNumber turret = new LoggedNetworkNumber("turretSet", 180);
@@ -132,6 +133,14 @@ public class RobotContainer {
         );
         getRightBumper.onFalse(
             new InstantCommand(() -> superstructure.setDesiredSystemState(Superstructure.DesiredSystemState.HOME))
+        );
+
+        Trigger getLeftBumper = new Trigger(() -> xboxDriver.getLeftTrigger() > 0.5);
+        getLeftBumper.onTrue(
+            new InstantCommand(() -> superstructure.setDesiredIntakeState(Superstructure.DesiredIntakeState.INTAKING))
+        );
+        getLeftBumper.onFalse(
+            new InstantCommand(() -> superstructure.setDesiredIntakeState(Superstructure.DesiredIntakeState.DEPLOYED))
         );
 
         // xboxDriver.getBButton().onTrue(
