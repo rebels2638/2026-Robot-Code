@@ -137,6 +137,8 @@
   "flywheelStatorCurrentLimit": 80.0,
   "flywheelPeakForwardTorqueCurrent": 80.0,
   "flywheelPeakReverseTorqueCurrent": -80.0,
+  "flywheelMinOutputVoltage": -12.0,
+  "flywheelMaxOutputVoltage": 12.0,
   "flywheelKS": 0.0,
   "flywheelKV": 0.189,
   "flywheelKA": 0.0,

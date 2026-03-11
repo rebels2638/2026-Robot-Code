@@ -1,5 +1,6 @@
 package frc.robot.configs;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.google.gson.Gson;
@@ -22,5 +23,7 @@ class ShooterConfigTest {
         assertTrue(config.turretMaxAccelerationDegPerSec2 > 0.0);
         assertTrue(config.turretMaxJerkDegPerSec3 > 0.0);
         assertTrue(config.turretAngleToleranceRotations > 0.0);
+        assertEquals(-12.0, config.flywheelMinOutputVoltage);
+        assertEquals(12.0, config.flywheelMaxOutputVoltage);
     }
 }

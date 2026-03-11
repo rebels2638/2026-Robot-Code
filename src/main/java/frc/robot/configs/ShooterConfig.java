@@ -31,6 +31,8 @@ public class ShooterConfig {
     public double latencyCompensationSeconds;
 
     public String canBusName;
+    public double flywheelMinOutputVoltage = -12.0;
+    public double flywheelMaxOutputVoltage = 12.0;
 
     public int hoodCanId;
     public boolean isHoodInverted;
