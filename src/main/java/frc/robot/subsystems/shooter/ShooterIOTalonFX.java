@@ -185,6 +185,10 @@ public class ShooterIOTalonFX implements ShooterIO {
         flywheelConfig.MotorOutput.NeutralMode = NeutralModeValue.Coast;
         flywheelConfig.MotorOutput.Inverted = config.isFlywheelInverted ?
             InvertedValue.Clockwise_Positive : InvertedValue.CounterClockwise_Positive;
+        flywheelConfig.Voltage.PeakReverseVoltage =
+            Math.min(config.flywheelMinOutputVoltage, config.flywheelMaxOutputVoltage);
+        flywheelConfig.Voltage.PeakForwardVoltage =
+            Math.max(config.flywheelMinOutputVoltage, config.flywheelMaxOutputVoltage);
 
         // Current and torque limiting
         flywheelConfig.CurrentLimits.SupplyCurrentLimitEnable = false;
@@ -202,6 +206,10 @@ public class ShooterIOTalonFX implements ShooterIO {
         flywheelFollowerConfig = new TalonFXConfiguration();
 
         flywheelFollowerConfig.MotorOutput.NeutralMode = NeutralModeValue.Coast;
+        flywheelFollowerConfig.Voltage.PeakReverseVoltage =
+            Math.min(config.flywheelMinOutputVoltage, config.flywheelMaxOutputVoltage);
+        flywheelFollowerConfig.Voltage.PeakForwardVoltage =
+            Math.max(config.flywheelMinOutputVoltage, config.flywheelMaxOutputVoltage);
         // Follower inverted state will be handled by the Follower control request
 
         // Current and torque limiting (same as leader)
