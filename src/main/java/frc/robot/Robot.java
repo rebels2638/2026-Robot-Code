@@ -13,6 +13,8 @@ import org.littletonrobotics.junction.wpilog.WPILOGWriter;
 
 import com.ctre.phoenix6.SignalLogger;
 
+import edu.wpi.first.cameraserver.CameraServer;
+import edu.wpi.first.cscore.HttpCamera;
 import edu.wpi.first.net.WebServer;
 import edu.wpi.first.wpilibj.Filesystem;
 import edu.wpi.first.wpilibj2.command.Command;
@@ -32,6 +34,8 @@ import frc.robot.lib.util.PhoenixUtil;
  * project.
  */
 public class Robot extends LoggedRobot {
+    private static final String ELASTIC_LIMELIGHT_STREAM_NAME = "limelight-fr";
+
     private Command m_autonomousCommand;
     private RobotContainer m_robotContainer;
 
@@ -94,6 +98,7 @@ public class Robot extends LoggedRobot {
         Logger.start();
         // for elastic dashboard
         WebServer.start(5800, Filesystem.getDeployDirectory().getPath());
+        startElasticCameraPublishers();
 
         m_robotContainer = RobotContainer.getInstance();
 
@@ -132,6 +137,22 @@ public class Robot extends LoggedRobot {
 
     @Override
     public void disabledPeriodic() {
+    }
+
+    private void startElasticCameraPublishers() {
+        if (Constants.currentMode == Constants.Mode.REPLAY
+            || Constants.shouldUseSimulation(Constants.SimOnlySubsystems.VISION)) {
+            return;
+        }
+
+        startElasticCameraPublisher(ELASTIC_LIMELIGHT_STREAM_NAME);
+    }
+
+    private void startElasticCameraPublisher(String cameraName) {
+        // Publish the Limelight MJPEG stream so Elastic can discover it as a CameraServer source.
+        HttpCamera camera =
+            new HttpCamera(cameraName, "http://" + cameraName + ".local:5800/stream.mjpg");
+        CameraServer.startAutomaticCapture(camera);
     }
 
     private void linkFollowPathLogging() {
