@@ -1,5 +1,8 @@
 package frc.robot.subsystems;
 
+import java.util.ArrayList;
+import java.util.Optional;
+
 import org.littletonrobotics.junction.AutoLogOutput;
 import org.littletonrobotics.junction.Logger;
 import org.littletonrobotics.junction.networktables.LoggedNetworkNumber;
@@ -72,6 +75,7 @@ public class Superstructure extends SubsystemBase {
         STOWED,
         DEPLOYED,
         INTAKING,
+        REVERSING,
         ALTERNATING
     }
 
@@ -80,6 +84,7 @@ public class Superstructure extends SubsystemBase {
         STOWED,
         DEPLOYED,
         INTAKING,
+        REVERSING,
         ALTERNATING
     }
 
@@ -104,7 +109,18 @@ public class Superstructure extends SubsystemBase {
         PASS_ALLIANCE_BOTTOM,
         PASS_NEUTRAL_TOP,
         PASS_NEUTRAL_CENTER,
-        PASS_NEUTRAL_BOTTOM
+        PASS_NEUTRAL_BOTTOM;
+
+        public boolean isPassTarget() {
+            return this != HUB;
+        }
+
+        public boolean isAlliancePassTarget() {
+            return switch (this) {
+                case PASS_ALLIANCE_TOP, PASS_ALLIANCE_CENTER, PASS_ALLIANCE_BOTTOM -> true;
+                default -> false;
+            };
+        }
     }
 
     enum RobotFieldZone {
@@ -209,6 +225,12 @@ public class Superstructure extends SubsystemBase {
     record AccumulatedYawRotationRange(
         double minAbsDeg,
         double maxAbsDeg
+    ) {}
+
+    record TargetCandidate(
+        TargetState targetState,
+        Translation2d targetPosition,
+        boolean lineOfSightClear
     ) {}
 
     private Superstructure() {
@@ -346,6 +368,7 @@ public class Superstructure extends SubsystemBase {
             case STOWED -> CurrentIntakeState.STOWED;
             case DEPLOYED -> CurrentIntakeState.DEPLOYED;
             case INTAKING -> CurrentIntakeState.INTAKING;
+            case REVERSING -> CurrentIntakeState.REVERSING;
             case ALTERNATING -> CurrentIntakeState.ALTERNATING;
         };
     }
@@ -521,6 +544,9 @@ public class Superstructure extends SubsystemBase {
                 break;
             case INTAKING:
                 intake.setSetpoint(IntakeSetpoint.INTAKING);
+                break;
+            case REVERSING:
+                intake.setSetpoint(IntakeSetpoint.OUTTAKING);
                 break;
             case ALTERNATING:
                 applyAlternatingIntake();
@@ -861,29 +887,26 @@ public class Superstructure extends SubsystemBase {
         TargetState zoneResolvedTarget = resolveTargetForZoneConstraints(desiredTargetState, robotFieldZone);
         boolean zoneAllowsTarget = isTargetAllowedInZone(zoneResolvedTarget, robotFieldZone);
         Translation3d targetLocation = getFieldTargetLocation(zoneResolvedTarget);
-        boolean passingTarget = isPassingTarget(zoneResolvedTarget);
+        boolean passingTarget = zoneResolvedTarget.isPassTarget();
         Translation2d shooterPosition = shooterKinematics.shooterPosition().toTranslation2d();
         Translation2d targetPosition = targetLocation.toTranslation2d();
-        RectangleZone hubZone = ZoneConstants.Hub.EXCLUSION;
-        RectangleZone flippedHubZone = flipRectangleZone(hubZone);
-        RectangleZone towerZone = ZoneConstants.Tower.EXCLUSION;
-        RectangleZone flippedTowerZone = flipRectangleZone(towerZone);
+        RectangleZone[] hubLineOfSightBlockers = buildMirroredRectangularBlockers(ZoneConstants.Tower.EXCLUSION);
+        RectangleZone[] passLineOfSightBlockers = buildMirroredRectangularBlockers(
+            ZoneConstants.Hub.EXCLUSION,
+            ZoneConstants.Tower.EXCLUSION
+        );
         boolean lineOfSightClear = passingTarget
-            ? isPassLineOfSightClear(
+            ? hasClearLineOfSightWithRectangularBlockers(
                 shooterPosition,
                 targetPosition,
-                hubZone,
-                flippedHubZone,
-                towerZone,
-                flippedTowerZone,
-                config.passHubBlockerRadiusMeters
+                config.passHubBlockerRadiusMeters,
+                passLineOfSightBlockers
             )
-            : isHubLineOfSightClear(
+            : hasClearLineOfSightWithRectangularBlockers(
                 shooterPosition,
                 targetPosition,
-                towerZone,
-                flippedTowerZone,
-                config.passHubBlockerRadiusMeters
+                config.passHubBlockerRadiusMeters,
+                hubLineOfSightBlockers
             );
 
         currentTargetState = zoneResolvedTarget;
@@ -943,70 +966,47 @@ public class Superstructure extends SubsystemBase {
         return true;
     }
 
-    static boolean isPassingTarget(TargetState targetState) {
-        return targetState != TargetState.HUB;
+    static boolean hasClearLineOfSightWithRectangularBlockers(
+        Translation2d shooterPosition,
+        Translation2d targetPosition,
+        double blockerRadiusMeters,
+        RectangleZone... blockerZones
+    ) {
+        for (RectangleZone blockerZone : blockerZones) {
+            if (!ZoneUtil.hasLineOfSightWithRectangularBlocker(
+                shooterPosition,
+                targetPosition,
+                blockerZone,
+                blockerRadiusMeters,
+                false
+            )) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
-    static boolean isPassLineOfSightClear(
+    static Optional<TargetState> selectClosestLineOfSightTarget(
         Translation2d shooterPosition,
-        Translation2d passingTargetPosition,
-        RectangleZone hubZone,
-        RectangleZone flippedHubZone,
-        RectangleZone towerZone,
-        RectangleZone flippedTowerZone,
-        double blockerRadiusMeters
+        TargetCandidate... candidates
     ) {
-        return ZoneUtil.hasLineOfSightWithRectangularBlocker(
-                shooterPosition,
-                passingTargetPosition,
-                hubZone,
-                blockerRadiusMeters,
-                false
-            )
-            && ZoneUtil.hasLineOfSightWithRectangularBlocker(
-                shooterPosition,
-                passingTargetPosition,
-                flippedHubZone,
-                blockerRadiusMeters,
-                false
-            )
-            && ZoneUtil.hasLineOfSightWithRectangularBlocker(
-                shooterPosition,
-                passingTargetPosition,
-                towerZone,
-                blockerRadiusMeters,
-                false
-            )
-            && ZoneUtil.hasLineOfSightWithRectangularBlocker(
-                shooterPosition,
-                passingTargetPosition,
-                flippedTowerZone,
-                blockerRadiusMeters,
-                false
-            );
-    }
+        TargetState closestLineOfSightTarget = null;
+        double closestDistanceMeters = Double.POSITIVE_INFINITY;
 
-    static boolean isHubLineOfSightClear(
-        Translation2d shooterPosition,
-        Translation2d hubTargetPosition,
-        RectangleZone towerZone,
-        RectangleZone flippedTowerZone,
-        double blockerRadiusMeters
-    ) {
-        return ZoneUtil.hasLineOfSightWithRectangularBlocker(
-                shooterPosition,
-                hubTargetPosition,
-                towerZone,
-                blockerRadiusMeters,
-                false
-            )
-            && ZoneUtil.hasLineOfSightWithRectangularBlocker(
-                shooterPosition,
-                hubTargetPosition,
-                flippedTowerZone,
-                blockerRadiusMeters,
-                false
-            );
+        for (TargetCandidate candidate : candidates) {
+            if (!candidate.lineOfSightClear()) {
+                continue;
+            }
+
+            double candidateDistanceMeters = shooterPosition.getDistance(candidate.targetPosition());
+            if (candidateDistanceMeters < closestDistanceMeters) {
+                closestDistanceMeters = candidateDistanceMeters;
+                closestLineOfSightTarget = candidate.targetState();
+            }
+        }
+
+        return Optional.ofNullable(closestLineOfSightTarget);
     }
 
     private static RectangleZone flipRectangleZone(RectangleZone zone) {
@@ -1015,6 +1015,16 @@ public class Superstructure extends SubsystemBase {
             FlippingUtil.flipFieldPosition(zone.cornerA()),
             FlippingUtil.flipFieldPosition(zone.cornerB())
         );
+    }
+
+    private static RectangleZone[] buildMirroredRectangularBlockers(RectangleZone... baseZones) {
+        RectangleZone[] blockerZones = new RectangleZone[baseZones.length * 2];
+        for (int i = 0; i < baseZones.length; i++) {
+            RectangleZone baseZone = baseZones[i];
+            blockerZones[i * 2] = baseZone;
+            blockerZones[i * 2 + 1] = flipRectangleZone(baseZone);
+        }
+        return blockerZones;
     }
 
     private Translation3d getFieldTargetLocation(TargetState targetState) {
@@ -1032,6 +1042,45 @@ public class Superstructure extends SubsystemBase {
             targetLocation = new Translation3d(fieldPosition.getX(), fieldPosition.getY(), targetLocation.getZ());
         }
         return targetLocation;
+    }
+
+    public Optional<TargetState> getClosestLineOfSightAlliancePassTarget() {
+        ShotKinematicsUtil.ShooterKinematics shooterKinematics = ShotKinematicsUtil.calculateShooterKinematics(
+            robotState.getEstimatedPose(),
+            shooter.getShooterRelativePose(),
+            robotState.getFieldRelativeSpeeds()
+        );
+        Translation2d shooterPosition = shooterKinematics.shooterPosition().toTranslation2d();
+        RectangleZone[] passLineOfSightBlockers = buildMirroredRectangularBlockers(
+            ZoneConstants.Hub.EXCLUSION,
+            ZoneConstants.Tower.EXCLUSION
+        );
+
+        ArrayList<TargetCandidate> candidates = new ArrayList<>();
+        for (TargetState targetState : TargetState.values()) {
+            if (!targetState.isAlliancePassTarget()) {
+                continue;
+            }
+            Translation2d targetPosition = getFieldTargetLocation(targetState).toTranslation2d();
+            boolean lineOfSightClear = hasClearLineOfSightWithRectangularBlockers(
+                shooterPosition,
+                targetPosition,
+                config.passHubBlockerRadiusMeters,
+                passLineOfSightBlockers
+            );
+            candidates.add(new TargetCandidate(targetState, targetPosition, lineOfSightClear));
+        }
+
+        Optional<TargetState> selectedTarget = selectClosestLineOfSightTarget(
+            shooterPosition,
+            candidates.toArray(TargetCandidate[]::new)
+        );
+        Logger.recordOutput("Superstructure/closestAlliancePassTargetFound", selectedTarget.isPresent());
+        Logger.recordOutput(
+            "Superstructure/closestAlliancePassTarget",
+            selectedTarget.map(Enum::name).orElse("NONE")
+        );
+        return selectedTarget;
     }
 
     private static CurrentClimbState mapClimberCurrentState(Climber.CurrentState climberCurrentState) {
@@ -1105,7 +1154,7 @@ public class Superstructure extends SubsystemBase {
     }
 
     public InterpolatingMatrixTreeMap<Double, N3, N1> getCurrentTargetLerpTable() {
-        return isPassingTarget(currentTargetState) ? shooter.getPassLerpTable() : shooter.getLerpTable();
+        return currentTargetState.isPassTarget() ? shooter.getPassLerpTable() : shooter.getLerpTable();
     }
 
     @AutoLogOutput(key = "Superstructure/isClimbExtended")
