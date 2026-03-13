@@ -8,15 +8,15 @@ import org.junit.jupiter.api.Test;
 class ZoneConstantsTest {
     @Test
     void getZone_returnsNamedTowerZone() {
-        ZoneConstants.RectangleZone zone = ZoneConstants.getZone("tower_left").orElseThrow();
-        assertEquals(ZoneConstants.Tower.LEFT, zone);
+        ZoneConstants.RectangleZone zone = ZoneConstants.getZone("tower_top").orElseThrow();
+        assertEquals(ZoneConstants.Tower.TOP, zone);
     }
 
     @Test
     void zones_containsTowerDefinitions() {
         assertTrue(ZoneConstants.ZONES.containsKey("tower"));
-        assertTrue(ZoneConstants.ZONES.containsKey("tower_left"));
-        assertTrue(ZoneConstants.ZONES.containsKey("tower_right"));
+        assertTrue(ZoneConstants.ZONES.containsKey("tower_top"));
+        assertTrue(ZoneConstants.ZONES.containsKey("tower_bottom"));
         assertTrue(ZoneConstants.ZONES.containsKey("alliance_lower"));
         assertTrue(ZoneConstants.ZONES.containsKey("alliance_lower_transition"));
         assertTrue(ZoneConstants.ZONES.containsKey("alliance_middle"));

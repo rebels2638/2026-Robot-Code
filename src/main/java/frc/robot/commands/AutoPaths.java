@@ -3,7 +3,6 @@ package frc.robot.commands;
 import edu.wpi.first.math.MathUtil;
 import edu.wpi.first.math.geometry.Pose2d;
 import edu.wpi.first.math.geometry.Translation2d;
-import frc.robot.constants.AlignmentConstants;
 import frc.robot.constants.ClimbingConstants;
 import frc.robot.lib.BLine.Path;
 import frc.robot.lib.BLine.Path.PathElement;
@@ -11,6 +10,7 @@ import frc.robot.lib.BLine.Path.PathConstraints;
 import frc.robot.lib.BLine.Path.Waypoint;
 import frc.robot.lib.util.ZoneUtil;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import org.littletonrobotics.junction.Logger;
 
@@ -19,15 +19,16 @@ public final class AutoPaths {
 
     public enum AutoClimbRejectReason {
         OUTSIDE_INCLUSION_ZONE,
-        INSIDE_EXCLUSION_ZONE
+        TOO_CLOSE_AND_OVERROTATED
     }
 
     public record AutoClimbPlan(
+        ClimbingConstants.AutoClimbSide side,
         Path approachPath,
         Path finalPath,
         List<Pose2d> approachWaypoints,
         Pose2d finalWaypoint,
-        boolean usesRetreatWaypoint
+        double estimatedDistanceMeters
     ) {
         public AutoClimbPlan {
             approachWaypoints = List.copyOf(approachWaypoints);
@@ -44,67 +45,102 @@ public final class AutoPaths {
         Pose2d currentPose,
         ClimbingConstants.AutoClimbTarget target
     ) {
-        boolean withinInclusionZone = ZoneUtil.isPoseInAnyZone(currentPose, target.inclusionZones(), true);
-        boolean withinExclusionZone = ZoneUtil.isPoseInAnyZone(currentPose, target.exclusionZones(), true);
-
         Logger.recordOutput("AutoPaths/AutoClimb/currentPose", currentPose);
-        Logger.recordOutput("AutoPaths/AutoClimb/targetPreClimbPose", target.preClimbPose());
-        Logger.recordOutput("AutoPaths/AutoClimb/targetFinalPose", target.finalClimbPose());
-        Logger.recordOutput("AutoPaths/AutoClimb/withinInclusionZone", withinInclusionZone);
-        Logger.recordOutput("AutoPaths/AutoClimb/withinExclusionZone", withinExclusionZone);
+        Logger.recordOutput("AutoPaths/AutoClimb/targetName", target.name());
 
-        if (withinExclusionZone) {
-            return rejected(AutoClimbRejectReason.INSIDE_EXCLUSION_ZONE);
+        ArrayList<AutoClimbPlan> validPlans = new ArrayList<>();
+        boolean hasTooCloseAndOverrotatedSide = false;
+        for (ClimbingConstants.AutoClimbSide side : target.sides()) {
+            boolean withinInclusionZone = ZoneUtil.isPoseInAnyZone(currentPose, side.inclusionZones(), true);
+            boolean tooCloseAndOverrotated = isTooCloseAndOverrotated(
+                currentPose,
+                side.finalClimbPose(),
+                side.preClimbPose(),
+                ClimbingConstants.ROTATION_CLEARANCE_DISTANCE_METERS,
+                ClimbingConstants.ROTATION_CLEARANCE_HEADING_ERROR_DEG
+            );
+
+            Logger.recordOutput("AutoPaths/AutoClimb/" + side.name() + "/preClimbPose", side.preClimbPose());
+            Logger.recordOutput("AutoPaths/AutoClimb/" + side.name() + "/finalClimbPose", side.finalClimbPose());
+            Logger.recordOutput("AutoPaths/AutoClimb/" + side.name() + "/withinInclusionZone", withinInclusionZone);
+            Logger.recordOutput("AutoPaths/AutoClimb/" + side.name() + "/tooCloseAndOverrotated", tooCloseAndOverrotated);
+
+            if (!withinInclusionZone) {
+                continue;
+            }
+            if (tooCloseAndOverrotated) {
+                hasTooCloseAndOverrotatedSide = true;
+                continue;
+            }
+            validPlans.add(buildPlan(currentPose, side));
         }
-        if (!withinInclusionZone) {
+
+        if (validPlans.isEmpty()) {
+            if (hasTooCloseAndOverrotatedSide) {
+                return rejected(AutoClimbRejectReason.TOO_CLOSE_AND_OVERROTATED);
+            }
             return rejected(AutoClimbRejectReason.OUTSIDE_INCLUSION_ZONE);
         }
 
-        ArrayList<Pose2d> approachWaypoints = new ArrayList<>();
-        boolean usesRetreatWaypoint = shouldInsertRetreatWaypoint(
-            currentPose,
-            target.finalClimbPose(),
-            target.preClimbPose(),
-            ClimbingConstants.ROTATION_CLEARANCE_DISTANCE_METERS,
-            ClimbingConstants.ROTATION_CLEARANCE_HEADING_ERROR_DEG
-        );
-        if (usesRetreatWaypoint) {
-            approachWaypoints.add(
-                calculateRetreatPose(target, ClimbingConstants.ROTATION_CLEARANCE_RETREAT_DISTANCE_METERS)
-            );
-        }
-        approachWaypoints.add(target.preClimbPose());
+        AutoClimbPlan selectedPlan = validPlans.stream()
+            .min(Comparator.comparingDouble(AutoClimbPlan::estimatedDistanceMeters))
+            .orElseThrow();
 
-        Path approachPath = buildMirroredPathFromWaypoints(
-            approachWaypoints,
-            createPathConstraints(
-                AlignmentConstants.Tower.INTERMEDIARY_MAX_VELOCITY_METERS_PER_SEC,
-                ClimbingConstants.APPROACH_MAX_ACCELERATION_METERS_PER_SEC2,
-                AlignmentConstants.Tower.INTERMEDIARY_TRANSLATION_TOLERANCE_METERS,
-                AlignmentConstants.Tower.INTERMEDIARY_ROTATION_TOLERANCE_DEG
-            )
-        );
-        Path finalPath = buildMirroredPathFromWaypoints(
-            List.of(target.finalClimbPose()),
-            createPathConstraints(
-                AlignmentConstants.Tower.APPROACH_MAX_VELOCITY_METERS_PER_SEC,
-                ClimbingConstants.FINAL_APPROACH_MAX_ACCELERATION_METERS_PER_SEC2,
-                AlignmentConstants.Tower.INTERMEDIARY_TRANSLATION_TOLERANCE_METERS,
-                AlignmentConstants.Tower.INTERMEDIARY_ROTATION_TOLERANCE_DEG
-            )
-        );
-
-        Logger.recordOutput("AutoPaths/AutoClimb/usesRetreatWaypoint", usesRetreatWaypoint);
-        Logger.recordOutput("AutoPaths/AutoClimb/approachWaypointCount", approachWaypoints.size());
+        Logger.recordOutput("AutoPaths/AutoClimb/validSideCount", validPlans.size());
+        Logger.recordOutput("AutoPaths/AutoClimb/selectedSideName", selectedPlan.side().name());
+        Logger.recordOutput("AutoPaths/AutoClimb/selectedSideEstimatedDistanceMeters", selectedPlan.estimatedDistanceMeters());
+        Logger.recordOutput("AutoPaths/AutoClimb/approachWaypointCount", selectedPlan.approachWaypoints().size());
         Logger.recordOutput("AutoPaths/AutoClimb/rejectionReason", "NONE");
 
-        return new AutoClimbPlanningResult(
-            new AutoClimbPlan(approachPath, finalPath, approachWaypoints, target.finalClimbPose(), usesRetreatWaypoint),
-            null
+        return new AutoClimbPlanningResult(selectedPlan, null);
+    }
+
+    private static AutoClimbPlan buildPlan(
+        Pose2d currentPose,
+        ClimbingConstants.AutoClimbSide side
+    ) {
+        ArrayList<Pose2d> approachWaypoints = new ArrayList<>();
+        approachWaypoints.add(side.preClimbPose());
+
+        Path approachPath = buildPathFromWaypoints(
+            approachWaypoints,
+            createPathConstraints(
+                ClimbingConstants.APPROACH_MAX_VELOCITY_METERS_PER_SEC,
+                ClimbingConstants.APPROACH_MAX_ACCELERATION_METERS_PER_SEC2,
+                ClimbingConstants.APPROACH_END_TRANSLATION_TOLERANCE_METERS,
+                ClimbingConstants.APPROACH_END_ROTATION_TOLERANCE_DEG
+            )
+        );
+        Path finalPath = buildPathFromWaypoints(
+            List.of(side.finalClimbPose()),
+            createPathConstraints(
+                ClimbingConstants.FINAL_APPROACH_MAX_VELOCITY_METERS_PER_SEC,
+                ClimbingConstants.FINAL_APPROACH_MAX_ACCELERATION_METERS_PER_SEC2,
+                ClimbingConstants.FINAL_APPROACH_END_TRANSLATION_TOLERANCE_METERS,
+                ClimbingConstants.FINAL_APPROACH_END_ROTATION_TOLERANCE_DEG
+            )
+        );
+
+        double estimatedDistanceMeters = calculateEstimatedDistanceMeters(
+            currentPose,
+            approachWaypoints,
+            side.finalClimbPose()
+        );
+
+        Logger.recordOutput("AutoPaths/AutoClimb/" + side.name() + "/approachWaypointCount", approachWaypoints.size());
+        Logger.recordOutput("AutoPaths/AutoClimb/" + side.name() + "/estimatedDistanceMeters", estimatedDistanceMeters);
+
+        return new AutoClimbPlan(
+            side,
+            approachPath,
+            finalPath,
+            approachWaypoints,
+            side.finalClimbPose(),
+            estimatedDistanceMeters
         );
     }
 
-    static boolean shouldInsertRetreatWaypoint(
+    static boolean isTooCloseAndOverrotated(
         Pose2d currentPose,
         Pose2d finalClimbPose,
         Pose2d preClimbPose,
@@ -123,39 +159,30 @@ public final class AutoPaths {
             && headingErrorDeg > rotationClearanceHeadingErrorDeg;
     }
 
-    static Pose2d calculateRetreatPose(
-        ClimbingConstants.AutoClimbTarget target,
-        double retreatDistanceMeters
+    static double calculateEstimatedDistanceMeters(
+        Pose2d currentPose,
+        List<Pose2d> approachWaypoints,
+        Pose2d finalWaypoint
     ) {
-        Translation2d approachVector = target.preClimbPose().getTranslation().minus(target.finalClimbPose().getTranslation());
-        if (approachVector.getNorm() < 1e-6) {
-            approachVector = new Translation2d(
-                retreatDistanceMeters,
-                0.0
-            ).rotateBy(target.preClimbPose().getRotation());
-        } else {
-            approachVector = approachVector.div(approachVector.getNorm()).times(retreatDistanceMeters);
+        Translation2d previousTranslation = currentPose.getTranslation();
+        double distanceMeters = 0.0;
+
+        for (Pose2d waypoint : approachWaypoints) {
+            distanceMeters += previousTranslation.getDistance(waypoint.getTranslation());
+            previousTranslation = waypoint.getTranslation();
         }
 
-        return new Pose2d(
-            target.preClimbPose().getTranslation().plus(approachVector),
-            target.preClimbPose().getRotation()
-        );
+        distanceMeters += previousTranslation.getDistance(finalWaypoint.getTranslation());
+        return distanceMeters;
     }
 
-    private static Path buildMirroredPathFromWaypoints(List<Pose2d> waypoints, PathConstraints constraints) {
+    private static Path buildPathFromWaypoints(List<Pose2d> waypoints, PathConstraints constraints) {
         ArrayList<PathElement> pathElements = new ArrayList<>(waypoints.size());
         for (Pose2d waypoint : waypoints) {
             pathElements.add(new Waypoint(waypoint));
         }
 
-        Path path = new Path(pathElements, constraints);
-        // SwerveDrive's shared FollowPath builder applies a global mirror to every path.
-        // Pre-mirror on-the-fly climb paths so runtime execution stays in the same field frame
-        // used by RobotState, zones, and the climb target constants. 
-        // TODO: at some point, this may not be the case anymore
-        path.mirror();
-        return path;
+        return new Path(pathElements, constraints);
     }
 
     private static PathConstraints createPathConstraints(
