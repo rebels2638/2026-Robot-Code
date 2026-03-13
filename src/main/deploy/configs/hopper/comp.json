@@ -13,6 +13,7 @@
   "hopperKD": 0.0,
   "hopperMotorToOutputShaftRatio": 6.875,
   "feedingVelocityRPS": 7.0,
+  "feedingIdleVoltage": 4.0,
   "reverseVelocityRPS": -7.0,
   "hopperVelocityToleranceRPS": 5.0
 }
