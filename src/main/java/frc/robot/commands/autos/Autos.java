@@ -29,22 +29,22 @@ public final class Autos {
     }
 
     private static final List<AutoDefinition> AUTOS = List.of(
-        auto(
-            "Simple Back",
-            setSystem(DesiredSystemState.HOME),
-            setIntake(DesiredIntakeState.STOWED),
-            setClimber(DesiredClimbState.RETRACTED),
-            followPath("simple_back", true)
-        ),
-        auto(
-            "Citrus Sweep",
-            setSystem(DesiredSystemState.HOME),
-            setIntake(DesiredIntakeState.DEPLOYED),
-            setClimber(DesiredClimbState.RETRACTED),
-            followPath("citrus_sweep"),
-            waitSeconds(0.25),
-            setIntake(DesiredIntakeState.STOWED)
-        )
+        // auto(
+        //     "Simple Back",
+        //     setSystem(DesiredSystemState.HOME),
+        //     setIntake(DesiredIntakeState.STOWED),
+        //     setClimber(DesiredClimbState.RETRACTED),
+        //     followPath("simple_back", true)
+        // ),
+        // auto(
+        //     "Citrus Sweep",
+        //     setSystem(DesiredSystemState.HOME),
+        //     setIntake(DesiredIntakeState.DEPLOYED),
+        //     setClimber(DesiredClimbState.RETRACTED),
+        //     followPath("citrus_sweep"),
+        //     waitSeconds(0.25),
+        //     setIntake(DesiredIntakeState.STOWED)
+        // )
     );
 
     private static AutoDefinition auto(String name, Command... commands) {

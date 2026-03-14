@@ -8,13 +8,12 @@
       "enabled": true,
       "distance_meters": 0.3,
       "side": "front",
-      "default_state": "shown",
+      "default_state": "hidden",
       "show_on_event_keys": [
-        "start_intake"
+        "intake",
+        "deploy"
       ],
-      "hide_on_event_keys": [
-        "pickup_intake"
-      ]
+      "hide_on_event_keys": []
     }
   },
   "kinematic_constraints": {
