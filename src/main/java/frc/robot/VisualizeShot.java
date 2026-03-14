@@ -11,7 +11,6 @@ import edu.wpi.first.math.geometry.Translation3d;
 import edu.wpi.first.math.kinematics.ChassisSpeeds;
 import edu.wpi.first.wpilibj.Timer;
 import frc.robot.constants.Constants;
-import frc.robot.lib.util.ShotCalculator;
 import frc.robot.lib.util.ballistics.ProjectileVisualizer;
 import frc.robot.subsystems.Superstructure;
 import frc.robot.subsystems.shooter.Shooter;
@@ -63,15 +62,6 @@ public class VisualizeShot {
         double exitVelocity = launchExitVelocityMetersPerSec;
         Superstructure superstructure = Superstructure.getInstance();
         Translation3d targetLocation = superstructure.getCurrentFieldTargetLocation();
-        double shooterDistanceToTarget =
-            shooterPose.getTranslation().toTranslation2d().getDistance(targetLocation.toTranslation2d());
-        double backspinRadPerSec = ShotCalculator.calculateSpinRateRadPerSec(
-            shooterDistanceToTarget,
-            superstructure.getCurrentTargetLerpTable(),
-            flywheelRPS,
-            rps -> Shooter.getInstance().calculateBackSpinRPM(rps) * 2.0 * Math.PI / 60.0
-        );
-        double backspinRPM = backspinRadPerSec * 60.0 / (2.0 * Math.PI);
         
         // Include tangential velocity from robot rotation (omega cross r)
         double omega = fieldRelativeSpeeds.omegaRadiansPerSecond;
@@ -98,7 +88,6 @@ public class VisualizeShot {
             Logger.recordOutput("VisualizeShot/totalYawDegrees", Math.toDegrees(newRotation.getZ()));
             Logger.recordOutput("VisualizeShot/exitVelocityMPS", exitVelocity);
             Logger.recordOutput("VisualizeShot/flywheelRPS", flywheelRPS);
-            Logger.recordOutput("VisualizeShot/backspinRPM", backspinRPM);
             Logger.recordOutput("VisualizeShot/robotVx", fieldRelativeSpeeds.vxMetersPerSecond);
             Logger.recordOutput("VisualizeShot/robotVy", fieldRelativeSpeeds.vyMetersPerSecond);
             Logger.recordOutput("VisualizeShot/omegaRadPerSec", omega);
@@ -114,8 +103,7 @@ public class VisualizeShot {
             shooterVyField,
             exitVelocity,
             shooterPose,
-            targetLocation.getZ(),
-            backspinRPM
+            targetLocation.getZ()
         );
     }
 }

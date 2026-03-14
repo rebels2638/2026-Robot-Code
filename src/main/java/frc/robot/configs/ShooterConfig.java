@@ -10,6 +10,7 @@ import edu.wpi.first.math.geometry.Rotation3d;
 import edu.wpi.first.math.geometry.Translation3d;
 import edu.wpi.first.math.numbers.N1;
 import edu.wpi.first.math.numbers.N3;
+import frc.robot.lib.util.ballistics.BallisticsModel;
 
 public class ShooterConfig {
     public static class LerpEntry {
@@ -23,6 +24,9 @@ public class ShooterConfig {
     // Backward-compatible alias for older config files.
     public List<LerpEntry> lerpTable;
     public List<LerpEntry> passLerpTable;
+    public BallisticsModel ballisticsModel = BallisticsModel.AERODYNAMIC;
+    public double minBallisticFlywheelVelocityRPS = 5.0;
+    public double maxBallisticFlywheelVelocityRPS = Double.POSITIVE_INFINITY;
 
     public double minShotDistFromShooterMeters;
     public double maxShotDistFromShooterMeters;
@@ -116,6 +120,18 @@ public class ShooterConfig {
 
     public InterpolatingMatrixTreeMap<Double, N3, N1> getPassLerpTable() {
         return buildLerpTable(passLerpTable);
+    }
+
+    public BallisticsModel getBallisticsModel() {
+        return ballisticsModel != null ? ballisticsModel : BallisticsModel.AERODYNAMIC;
+    }
+
+    public double getMinBallisticFlywheelVelocityRPS() {
+        return Double.isFinite(minBallisticFlywheelVelocityRPS) ? minBallisticFlywheelVelocityRPS : 5.0;
+    }
+
+    public double getMaxBallisticFlywheelVelocityRPS() {
+        return Double.isFinite(maxBallisticFlywheelVelocityRPS) ? maxBallisticFlywheelVelocityRPS : Double.POSITIVE_INFINITY;
     }
 
     public List<LerpEntry> getShootingLerpEntries() {

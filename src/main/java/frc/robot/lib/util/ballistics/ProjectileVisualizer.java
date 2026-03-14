@@ -14,11 +14,11 @@ import edu.wpi.first.wpilibj2.command.SubsystemBase;
 import frc.robot.constants.Constants;
 
 /**
- * Visualizes one or more projectiles using physics simulation with drag and Magnus effect.
- * Uses numerical integration to simulate the trajectory of the 2026 "Rebuilt" Fuel game piece.
+ * Visualizes one or more projectiles using simple gravity-only kinematics.
  */
 public class ProjectileVisualizer extends SubsystemBase {
-    private static final double SIMULATION_DT = 0.001;
+    private static final double SIMULATION_DT = 0.02;
+    private static final BallisticsModel VISUALIZATION_MODEL = BallisticsModel.SIMPLE;
 
     private static final ProjectileVisualizer INSTANCE = new ProjectileVisualizer();
 
@@ -27,7 +27,7 @@ public class ProjectileVisualizer extends SubsystemBase {
     }
 
     /**
-     * Add a projectile with constant parameters (no spin/Magnus effect).
+     * Add a projectile with constant parameters.
      */
     public static int addProjectile(
             double robotVx,
@@ -45,8 +45,7 @@ public class ProjectileVisualizer extends SubsystemBase {
     }
 
     /**
-     * Add a projectile with constant parameters including spin rate for Magnus effect.
-     * @param spinRateRPM Spin rate in RPM (positive = backspin for upward lift)
+     * Add a projectile with constant parameters plus an ignored legacy spin argument.
      */
     public static int addProjectile(
             double robotVx,
@@ -65,7 +64,7 @@ public class ProjectileVisualizer extends SubsystemBase {
     }
 
     /**
-     * Add a projectile with supplier parameters (no spin/Magnus effect).
+     * Add a projectile with supplier parameters.
      */
     public static int addProjectile(
             Supplier<Double> robotVxSupplier,
@@ -83,8 +82,7 @@ public class ProjectileVisualizer extends SubsystemBase {
     }
 
     /**
-     * Add a projectile with supplier parameters including spin rate for Magnus effect.
-     * @param spinRateRPMSupplier Spin rate in RPM (positive = backspin for upward lift)
+     * Add a projectile with supplier parameters plus an ignored legacy spin supplier.
      */
     public static int addProjectile(
             Supplier<Double> robotVxSupplier,
@@ -288,7 +286,7 @@ public class ProjectileVisualizer extends SubsystemBase {
             double remainingTime = elapsedSinceLastUpdate;
             while (remainingTime > 0 && state.z() >= 0) {
                 double dt = Math.min(SIMULATION_DT, remainingTime);
-                state = BallisticsPhysics.integrateStep3D(state, spinRateRadPerSec, dt);
+                state = BallisticsPhysics.integrateStep3D(state, spinRateRadPerSec, dt, VISUALIZATION_MODEL);
                 remainingTime -= dt;
             }
 

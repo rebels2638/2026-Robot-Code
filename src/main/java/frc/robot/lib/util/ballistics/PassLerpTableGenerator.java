@@ -243,8 +243,10 @@ public final class PassLerpTableGenerator {
         double hoodAngleRad,
         ShooterConfig config
     ) {
-        TrajectoryEval lowEval = evaluate(distanceMeters, targetHeightMeters, shooterHeightMeters, hoodAngleRad, MIN_RPS, config);
-        TrajectoryEval highEval = evaluate(distanceMeters, targetHeightMeters, shooterHeightMeters, hoodAngleRad, MAX_RPS, config);
+        double minRps = Math.max(MIN_RPS, config.getMinBallisticFlywheelVelocityRPS());
+        double maxRps = Math.min(MAX_RPS, config.getMaxBallisticFlywheelVelocityRPS());
+        TrajectoryEval lowEval = evaluate(distanceMeters, targetHeightMeters, shooterHeightMeters, hoodAngleRad, minRps, config);
+        TrajectoryEval highEval = evaluate(distanceMeters, targetHeightMeters, shooterHeightMeters, hoodAngleRad, maxRps, config);
 
         double lowError = lowEval.solveError();
         double highError = highEval.solveError();
@@ -255,8 +257,8 @@ public final class PassLerpTableGenerator {
             return null;
         }
 
-        double lo = MIN_RPS;
-        double hi = MAX_RPS;
+        double lo = minRps;
+        double hi = maxRps;
         TrajectoryEval loEval = lowEval;
         TrajectoryEval hiEval = highEval;
 
@@ -317,7 +319,8 @@ public final class PassLerpTableGenerator {
             shooterHeightMeters,
             targetHeightMeters,
             spinRateRadPerSec,
-            SIM_DT_SECONDS
+            SIM_DT_SECONDS,
+            config.getBallisticsModel()
         );
         double solveError = result.reachedTarget()
             ? (result.finalHeight() - targetHeightMeters)

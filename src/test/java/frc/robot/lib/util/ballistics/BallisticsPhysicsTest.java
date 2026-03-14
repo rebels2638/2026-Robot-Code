@@ -39,6 +39,20 @@ class BallisticsPhysicsTest {
     }
 
     @Test
+    // Simple model should keep horizontal velocity constant and only accelerate vertically under gravity.
+    void computeDerivatives2D_simpleModel_returnsPhysicsOneTerms() {
+        BallisticsPhysics.State2D state = new BallisticsPhysics.State2D(0.0, 1.0, 7.0, 5.0);
+
+        BallisticsPhysics.Derivatives2D derivatives =
+            BallisticsPhysics.computeDerivatives2D(state, 999.0, BallisticsModel.SIMPLE);
+
+        assertEquals(7.0, derivatives.dx(), EPS);
+        assertEquals(5.0, derivatives.dz(), EPS);
+        assertEquals(0.0, derivatives.dvx(), EPS);
+        assertEquals(-BallisticsConstants.GRAVITY, derivatives.dvz(), EPS);
+    }
+
+    @Test
     // Backspin should increase vertical accel relative to no-spin, topspin should decrease it.
     void computeDerivatives2D_backspinDirection_changesVerticalAccelerationDirection() {
         BallisticsPhysics.State2D state = new BallisticsPhysics.State2D(0.0, 2.0, 15.0, 0.0);
@@ -61,6 +75,20 @@ class BallisticsPhysicsTest {
         assertTrue(next.x() > state.x());
         assertTrue(next.z() > state.z());
         assertTrue(next.vz() < state.vz());
+    }
+
+    @Test
+    // Simple model integration should match the closed-form constant-vx trajectory exactly.
+    void integrateStep2D_simpleModel_matchesClosedForm() {
+        BallisticsPhysics.State2D state = new BallisticsPhysics.State2D(0.0, 1.0, 12.0, 4.0);
+        double dt = 0.25;
+
+        BallisticsPhysics.State2D next = BallisticsPhysics.integrateStep2D(state, 0.0, dt, BallisticsModel.SIMPLE);
+
+        assertEquals(3.0, next.x(), EPS);
+        assertEquals(1.0 + 4.0 * dt - 0.5 * BallisticsConstants.GRAVITY * dt * dt, next.z(), EPS);
+        assertEquals(12.0, next.vx(), EPS);
+        assertEquals(4.0 - BallisticsConstants.GRAVITY * dt, next.vz(), EPS);
     }
 
     @Test
@@ -96,6 +124,33 @@ class BallisticsPhysicsTest {
 
         assertFalse(result.reachedTarget());
         assertTrue(result.finalDistance() < 50.0);
+    }
+
+    @Test
+    // Simple model should use the exact textbook parabola at the requested horizontal distance.
+    void simulateToDistance_simpleModel_matchesClosedFormHeight() {
+        double distance = 3.0;
+        double angle = Math.toRadians(40.0);
+        double exitVelocity = 10.0;
+        double expectedTime = distance / (exitVelocity * Math.cos(angle));
+        double expectedHeight =
+            1.0 + exitVelocity * Math.sin(angle) * expectedTime - 0.5 * BallisticsConstants.GRAVITY * expectedTime * expectedTime;
+
+        TrajectoryResult result = BallisticsPhysics.simulateToDistance(
+            distance,
+            angle,
+            exitVelocity,
+            1.0,
+            0.0,
+            999.0,
+            0.002,
+            BallisticsModel.SIMPLE
+        );
+
+        assertTrue(result.reachedTarget());
+        assertEquals(expectedTime, result.flightTime(), EPS);
+        assertEquals(expectedHeight, result.finalHeight(), EPS);
+        assertEquals(distance, result.finalDistance(), EPS);
     }
 
     @Test
@@ -149,5 +204,24 @@ class BallisticsPhysicsTest {
         );
 
         assertTrue(result.getZ() < 10.0);
+    }
+
+    @Test
+    // Simple 3D crossing should preserve constant horizontal velocity and hit the requested plane exactly.
+    void simulateToHeight3D_simpleModel_matchesClosedFormCrossing() {
+        Translation3d result = BallisticsPhysics.simulateToHeight3D(
+            new Translation3d(0.5, -0.25, 1.0),
+            6.0,
+            -2.0,
+            5.0,
+            1000.0,
+            1.0,
+            0.002,
+            BallisticsModel.SIMPLE
+        );
+
+        assertEquals(1.0, result.getZ(), EPS);
+        assertTrue(result.getX() > 0.5);
+        assertTrue(result.getY() < -0.25);
     }
 }
