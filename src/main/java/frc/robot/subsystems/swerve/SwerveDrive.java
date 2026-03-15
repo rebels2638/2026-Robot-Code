@@ -409,8 +409,9 @@ public class SwerveDrive extends SubsystemBase {
 
     @Override
     public void periodic() {
-        double dt = Timer.getTimestamp() - prevLoopTime; 
-        prevLoopTime = Timer.getTimestamp();
+        double now = Timer.getTimestamp();
+        double dt = now - prevLoopTime;
+        prevLoopTime = now;
 
         Logger.recordOutput("SwerveDrive/dtPeriodic", dt);
 
@@ -1822,8 +1823,9 @@ public class SwerveDrive extends SubsystemBase {
     }
 
     private void driveRobotRelative(ChassisSpeeds speeds) {
-        double dt = Timer.getTimestamp() - prevDriveTime; 
-        prevDriveTime = Timer.getTimestamp();
+        double now = Timer.getTimestamp();
+        double dt = now - prevDriveTime;
+        prevDriveTime = now;
         Rotation2d heading = currentPose.getRotation();
 
         lastUnoverriddenOmega = speeds.omegaRadiansPerSecond;
