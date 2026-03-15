@@ -230,6 +230,7 @@ public class SwerveDrive extends SubsystemBase {
         new SwerveModuleState(),
         new SwerveModuleState()
     };
+    private Pose2d currentPose = new Pose2d();
 
     private ChassisSpeeds desiredRobotRelativeSpeeds = new ChassisSpeeds();
     private ChassisSpeeds obtainableFieldRelativeSpeeds = new ChassisSpeeds();
@@ -497,6 +498,8 @@ public class SwerveDrive extends SubsystemBase {
         }
         Logger.recordOutput("SwerveDrive/measuredModuleStates", moduleStates);
         Logger.recordOutput("SwerveDrive/measuredModulePositions", modulePositions);
+
+        currentPose = RobotState.getInstance().getEstimatedPose();
 
         // FSM processing
         handleStateTransitions();
@@ -893,8 +896,7 @@ public class SwerveDrive extends SubsystemBase {
     }
 
     private boolean isAtSnapTarget() {
-        Rotation2d currentRotation = RobotState.getInstance().getEstimatedPose().getRotation();
-        double errorRad = MathUtil.angleModulus(snapTargetAngle.getRadians() - currentRotation.getRadians());
+        double errorRad = MathUtil.angleModulus(snapTargetAngle.getRadians() - currentPose.getRotation().getRadians());
         return Math.abs(errorRad) <= Math.toRadians(drivetrainConfig.snappedToleranceDeg);
     }
 
@@ -1221,8 +1223,7 @@ public class SwerveDrive extends SubsystemBase {
     }
 
     private double calculateSnapOmega() {
-        Rotation2d currentRotation = RobotState.getInstance().getEstimatedPose().getRotation();
-        double current = currentRotation.getRadians();
+        double current = currentPose.getRotation().getRadians();
         double target = snapTargetAngle.getRadians();
 
         snappedOmegaOverridePIDController.setSetpoint(target);
@@ -1388,7 +1389,7 @@ public class SwerveDrive extends SubsystemBase {
 
     public void setRotationRangeWrappedDegrees(double minWrappedDeg, double maxWrappedDeg) {
         double wrappedReferenceDeg = normalizeWrappedDegrees(
-            RobotState.getInstance().getEstimatedPose().getRotation().getDegrees()
+            currentPose.getRotation().getDegrees()
         );
         WrappedRotationRangeResolution resolution = resolveWrappedRotationRangeDegrees(
             minWrappedDeg,
@@ -1784,14 +1785,15 @@ public class SwerveDrive extends SubsystemBase {
     private ChassisSpeeds compensateRobotRelativeSpeeds(ChassisSpeeds speeds) {
         Rotation2d angularVelocity = new Rotation2d(speeds.omegaRadiansPerSecond * drivetrainConfig.rotationCompensationCoefficient);
         if (angularVelocity.getRadians() != 0.0) {
+            Rotation2d heading = currentPose.getRotation();
             speeds = ChassisSpeeds.fromFieldRelativeSpeeds(
                 ChassisSpeeds.fromRobotRelativeSpeeds( // why should this be split into two?
                     speeds.vxMetersPerSecond,
                     speeds.vyMetersPerSecond,
                     speeds.omegaRadiansPerSecond,
-                    RobotState.getInstance().getEstimatedPose().getRotation().plus(angularVelocity)
+                    heading.plus(angularVelocity)
                 ),
-                RobotState.getInstance().getEstimatedPose().getRotation()
+                heading
             );
         }
 
@@ -1822,6 +1824,7 @@ public class SwerveDrive extends SubsystemBase {
     private void driveRobotRelative(ChassisSpeeds speeds) {
         double dt = Timer.getTimestamp() - prevDriveTime; 
         prevDriveTime = Timer.getTimestamp();
+        Rotation2d heading = currentPose.getRotation();
 
         lastUnoverriddenOmega = speeds.omegaRadiansPerSecond;
         desiredRobotRelativeSpeeds = speeds;
@@ -1866,10 +1869,10 @@ public class SwerveDrive extends SubsystemBase {
                 desiredRobotRelativeSpeeds.omegaRadiansPerSecond
             );
 
-            desiredRobotRelativeSpeeds = ChassisSpeeds.fromFieldRelativeSpeeds(frozenFieldRelativeSpeeds, RobotState.getInstance().getEstimatedPose().getRotation());
+            desiredRobotRelativeSpeeds = ChassisSpeeds.fromFieldRelativeSpeeds(frozenFieldRelativeSpeeds, heading);
         }
 
-        ChassisSpeeds desiredFieldRelativeSpeeds = ChassisSpeeds.fromRobotRelativeSpeeds(desiredRobotRelativeSpeeds, RobotState.getInstance().getEstimatedPose().getRotation());
+        ChassisSpeeds desiredFieldRelativeSpeeds = ChassisSpeeds.fromRobotRelativeSpeeds(desiredRobotRelativeSpeeds, heading);
         Logger.recordOutput("SwerveDrive/desiredFieldRelativeSpeeds", desiredFieldRelativeSpeeds);
         Logger.recordOutput("SwerveDrive/desiredRobotRelativeSpeeds", desiredRobotRelativeSpeeds);
         
@@ -1886,7 +1889,7 @@ public class SwerveDrive extends SubsystemBase {
         
         Logger.recordOutput("SwerveDrive/obtainableFieldRelativeSpeeds", obtainableFieldRelativeSpeeds);
 
-        ChassisSpeeds obtainableRobotRelativeSpeeds = ChassisSpeeds.fromFieldRelativeSpeeds(obtainableFieldRelativeSpeeds, RobotState.getInstance().getEstimatedPose().getRotation());
+        ChassisSpeeds obtainableRobotRelativeSpeeds = ChassisSpeeds.fromFieldRelativeSpeeds(obtainableFieldRelativeSpeeds, heading);
         Logger.recordOutput("SwerveDrive/obtainableRobotRelativeSpeeds", obtainableRobotRelativeSpeeds);
 
         SwerveModuleState[] moduleSetpoints = kinematics.toSwerveModuleStates(obtainableRobotRelativeSpeeds);
@@ -1905,7 +1908,7 @@ public class SwerveDrive extends SubsystemBase {
     }
 
     private void driveFieldRelative(ChassisSpeeds speeds) {
-        speeds = ChassisSpeeds.fromFieldRelativeSpeeds(speeds, RobotState.getInstance().getEstimatedPose().getRotation());
+        speeds = ChassisSpeeds.fromFieldRelativeSpeeds(speeds, currentPose.getRotation());
         driveRobotRelative(speeds);
     }
 
