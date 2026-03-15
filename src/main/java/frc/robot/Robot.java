@@ -158,30 +158,22 @@ public class Robot extends LoggedRobot {
     private void linkFollowPathLogging() {
         // Pose logging consumer
         FollowPath.setPoseLoggingConsumer(pair -> {
-            if (Constants.VERBOSE_LOGGING_ENABLED) {
-                Logger.recordOutput(pair.getFirst(), pair.getSecond());
-            }
+            Logger.recordOutput(pair.getFirst(), pair.getSecond());
         });
 
         // Translation list logging consumer
         FollowPath.setTranslationListLoggingConsumer(pair -> {
-            if (Constants.VERBOSE_LOGGING_ENABLED) {
-                Logger.recordOutput(pair.getFirst(), pair.getSecond());
-            }
+            Logger.recordOutput(pair.getFirst(), pair.getSecond());
         });
 
         // Double logging consumer
         FollowPath.setDoubleLoggingConsumer(pair -> {
-            if (Constants.VERBOSE_LOGGING_ENABLED) {
-                Logger.recordOutput(pair.getFirst(), pair.getSecond());
-            }
+            Logger.recordOutput(pair.getFirst(), pair.getSecond());
         });
 
         // Boolean logging consumer
         FollowPath.setBooleanLoggingConsumer(pair -> {
-            if (Constants.VERBOSE_LOGGING_ENABLED) {
-                Logger.recordOutput(pair.getFirst(), pair.getSecond());
-            }
+            Logger.recordOutput(pair.getFirst(), pair.getSecond());
         });
     }
     

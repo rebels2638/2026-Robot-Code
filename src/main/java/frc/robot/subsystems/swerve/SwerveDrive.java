@@ -143,6 +143,8 @@ public class SwerveDrive extends SubsystemBase {
     // Path following
     private Path currentPath = null;
     private boolean shouldResetPose = false;
+    private boolean shouldUseDefaultPathFlipping = true;
+    private boolean shouldFlipCurrentPath = false;
     private boolean shouldMirrorCurrentPath = false;
     private BooleanSupplier pathMirroringHook = () -> false;
     private Command currentPathCommand = null;
@@ -532,8 +534,9 @@ public class SwerveDrive extends SubsystemBase {
                 break;
                 
             case PREPARE_FOR_AUTO:
-                if (currentPath != null) {
-                    modulesAlignmentTargetRotation = currentPath.getInitialModuleDirection();
+                Path resolvedCurrentPath = resolveConfiguredCurrentPath();
+                if (resolvedCurrentPath != null) {
+                    modulesAlignmentTargetRotation = resolvedCurrentPath.getInitialModuleDirection();
                     modulesAlignmentToleranceDeg = 15;
                 }
                 if (areModulesAligned()) {
@@ -729,9 +732,29 @@ public class SwerveDrive extends SubsystemBase {
     private void prepareForAuto() {
         cancelPathCommand();
 
-        if (currentPath != null) {
-            alignModules(currentPath.getInitialModuleDirection(), 15);
+        Path resolvedCurrentPath = resolveConfiguredCurrentPath();
+        if (resolvedCurrentPath != null) {
+            alignModules(resolvedCurrentPath.getInitialModuleDirection(), 15);
         }
+    }
+
+    private boolean shouldFlipPathForCurrentSettings() {
+        return shouldUseDefaultPathFlipping ? Constants.shouldFlipPath() : shouldFlipCurrentPath;
+    }
+
+    private Path resolveConfiguredCurrentPath() {
+        if (currentPath == null) {
+            return null;
+        }
+
+        Path resolvedPath = currentPath.copy();
+        if (shouldFlipPathForCurrentSettings()) {
+            resolvedPath.flip();
+        }
+        if (shouldMirrorCurrentPath) {
+            resolvedPath.mirror();
+        }
+        return resolvedPath;
     }
 
     private void handlePrepareForAutoSystemState() {
@@ -846,13 +869,17 @@ public class SwerveDrive extends SubsystemBase {
      * Builds a path command using the followPathBuilder, applying pose reset if configured.
      */
     private Command buildPathCommand(Path path) {
+        FollowPath.Builder configuredBuilder = shouldUseDefaultPathFlipping
+            ? followPathBuilder.withDefaultShouldFlip()
+            : followPathBuilder.withShouldFlip(() -> shouldFlipCurrentPath);
+
         if (shouldResetPose) {
-            return followPathBuilder
+            return configuredBuilder
                 .withShouldMirror(() -> shouldMirrorCurrentPath)
                 .withPoseReset(RobotState.getInstance()::resetPose)
                 .build(path);
         }
-        return followPathBuilder
+        return configuredBuilder
             .withShouldMirror(() -> shouldMirrorCurrentPath)
             .withPoseReset((Pose2d pose) -> {})
             .build(path);
@@ -1241,6 +1268,18 @@ public class SwerveDrive extends SubsystemBase {
     public void setCurrentPath(Path path, boolean shouldResetPose, boolean shouldMirrorPath) {
         this.currentPath = path;
         this.shouldResetPose = shouldResetPose;
+        this.shouldUseDefaultPathFlipping = true;
+        this.shouldFlipCurrentPath = false;
+        this.shouldMirrorCurrentPath = shouldMirrorPath;
+        // Clear existing command to allow fresh path to be scheduled
+        cancelPathCommand();
+    }
+
+    public void setCurrentPath(Path path, boolean shouldResetPose, boolean shouldMirrorPath, boolean shouldFlipPath) {
+        this.currentPath = path;
+        this.shouldResetPose = shouldResetPose;
+        this.shouldUseDefaultPathFlipping = false;
+        this.shouldFlipCurrentPath = shouldFlipPath;
         this.shouldMirrorCurrentPath = shouldMirrorPath;
         // Clear existing command to allow fresh path to be scheduled
         cancelPathCommand();
@@ -1260,6 +1299,37 @@ public class SwerveDrive extends SubsystemBase {
 
     public Command followPathCommand(Path path, boolean shouldResetPose, boolean shouldMirrorPath) {
         return followPathCommand(path, () -> shouldResetPose, () -> shouldMirrorPath);
+    }
+
+    public Command prepareForPathCommand(Path path, boolean shouldMirrorPath) {
+        return new InstantCommand(() -> setCurrentPath(path, false, shouldMirrorPath)).andThen(
+            new InstantCommand(() -> setDesiredSystemState(DesiredSystemState.PREPARE_FOR_AUTO))
+        ).andThen(
+            new WaitUntilCommand(() -> getCurrentSystemState() == CurrentSystemState.READY_FOR_AUTO)
+        );
+    }
+
+    public Command prepareForPathCommand(Path path, boolean shouldMirrorPath, boolean shouldFlipPath) {
+        return new InstantCommand(() -> setCurrentPath(path, false, shouldMirrorPath, shouldFlipPath)).andThen(
+            new InstantCommand(() -> setDesiredSystemState(DesiredSystemState.PREPARE_FOR_AUTO))
+        ).andThen(
+            new WaitUntilCommand(() -> getCurrentSystemState() == CurrentSystemState.READY_FOR_AUTO)
+        );
+    }
+
+    public Command followPathCommand(Path path, boolean shouldResetPose, boolean shouldMirrorPath, boolean shouldFlipPath) {
+        return new InstantCommand(() -> setCurrentPath(
+            path,
+            shouldResetPose,
+            shouldMirrorPath,
+            shouldFlipPath
+        )).andThen(
+            new InstantCommand(() -> setDesiredSystemState(DesiredSystemState.FOLLOW_PATH))
+        ).andThen(
+            new WaitUntilCommand(() -> currentPathCommand != null)
+        ).andThen(
+            new WaitUntilCommand(() -> getCurrentSystemState() == CurrentSystemState.IDLE)
+        );
     }
 
     public Command followPathCommand(
