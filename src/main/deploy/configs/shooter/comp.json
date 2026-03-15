@@ -198,13 +198,13 @@
     {
       "distanceMeters": 6.0,
       "hoodAngleDegrees": 57.0,
-      "flywheelVelocityRPS": 34.3,
+      "flywheelVelocityRPS": 36.6,
       "flightTimeSeconds": 1.21
     },
     {
       "distanceMeters": 6.5,
       "hoodAngleDegrees": 57.0,
-      "flywheelVelocityRPS": 37.3,
+      "flywheelVelocityRPS": 39.3,
       "flightTimeSeconds": 1.30
     }
   ]
