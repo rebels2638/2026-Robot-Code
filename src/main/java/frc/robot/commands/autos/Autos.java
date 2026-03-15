@@ -85,7 +85,7 @@ public final class Autos {
             climb()
         ),
         auto(
-            "double_swipe",
+            "double_swipe_bottom",
             new Pose2d(
                 new Translation2d(3.569, 2.320),
                 Rotation2d.fromRadians(0)
@@ -95,6 +95,19 @@ public final class Autos {
             firstFollowPath("bottom_jab_sharp"),
             waitSeconds(6),
             followPath("bottom_sweep_short"),
+            waitSeconds(6)
+        ),
+        auto(
+            "double_swipe_top",
+            new Pose2d(
+                new Translation2d(3.569, 5.68),
+                Rotation2d.fromRadians(0)
+            ),
+            setTarget(TargetState.HUB),
+            setSystem(DesiredSystemState.HOME),
+            firstFollowPath("bottom_jab_sharp", false, true),
+            waitSeconds(6),
+            followPath("bottom_sweep_short", false, true),
             waitSeconds(6)
         )
 
