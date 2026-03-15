@@ -217,7 +217,8 @@ public class RobotState {
         boolean didResetGyro = false;
         if (DriverStation.isDisabled()
             && Timer.getTimestamp() - lastGyroResetTime > robotStateConfig.gyroResetTimeoutSeconds
-            && observation.visionMeasurementStdDevs().get(2,0) < robotStateConfig.gyroResetMaxVisionRotationStdDev) {
+            // && observation.visionMeasurementStdDevs().get(2,0) < robotStateConfig.gyroResetMaxVisionRotationStdDev
+            ) {
                 resetPose(new Pose2d(getEstimatedPose().getTranslation(), observation.visionRobotPoseMeters().getRotation()));
                 lastGyroResetTime = Timer.getTimestamp();
                 didResetGyro = true;
