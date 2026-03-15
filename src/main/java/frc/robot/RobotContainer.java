@@ -129,7 +129,7 @@ public class RobotContainer {
         FollowPath.registerEventTrigger("intake", () -> {
             superstructure.setDesiredIntakeState(Superstructure.DesiredIntakeState.INTAKING);
         });
-        FollowPath.registerEventTrigger("deploy_intake", () -> {
+        FollowPath.registerEventTrigger("deploy", () -> {
             superstructure.setDesiredIntakeState(Superstructure.DesiredIntakeState.DEPLOYED);
         });
     }
@@ -318,5 +318,6 @@ public class RobotContainer {
     public Command getAutonomousCommand() {
         Command selectedAuto = autoChooser.getSelected();
         return selectedAuto != null ? selectedAuto : Commands.none();
+        // return Autos.followPath("bottom_sweep_long", true, true);
     }
 }
