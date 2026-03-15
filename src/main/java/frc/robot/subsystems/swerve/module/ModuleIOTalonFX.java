@@ -67,10 +67,10 @@ public class ModuleIOTalonFX implements ModuleIO {
     private final StatusSignal<Temperature> steerTemperature;
 
     // private final VelocityTorqueCurrentFOC driveMotorRequest = new VelocityTorqueCurrentFOC(0).withSlot(0);
-    private final VelocityVoltage driveMotorRequest = new VelocityVoltage(0).withSlot(0);
+    private final VelocityVoltage driveMotorRequest = new VelocityVoltage(0).withSlot(0).withEnableFOC(true);
 
     // private final MotionMagicExpoTorqueCurrentFOC steerMotorRequest = new MotionMagicExpoTorqueCurrentFOC(0).withSlot(0);
-    private final PositionVoltage steerMotorRequest = new PositionVoltage(0).withSlot(0);
+    private final PositionVoltage steerMotorRequest = new PositionVoltage(0).withSlot(0).withEnableFOC(true);
 
     private final TorqueCurrentFOC torqueCurrentFOCRequest = new TorqueCurrentFOC(0);
 
@@ -222,6 +222,22 @@ public class ModuleIOTalonFX implements ModuleIO {
             steerVelocityStatusSignal
         );
 
+        PhoenixUtil.registerSignals(
+            generalConfig.canBusName,
+            driveTorqueCurrent,
+            driveTemperature,
+            driveMotorVoltage,
+            steerTorqueCurrent,
+            steerTemperature,
+            steerMotorVoltage,
+            steerEncoderAbsolutePosition,
+            steerEncoderPositionStatusSignal,
+            drivePositionStatusSignal,
+            driveVelocityStatusSignal,
+            steerPositionStatusSignal,
+            steerVelocityStatusSignal
+        );
+
         driveMotor.optimizeBusUtilization();
         steerMotor.optimizeBusUtilization();
         steerEncoder.optimizeBusUtilization();
@@ -229,23 +245,23 @@ public class ModuleIOTalonFX implements ModuleIO {
 
     @Override
     public void updateInputs(ModuleIOInputs inputs) {
-        BaseStatusSignal.refreshAll(
-            driveTorqueCurrent,
-            driveTemperature,
-            driveMotorVoltage,
-
-            steerTorqueCurrent,
-            steerTemperature,
-            steerMotorVoltage,
-
-            steerEncoderAbsolutePosition,
-            steerEncoderPositionStatusSignal,
-
+        inputs.driveMotorConnected = BaseStatusSignal.isAllGood(
             drivePositionStatusSignal,
             driveVelocityStatusSignal,
-
+            driveMotorVoltage,
+            driveTorqueCurrent,
+            driveTemperature
+        );
+        inputs.steerMotorConnected = BaseStatusSignal.isAllGood(
             steerPositionStatusSignal,
-            steerVelocityStatusSignal
+            steerVelocityStatusSignal,
+            steerMotorVoltage,
+            steerTorqueCurrent,
+            steerTemperature
+        );
+        inputs.steerEncoderConnected = BaseStatusSignal.isAllGood(
+            steerEncoderAbsolutePosition,
+            steerEncoderPositionStatusSignal
         );
 
         inputs.drivePositionMeters = BaseStatusSignal.getLatencyCompensatedValue(drivePositionStatusSignal, driveVelocityStatusSignal).in(Rotation);
@@ -265,15 +281,33 @@ public class ModuleIOTalonFX implements ModuleIO {
         inputs.steerTorqueCurrent = steerTorqueCurrent.getValue().in(Amps);
         inputs.steerTemperatureFahrenheit = steerTemperature.getValue().in(Fahrenheit);
 
-        inputs.odometryTimestampsSeconds = timestampQueue.stream().mapToDouble(Double::doubleValue).toArray();
-        inputs.odometryDrivePositionsMeters = drivePositionQueue.stream().mapToDouble(Double::doubleValue).toArray();
-        inputs.odometrySteerPositions = steerPositionQueue.stream().map((Double value) -> Rotation2d.fromRotations(value)).toArray(Rotation2d[]::new);
+        inputs.odometryTimestampsSeconds = copyDoubleQueue(timestampQueue);
+        inputs.odometryDrivePositionsMeters = copyDoubleQueue(drivePositionQueue);
+        inputs.odometrySteerPositions = copyRotationQueue(steerPositionQueue);
 
         timestampQueue.clear();
         drivePositionQueue.clear();
         steerPositionQueue.clear();
 
         lastSteerAngleRad = new Rotation2d(inputs.steerPosition.getRadians());
+    }
+
+    private static double[] copyDoubleQueue(Queue<Double> queue) {
+        double[] values = new double[queue.size()];
+        int index = 0;
+        for (Double value : queue) {
+            values[index++] = value;
+        }
+        return values;
+    }
+
+    private static Rotation2d[] copyRotationQueue(Queue<Double> queue) {
+        Rotation2d[] values = new Rotation2d[queue.size()];
+        int index = 0;
+        for (Double value : queue) {
+            values[index++] = Rotation2d.fromRotations(value);
+        }
+        return values;
     }
 
     @Override
@@ -353,8 +387,26 @@ public class ModuleIOTalonFX implements ModuleIO {
     }
 
     @Override
-    public void setWheelCoast(boolean isCoast) {
-        driveMotor.setNeutralMode(isCoast ? NeutralModeValue.Coast : NeutralModeValue.Brake);
-        steerMotor.setNeutralMode(isCoast ? NeutralModeValue.Coast : NeutralModeValue.Brake);
+    public void enableDriveEStop() {
+        driveConfig.CurrentLimits.StatorCurrentLimit = 0;
+        PhoenixUtil.tryUntilOk(5, () -> driveMotor.getConfigurator().apply(driveConfig, 0.25));
+    }
+
+    @Override
+    public void disableDriveEStop() {
+        driveConfig.CurrentLimits.StatorCurrentLimit = generalConfig.driveStatorCurrentLimit;
+        PhoenixUtil.tryUntilOk(5, () -> driveMotor.getConfigurator().apply(driveConfig, 0.25));
+    }
+
+    @Override
+    public void enableSteerEStop() {
+        steerConfig.CurrentLimits.StatorCurrentLimit = 0;
+        PhoenixUtil.tryUntilOk(5, () -> steerMotor.getConfigurator().apply(steerConfig, 0.25));
+    }
+
+    @Override
+    public void disableSteerEStop() {
+        steerConfig.CurrentLimits.StatorCurrentLimit = generalConfig.steerStatorCurrentLimit;
+        PhoenixUtil.tryUntilOk(5, () -> steerMotor.getConfigurator().apply(steerConfig, 0.25));
     }
 }

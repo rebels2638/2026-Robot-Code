@@ -1,131 +1,211 @@
 {
-  "lerpTable": [
+  "passLerpTable": [
     {
-      "distanceMeters": 0.889,
-      "hoodAngleRotations": 0.1486111111,
-      "flywheelVelocityRPS": 85.0
+      "distanceMeters": 1.0,
+      "hoodAngleDegrees": 25.084,
+      "flywheelVelocityRPS": 8.577,
+      "flightTimeSeconds": 0.489423
     },
     {
-      "distanceMeters": 1.2192,
-      "hoodAngleRotations": 0.1486111111,
-      "flywheelVelocityRPS": 73.0
+      "distanceMeters": 2.2,
+      "hoodAngleDegrees": 27.684,
+      "flywheelVelocityRPS": 15.375,
+      "flightTimeSeconds": 0.623861
     },
     {
-      "distanceMeters": 1.524,
-      "hoodAngleRotations": 0.1486111111,
-      "flywheelVelocityRPS": 30.5
+      "distanceMeters": 3.4,
+      "hoodAngleDegrees": 29.784,
+      "flywheelVelocityRPS": 20.392,
+      "flightTimeSeconds": 0.753955
     },
     {
-      "distanceMeters": 1.8288,
-      "hoodAngleRotations": 0.1486111111,
-      "flywheelVelocityRPS": 26.5
+      "distanceMeters": 4.6,
+      "hoodAngleDegrees": 29.884,
+      "flywheelVelocityRPS": 24.678,
+      "flightTimeSeconds": 0.85755
     },
     {
-      "distanceMeters": 2.4384,
-      "hoodAngleRotations": 0.1486111111,
-      "flywheelVelocityRPS": 25.5
+      "distanceMeters": 5.8,
+      "hoodAngleDegrees": 29.684,
+      "flywheelVelocityRPS": 28.493,
+      "flightTimeSeconds": 0.94995
     },
     {
-      "distanceMeters": 3.048,
-      "hoodAngleRotations": 0.1486111111,
-      "flywheelVelocityRPS": 26.5
+      "distanceMeters": 7.0,
+      "hoodAngleDegrees": 29.784,
+      "flywheelVelocityRPS": 31.911,
+      "flightTimeSeconds": 1.04183
     },
     {
-      "distanceMeters": 3.6576,
-      "hoodAngleRotations": 0.1444444445,
-      "flywheelVelocityRPS": 28.0
+      "distanceMeters": 8.2,
+      "hoodAngleDegrees": 30.384,
+      "flywheelVelocityRPS": 34.967,
+      "flightTimeSeconds": 1.140038
     },
     {
-      "distanceMeters": 4.572,
-      "hoodAngleRotations": 0.1388888889,
-      "flywheelVelocityRPS": 30.5
+      "distanceMeters": 9.4,
+      "hoodAngleDegrees": 29.084,
+      "flywheelVelocityRPS": 38.241,
+      "flightTimeSeconds": 1.198027
     },
     {
-      "distanceMeters": 5.4864,
-      "hoodAngleRotations": 0.1388888889,
-      "flywheelVelocityRPS": 32.5
+      "distanceMeters": 10.6,
+      "hoodAngleDegrees": 29.984,
+      "flywheelVelocityRPS": 40.86,
+      "flightTimeSeconds": 1.29881
     },
     {
-      "distanceMeters": 6.4008,
-      "hoodAngleRotations": 0.1458333334,
-      "flywheelVelocityRPS": 35.0
+      "distanceMeters": 11.8,
+      "hoodAngleDegrees": 30.184,
+      "flywheelVelocityRPS": 43.524,
+      "flightTimeSeconds": 1.384072
     },
     {
-      "distanceMeters": 7.62,
-      "hoodAngleRotations": 0.1125,
-      "flywheelVelocityRPS": 38.5
+      "distanceMeters": 13.0,
+      "hoodAngleDegrees": 29.884,
+      "flywheelVelocityRPS": 46.216,
+      "flightTimeSeconds": 1.456039
     },
     {
-      "distanceMeters": 9.144,
-      "hoodAngleRotations": 0.1277777778,
-      "flywheelVelocityRPS": 41.0
+      "distanceMeters": 14.2,
+      "hoodAngleDegrees": 30.084,
+      "flywheelVelocityRPS": 48.704,
+      "flightTimeSeconds": 1.539459
     },
     {
-      "distanceMeters": 10.668,
-      "hoodAngleRotations": 0.1305555556,
-      "flywheelVelocityRPS": 44.5
+      "distanceMeters": 15.4,
+      "hoodAngleDegrees": 30.184,
+      "flywheelVelocityRPS": 51.155,
+      "flightTimeSeconds": 1.619912
+    },
+    {
+      "distanceMeters": 16.6,
+      "hoodAngleDegrees": 30.184,
+      "flywheelVelocityRPS": 53.582,
+      "flightTimeSeconds": 1.697145
+    },
+    {
+      "distanceMeters": 17.0,
+      "hoodAngleDegrees": 30.284,
+      "flywheelVelocityRPS": 54.356,
+      "flightTimeSeconds": 1.725768
     }
   ],
-  "minShotDistFromShooterMeters": 0.889,
-  "maxShotDistFromShooterMeters": 10.668,
-  "latencyCompensationSeconds": 0.3,
-  "canBusName": "drivetrain",
-  "hoodCanId": 19,
-  "isHoodInverted": true,
-  "hoodStatorCurrentLimit": 80.0,
-  "hoodPeakForwardTorqueCurrent": 80.0,
-  "hoodPeakReverseTorqueCurrent": -80.0,
-  "hoodKS": 0.22,
+  "minShotDistFromShooterMeters": 1.4,
+  "maxShotDistFromShooterMeters": 6.5,
+  "minPassDistFromShooterMeters": 1.0,
+  "maxPassDistFromShooterMeters": 17.0,
+  "latencyCompensationSeconds": 0.0,
+  "canBusName": "",
+  "hoodCanId": 36,
+  "isHoodInverted": false,
+  "hoodStatorCurrentLimit": 30.0,
+  "hoodPeakForwardTorqueCurrent": 30.0,
+  "hoodPeakReverseTorqueCurrent": -30.0,
+  "hoodKS": 0.2,
   "hoodKV": 0.0,
   "hoodKA": 0.0,
-  "hoodKP": 50.0,
-  "hoodKI": 20.0,
-  "hoodKD": 1.0,
-  "hoodMotorToOutputShaftRatio": 2.3333333333,
-  "hoodStartingAngleRotations": 0.15,
-  "hoodMinAngleRotations": -0.2222222222,
-  "hoodMaxAngleRotations": 0.15,
-  "turretCanId": 33,
+  "hoodKP": 120.0,
+  "hoodKI": 0.0,
+  "hoodKD": 0.0,
+  "hoodMotorToOutputShaftRatio": 45,
+  "hoodStartingAngleDegrees": 70,
+  "hoodMinAngleDegrees": 40,
+  "hoodMaxAngleDegrees": 70,
+  "turretCanId": 27,
   "isTurretInverted": true,
-  "turretStatorCurrentLimit": 90.0,
-  "turretPeakForwardTorqueCurrent": 90.0,
-  "turretPeakReverseTorqueCurrent": -90.0,
-  "turretKS": 0.22,
-  "turretKV": 0.0,
+  "turretStatorCurrentLimit": 30.0,
+  "turretPeakForwardTorqueCurrent": 30.0,
+  "turretPeakReverseTorqueCurrent": -30.0,
+  "turretKS": 0.2,
+  "turretKV": 3.2,
   "turretKA": 0.0,
-  "turretKP": 75.0,
+  "turretKP": 40.0,
   "turretKI": 0.0,
-  "turretKD": 0.0,
-  "turretMotorToOutputShaftRatio": 6.6666666667,
+  "turretKD": 0.3,
+  "turretMotorToOutputShaftRatio": 20.27,
   "turretStartingAngleDeg": 180.0,
-  "turretMinAngleDeg": 90.0,
-  "turretMaxAngleDeg": 270.0,
-  "turretMaxVelocityDegPerSec": 720.0,
-  "turretMaxAccelerationDegPerSec2": 3000.0,
-  "flywheelCanId": 16,
-  "flywheelFollowerCanId": 17,
-  "isFlywheelInverted": false,
-  "isFlywheelFollowerOppositeDirection": false,
-  "flywheelStatorCurrentLimit": 15.0,
-  "flywheelPeakForwardTorqueCurrent": 15.0,
-  "flywheelPeakReverseTorqueCurrent": -15.0,
-  "flywheelKS": 0.1,
-  "flywheelKV": 0.188,
+  "turretMinAngleDeg": 60.0,
+  "turretMaxAngleDeg": 375.0,
+  "turretMaxVelocityDegPerSec": 3000.0,
+  "turretMaxAccelerationDegPerSec2": 9000.0,
+  "turretMaxJerkDegPerSec3": 50000.0,
+  "turretAngleToleranceRotations": 0.0277,
+  "flywheelCanId": 31,
+  "flywheelFollowerCanId": 33,
+  "isFlywheelInverted": true,
+  "isFlywheelFollowerOppositeDirection": true,
+  "flywheelStatorCurrentLimit": 80.0,
+  "flywheelPeakForwardTorqueCurrent": 80.0,
+  "flywheelPeakReverseTorqueCurrent": 0,
+  "flywheelMinOutputVoltage": -12.0,
+  "flywheelMaxOutputVoltage": 12.0,
+  "flywheelKS": 0.0,
+  "flywheelKV": 0.0,
   "flywheelKA": 0.0,
-  "flywheelKP": 0.5,
+  "flywheelKP": 99999999999,
   "flywheelKI": 0.0,
   "flywheelKD": 0.0,
   "flywheelMotorToOutputShaftRatio": 1.0,
   "flywheelRadiusMeters": 0.0508,
   "backRollerGearRatio": 1.3333333333,
   "backRollerRadiusMeters": 0.0254,
-  "shooterPoseX": -0.19,
+  "shooterPoseX": 0.0,
   "shooterPoseY": 0.0,
-  "shooterPoseZ": 0.46,
+  "shooterPoseZ": 0.69,
   "shooterPoseRollDeg": 0.0,
   "shooterPosePitchDeg": 0.0,
   "shooterPoseYawDeg": 0.0,
-  "hoodAngleToleranceRotations": 0.0055555556,
-  "turretAngleToleranceRotations": 0.0055555556,
-  "flywheelVelocityToleranceRPS": 3.0
+  "hoodAngleToleranceDegrees": 2.0,
+  "flywheelVelocityToleranceRPS": 8.0,
+  "shootingLerpTable": [
+    {
+      "distanceMeters": 1.4,
+      "hoodAngleDegrees": 70,
+      "flywheelVelocityRPS": 24,
+      "flightTimeSeconds": 0.8
+    },
+    {
+      "distanceMeters": 2.2,
+      "hoodAngleDegrees": 70,
+      "flywheelVelocityRPS": 26.0,
+      "flightTimeSeconds": 1
+    },
+    {
+      "distanceMeters": 3.15,
+      "hoodAngleDegrees": 65.0,
+      "flywheelVelocityRPS": 29.0,
+      "flightTimeSeconds": 1.1
+    },
+    {
+      "distanceMeters": 3.72,
+      "hoodAngleDegrees": 60.0,
+      "flywheelVelocityRPS": 29.0,
+      "flightTimeSeconds": 1.1
+    },
+    {
+      "distanceMeters": 5.05,
+      "hoodAngleDegrees": 58.0,
+      "flywheelVelocityRPS": 33.0,
+      "flightTimeSeconds": 1.15
+    },
+    {
+      "distanceMeters": 5.5,
+      "hoodAngleDegrees": 57.0,
+      "flywheelVelocityRPS": 33.3,
+      "flightTimeSeconds": 1.18
+    },
+    {
+      "distanceMeters": 6.0,
+      "hoodAngleDegrees": 57.0,
+      "flywheelVelocityRPS": 34.3,
+      "flightTimeSeconds": 1.21
+    },
+    {
+      "distanceMeters": 6.5,
+      "hoodAngleDegrees": 57.0,
+      "flywheelVelocityRPS": 37.3,
+      "flightTimeSeconds": 1.30
+    }
+  ]
 }

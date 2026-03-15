@@ -24,13 +24,11 @@ public class KickerIOSim implements KickerIO {
 
     private boolean isKickerClosedLoop = true;
     private double desiredKickerVelocityRotationsPerSec = 0;
+    private boolean isKickerEStopped = false;
 
     private double lastTimeInputs = Timer.getTimestamp();
 
-    private final KickerConfig config;
-
     public KickerIOSim(KickerConfig config) {
-        this.config = config;
 
         // Initialize PID controller with config values
         kickerFeedback = new PIDController(config.kickerKP, config.kickerKI, config.kickerKD);
@@ -44,11 +42,13 @@ public class KickerIOSim implements KickerIO {
         double dt = Timer.getTimestamp() - lastTimeInputs;
         lastTimeInputs = Timer.getTimestamp();
 
-        if (isKickerClosedLoop) {
+        if (isKickerEStopped) {
+            kickerSim.setInputVoltage(0);
+        } else if (isKickerClosedLoop) {
             kickerSim.setInputVoltage(
                 MathUtil.clamp(
                     kickerFeedforward.calculate(desiredKickerVelocityRotationsPerSec) +
-                    kickerFeedback.calculate(kickerSim.getAngularVelocityRadPerSec()),
+                    kickerFeedback.calculate(kickerSim.getAngularVelocityRadPerSec() / (2 * Math.PI)),
                     -12,
                     12
                 )
@@ -57,7 +57,8 @@ public class KickerIOSim implements KickerIO {
 
         kickerSim.update(dt);
 
-        inputs.velocityRotationsPerSec = kickerSim.getAngularVelocityRadPerSec();
+        inputs.kickerMotorConnected = true;
+        inputs.velocityRotationsPerSec = kickerSim.getAngularVelocityRadPerSec() / (2 * Math.PI);
         inputs.appliedVolts = kickerSim.getInputVoltage();
         inputs.torqueCurrent = kickerSim.getCurrentDrawAmps();
 
@@ -67,6 +68,11 @@ public class KickerIOSim implements KickerIO {
 
     @Override
     public void setVelocity(double velocityRotationsPerSec) {
+        if (isKickerEStopped) {
+            kickerSim.setInputVoltage(0);
+            isKickerClosedLoop = false;
+            return;
+        }
         kickerFeedback.setSetpoint(velocityRotationsPerSec);
         desiredKickerVelocityRotationsPerSec = velocityRotationsPerSec;
         isKickerClosedLoop = true;
@@ -74,7 +80,7 @@ public class KickerIOSim implements KickerIO {
 
     @Override
     public void setVoltage(double voltage) {
-        kickerSim.setInputVoltage(voltage);
+        kickerSim.setInputVoltage(isKickerEStopped ? 0 : voltage);
         isKickerClosedLoop = false;
     }
 
@@ -87,5 +93,17 @@ public class KickerIOSim implements KickerIO {
         kickerFeedforward.setKs(config.kS());
         kickerFeedforward.setKv(config.kV());
         kickerFeedforward.setKa(config.kA());
+    }
+
+    @Override
+    public void enableEStop() {
+        isKickerEStopped = true;
+        kickerSim.setInputVoltage(0);
+        isKickerClosedLoop = false;
+    }
+
+    @Override
+    public void disableEStop() {
+        isKickerEStopped = false;
     }
 }

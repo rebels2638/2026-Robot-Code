@@ -7,14 +7,29 @@ import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.math.geometry.Rotation3d;
 import edu.wpi.first.math.geometry.Transform3d;
 import edu.wpi.first.math.geometry.Translation2d;
+import edu.wpi.first.math.geometry.Translation3d;
 import edu.wpi.first.math.kinematics.ChassisSpeeds;
 import edu.wpi.first.wpilibj.Timer;
-import frc.robot.constants.FieldConstants;
+import frc.robot.constants.Constants;
+import frc.robot.lib.util.ShotCalculator;
 import frc.robot.lib.util.ballistics.ProjectileVisualizer;
+import frc.robot.subsystems.Superstructure;
 import frc.robot.subsystems.shooter.Shooter;
 
 public class VisualizeShot {
     public VisualizeShot() {
+        this(Shooter.getInstance().getShotExitVelocityMetersPerSec());
+    }
+
+    public VisualizeShot(double launchExitVelocityMetersPerSec) {
+        visualize(launchExitVelocityMetersPerSec);
+    }
+
+    private void visualize(double launchExitVelocityMetersPerSec) {
+        if (Constants.currentMode != Constants.Mode.SIM) {
+            return;
+        }
+        
         // Convert robot pose from field-relative Pose2d to Pose3d
         Pose3d robotPose3d = new Pose3d(RobotState.getInstance().getEstimatedPose());
         Rotation2d robotHeading = RobotState.getInstance().getEstimatedPose().getRotation();
@@ -45,8 +60,18 @@ public class VisualizeShot {
         shooterPose = new Pose3d(shooterPose.getTranslation(), newRotation);
 
         double flywheelRPS = Shooter.getInstance().getFlywheelVelocityRotationsPerSec();
-        double exitVelocity = Shooter.getInstance().getShotExitVelocityMetersPerSec();
-        double backspinRPM = Shooter.getInstance().calculateBackSpinRPM(flywheelRPS);
+        double exitVelocity = launchExitVelocityMetersPerSec;
+        Superstructure superstructure = Superstructure.getInstance();
+        Translation3d targetLocation = superstructure.getCurrentFieldTargetLocation();
+        double shooterDistanceToTarget =
+            shooterPose.getTranslation().toTranslation2d().getDistance(targetLocation.toTranslation2d());
+        double backspinRadPerSec = ShotCalculator.calculateSpinRateRadPerSec(
+            shooterDistanceToTarget,
+            superstructure.getCurrentTargetLerpTable(),
+            flywheelRPS,
+            rps -> Shooter.getInstance().calculateBackSpinRPM(rps) * 2.0 * Math.PI / 60.0
+        );
+        double backspinRPM = backspinRadPerSec * 60.0 / (2.0 * Math.PI);
         
         // Include tangential velocity from robot rotation (omega cross r)
         double omega = fieldRelativeSpeeds.omegaRadiansPerSecond;
@@ -65,28 +90,31 @@ public class VisualizeShot {
         double shooterVyField = fieldRelativeSpeeds.vyMetersPerSecond + tangentialVyField;
 
         // Debug logging for shot parameters
-        Logger.recordOutput("VisualizeShot/shooterPose", shooterPose);
-        Logger.recordOutput("VisualizeShot/launchTime", Timer.getFPGATimestamp());
-        Logger.recordOutput("VisualizeShot/hoodAngleDegrees", Math.toDegrees(hoodAngleRadians));
-        Logger.recordOutput("VisualizeShot/turretAngleDegrees", Math.toDegrees(turretAngleRadians));
-        Logger.recordOutput("VisualizeShot/totalYawDegrees", Math.toDegrees(newRotation.getZ()));
-        Logger.recordOutput("VisualizeShot/exitVelocityMPS", exitVelocity);
-        Logger.recordOutput("VisualizeShot/flywheelRPS", flywheelRPS);
-        Logger.recordOutput("VisualizeShot/backspinRPM", backspinRPM);
-        Logger.recordOutput("VisualizeShot/robotVx", fieldRelativeSpeeds.vxMetersPerSecond);
-        Logger.recordOutput("VisualizeShot/robotVy", fieldRelativeSpeeds.vyMetersPerSecond);
-        Logger.recordOutput("VisualizeShot/omegaRadPerSec", omega);
-        Logger.recordOutput("VisualizeShot/tangentialVxField", tangentialVxField);
-        Logger.recordOutput("VisualizeShot/tangentialVyField", tangentialVyField);
-        Logger.recordOutput("VisualizeShot/shooterVxField", shooterVxField);
-        Logger.recordOutput("VisualizeShot/shooterVyField", shooterVyField);
+        if (Constants.VERBOSE_LOGGING_ENABLED) {
+            Logger.recordOutput("VisualizeShot/shooterPose", shooterPose);
+            Logger.recordOutput("VisualizeShot/launchTime", Timer.getFPGATimestamp());
+            Logger.recordOutput("VisualizeShot/hoodAngleDegrees", Math.toDegrees(hoodAngleRadians));
+            Logger.recordOutput("VisualizeShot/turretAngleDegrees", Math.toDegrees(turretAngleRadians));
+            Logger.recordOutput("VisualizeShot/totalYawDegrees", Math.toDegrees(newRotation.getZ()));
+            Logger.recordOutput("VisualizeShot/exitVelocityMPS", exitVelocity);
+            Logger.recordOutput("VisualizeShot/flywheelRPS", flywheelRPS);
+            Logger.recordOutput("VisualizeShot/backspinRPM", backspinRPM);
+            Logger.recordOutput("VisualizeShot/robotVx", fieldRelativeSpeeds.vxMetersPerSecond);
+            Logger.recordOutput("VisualizeShot/robotVy", fieldRelativeSpeeds.vyMetersPerSecond);
+            Logger.recordOutput("VisualizeShot/omegaRadPerSec", omega);
+            Logger.recordOutput("VisualizeShot/tangentialVxField", tangentialVxField);
+            Logger.recordOutput("VisualizeShot/tangentialVyField", tangentialVyField);
+            Logger.recordOutput("VisualizeShot/shooterVxField", shooterVxField);
+            Logger.recordOutput("VisualizeShot/shooterVyField", shooterVyField);
+            Logger.recordOutput("VisualizeShot/targetLocation", targetLocation);
+        }
 
         ProjectileVisualizer.addProjectile(
-            fieldRelativeSpeeds.vxMetersPerSecond,
-            fieldRelativeSpeeds.vyMetersPerSecond,
+            shooterVxField,
+            shooterVyField,
             exitVelocity,
             shooterPose,
-            FieldConstants.Hub.hubCenter.getZ(),
+            targetLocation.getZ(),
             backspinRPM
         );
     }

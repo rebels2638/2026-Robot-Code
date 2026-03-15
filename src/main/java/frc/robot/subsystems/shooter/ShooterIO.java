@@ -8,23 +8,27 @@ public interface ShooterIO {
     @AutoLog
     class ShooterIOInputs {
         // Hood
+        public boolean hoodMotorConnected = false;
         public double hoodAngleRotations = 0;
         public double hoodVelocityRotationsPerSec = 0;
         public double hoodAppliedVolts = 0;
         public double hoodTorqueCurrent = 0;
 
         // Turret
+        public boolean turretMotorConnected = false;
         public double turretAngleRotations = 0;
         public double turretVelocityRotationsPerSec = 0;
         public double turretAppliedVolts = 0;
         public double turretTorqueCurrent = 0;
 
         // Flywheel (leader)
+        public boolean flywheelMotorConnected = false;
         public double flywheelVelocityRotationsPerSec = 0;
         public double flywheelAppliedVolts = 0;
         public double flywheelTorqueCurrent = 0;
 
         // Flywheel (follower)
+        public boolean flywheelFollowerMotorConnected = false;
         public double flywheelFollowerAppliedVolts = 0;
         public double flywheelFollowerTorqueCurrent = 0;
 
@@ -38,6 +42,11 @@ public interface ShooterIO {
     public default void updateInputs(ShooterIOInputs inputs) {}
     public default void setAngle(double angleRotations) {}
     public default void setTurretAngle(double angleRotations) {}
+    // Velocity is the final signed mechanism setpoint velocity. IO implementations must not
+    // derive or re-profile it; a non-finite value should be treated as zero for safety.
+    public default void setTurretAngle(double angleRotations, double velocityRotationsPerSec) {
+        setTurretAngle(angleRotations);
+    }
     public default void setShotVelocity(double velocityRotationsPerSec) {}
     public default void setHoodTorqueCurrentFOC(double torqueCurrentFOC) {}
     public default void setTurretTorqueCurrentFOC(double torqueCurrentFOC) {}
@@ -46,4 +55,10 @@ public interface ShooterIO {
     public default void configureHoodControlLoop(MotorControlLoopConfig config) {}
     public default void configureTurretControlLoop(MotorControlLoopConfig config) {}
     public default void configureFlywheelControlLoop(MotorControlLoopConfig config) {}
+    public default void enableHoodEStop() {}
+    public default void disableHoodEStop() {}
+    public default void enableTurretEStop() {}
+    public default void disableTurretEStop() {}
+    public default void enableFlywheelEStop() {}
+    public default void disableFlywheelEStop() {}
 }

@@ -17,7 +17,6 @@ import edu.wpi.first.math.geometry.Translation2d;
 
 import java.io.IOException;
 import java.net.HttpURLConnection;
-import java.net.MalformedURLException;
 import java.net.URL;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
@@ -914,9 +913,9 @@ public class LimelightHelpers {
         String urlString = "http://" + sanitizeName(tableName) + ".local:5807/" + request;
         URL url;
         try {
-            url = new URL(urlString);
+            url = new java.net.URI(urlString).toURL();
             return url;
-        } catch (MalformedURLException e) {
+        } catch (Exception e) {
             System.err.println("bad LL URL");
         }
         return null;

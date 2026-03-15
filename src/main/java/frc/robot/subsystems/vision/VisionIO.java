@@ -12,6 +12,9 @@ public interface VisionIO {
 
         public int[] tagIds = new int[0];
         public Pose3d[] tagPoses = new Pose3d[0];
+        public int rawMegatag1ObservationCount = 0;
+        public int rawMegatag2ObservationCount = 0;
+        public int rawObservationCount = 0;
         public TargetObservation latestTargetObservation = new TargetObservation(Rotation2d.kZero, Rotation2d.kZero);
     }
 
@@ -31,6 +34,10 @@ public interface VisionIO {
         MEGATAG_1,
         MEGATAG_2,
         PHOTONVISION
+    }
+
+    public default boolean publishRobotOrientation() {
+        return false;
     }
 
     public default void updateInputs(VisionIOInputs inputs) {}

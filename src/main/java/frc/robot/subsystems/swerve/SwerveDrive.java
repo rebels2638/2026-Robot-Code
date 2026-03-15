@@ -7,6 +7,7 @@ import static edu.wpi.first.units.Units.Volts;
 import java.util.ArrayList;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
+import java.util.function.BooleanSupplier;
 import java.util.function.DoubleSupplier;
 
 import org.littletonrobotics.junction.AutoLogOutput;
@@ -17,14 +18,20 @@ import edu.wpi.first.math.controller.PIDController;
 import edu.wpi.first.math.geometry.Pose2d;
 import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.math.geometry.Rotation3d;
+import edu.wpi.first.math.geometry.Translation2d;
 import edu.wpi.first.math.kinematics.ChassisSpeeds;
 import edu.wpi.first.math.kinematics.SwerveModulePosition;
 import edu.wpi.first.math.kinematics.SwerveModuleState;
 import edu.wpi.first.math.kinematics.SwerveDriveKinematics;
+import edu.wpi.first.wpilibj.Alert;
+import edu.wpi.first.wpilibj.Alert.AlertType;
+import edu.wpi.first.wpilibj.DriverStation;
 import edu.wpi.first.wpilibj.Timer;
 import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.CommandScheduler;
+import edu.wpi.first.wpilibj2.command.InstantCommand;
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
+import edu.wpi.first.wpilibj2.command.WaitUntilCommand;
 import edu.wpi.first.wpilibj2.command.sysid.SysIdRoutine;
 import edu.wpi.first.wpilibj2.command.sysid.SysIdRoutine.Direction;
 import frc.robot.RobotState;
@@ -60,7 +67,8 @@ public class SwerveDrive extends SubsystemBase {
     public enum DesiredSystemState {
         DISABLED,
         IDLE,
-        TELEOP,
+        TELOP_FIELD_RELATIVE,
+        TELOP_ROBOT_RELATIVE,
         FOLLOW_PATH,
         PREPARE_FOR_AUTO,
         SYSID
@@ -69,7 +77,8 @@ public class SwerveDrive extends SubsystemBase {
     public enum CurrentSystemState {
         DISABLED,
         IDLE,
-        TELEOP,
+        TELOP_FIELD_RELATIVE,
+        TELOP_ROBOT_RELATIVE,
         FOLLOW_PATH,
         PREPARE_FOR_AUTO,
         READY_FOR_AUTO,
@@ -79,6 +88,8 @@ public class SwerveDrive extends SubsystemBase {
     public enum DesiredOmegaOverrideState {
         NONE,
         RANGED_ROTATION,
+        RANGED_ROTATION_CAPPED,
+        CAPPED,
         SNAPPED,
     }
 
@@ -86,6 +97,9 @@ public class SwerveDrive extends SubsystemBase {
         NONE,
         RANGED_NOMINAL,
         RANGED_RETURNING,
+        RANGED_CAPPED_NOMINAL,
+        RANGED_CAPPED_RETURNING,
+        CAPPED,
         SNAPPED_NOMINAL,
         SNAPPED_RETURNING,
     }
@@ -106,6 +120,7 @@ public class SwerveDrive extends SubsystemBase {
     // FSM State Variables
     private DesiredSystemState desiredSystemState = DesiredSystemState.DISABLED;
     private CurrentSystemState currentSystemState = CurrentSystemState.DISABLED;
+    @SuppressWarnings("unused")
     private CurrentSystemState previousSystemState = CurrentSystemState.DISABLED;
 
     private DesiredOmegaOverrideState desiredOmegaOverrideState = DesiredOmegaOverrideState.NONE;
@@ -117,28 +132,54 @@ public class SwerveDrive extends SubsystemBase {
     private CurrentTranslationOverrideState previousTranslationOverrideState = CurrentTranslationOverrideState.NONE;
 
     // Teleop input suppliers (normalized -1 to 1)
-    private DoubleSupplier vxNormalizedSupplier = () -> 0.0;
-    private DoubleSupplier vyNormalizedSupplier = () -> 0.0;
-    private DoubleSupplier omegaNormalizedSupplier = () -> 0.0;
+    private DoubleSupplier fieldRelativeVxNormalizedSupplier = () -> 0.0;
+    private DoubleSupplier fieldRelativeVyNormalizedSupplier = () -> 0.0;
+    private DoubleSupplier fieldRelativeOmegaNormalizedSupplier = () -> 0.0;
+    private DoubleSupplier robotRelativeVxNormalizedSupplier = () -> 0.0;
+    private DoubleSupplier robotRelativeVyNormalizedSupplier = () -> 0.0;
+    private DoubleSupplier robotRelativeOmegaNormalizedSupplier = () -> 0.0;
+    private Rotation2d robotRelativeTeleopHeadingOffset = new Rotation2d();
 
     // Path following
     private Path currentPath = null;
     private boolean shouldResetPose = false;
+    private boolean shouldMirrorCurrentPath = false;
+    private BooleanSupplier pathMirroringHook = () -> false;
     private Command currentPathCommand = null;
     private FollowPath.Builder followPathBuilder;
 
+    enum RotationRangeFrame {
+        ACCUMULATED_UNBOUNDED,
+        WRAPPED_ONE_TURN
+    }
+
     // Omega override rotation
-    private Rotation2d rotationRangeMin = Rotation2d.fromDegrees(-180);
-    private Rotation2d rotationRangeMax = Rotation2d.fromDegrees(180);
+    private double rotationRangeMinAbsRad = -Math.PI;
+    private double rotationRangeMaxAbsRad = Math.PI;
     private Rotation2d snapTargetAngle = Rotation2d.fromDegrees(0);
     private PIDController omegaOverridePIDController;
     private PIDController snappedOmegaOverridePIDController;
-    private static final double RANGED_ROTATION_MAX_VELOCITY_FACTOR = 0.6;
+    private static final double OMEGA_OVERRIDE_CONTROLLER_MAX_VELOCITY_FACTOR = 1;
     private static final double RANGED_ROTATION_BUFFER_RAD = Math.toRadians(15.0); // Buffer to prevent oscillation at boundaries
+    private static final double RANGED_ROTATION_BOUNDARY_VELOCITY_MAX_SAMPLE_AGE_S = 0.1;
+    @SuppressWarnings("unused")
+    private boolean hasWarnedInvalidBufferedRotationRange = false;
+    private boolean hasWarnedInvalidAccumulatedRotationRange = false;
+    private boolean hasWarnedInvalidWrappedRotationRange = false;
+    private RotationRangeFrame lastRotationRangeFrame = null;
+    private double lastRecoveryMinBoundaryRad = Double.NaN;
+    private double lastRecoveryMaxBoundaryRad = Double.NaN;
+    private double lastRotationRangeUpdateTimestampSec = Double.NaN;
+    private double recoveryMinBoundaryVelocityRadPerSec = 0.0;
+    private double recoveryMaxBoundaryVelocityRadPerSec = 0.0;
 
     private boolean shouldOverrideOmega = false;
     private double omegaOverride = 0.0;
     private double lastUnoverriddenOmega = 0.0;
+
+    // Rotational velocity cap (limits max angular velocity)
+    private boolean shouldOverrideOmegaVelocityCap = false;
+    private double omegaVelocityCapMaxRadiansPerSec = Double.MAX_VALUE;
 
     // Translational speed freezing (used during shooting) - only vx/vy are frozen, omega remains controlled
     private boolean shouldOverrideTranslationalSpeedsFrozen = false;
@@ -146,8 +187,8 @@ public class SwerveDrive extends SubsystemBase {
     private double frozenVyMetersPerSec = 0.0;
 
     // Shooting velocity cap (limits max translational velocity during shooting)
-    private boolean shouldOverrideVelocityCap = false;
-    private double velocityCapMaxVelocityMetersPerSec = 1.0;
+    private boolean shouldOverrideTranslationVelocityCap = false;
+    private double translationVelocityCapMaxVelocityMetersPerSec = Double.MAX_VALUE;
 
     // Alliance-based inversion
     private int invert = 1;
@@ -155,9 +196,10 @@ public class SwerveDrive extends SubsystemBase {
     private double modulesAlignmentToleranceDeg = 15.0;
     private Rotation2d modulesAlignmentTargetRotation = Rotation2d.fromDegrees(0);
 
-    public static final double ODOMETRY_FREQUENCY = 250;
+    public static final double ODOMETRY_FREQUENCY = 150;
 
     public static final Lock odometryLock = new ReentrantLock();
+    private static final String[] MODULE_ALERT_NAMES = {"Front Left", "Front Right", "Back Left", "Back Right"};
 
     private ModuleIO[] modules;
     private ModuleIOInputsAutoLogged[] moduleInputs = {
@@ -169,6 +211,11 @@ public class SwerveDrive extends SubsystemBase {
 
     private final GyroIO gyroIO;
     private GyroIOInputsAutoLogged gyroInputs = new GyroIOInputsAutoLogged();
+
+    private static final int FRONT_LEFT_INDEX = 0;
+    private static final int FRONT_RIGHT_INDEX = 1;
+    private static final int BACK_LEFT_INDEX = 2;
+    private static final int BACK_RIGHT_INDEX = 3;
 
     private SwerveModulePosition[] modulePositions = new SwerveModulePosition[] {
         new SwerveModulePosition(),
@@ -195,6 +242,13 @@ public class SwerveDrive extends SubsystemBase {
 
     private final DashboardMotorControlLoopConfigurator driveControlLoopConfigurator;
     private final DashboardMotorControlLoopConfigurator steerControlLoopConfigurator;
+    private boolean pendingDriveControlLoopConfigApply = false;
+    private boolean pendingSteerControlLoopConfigApply = false;
+    private final boolean enableConnectionAlerts;
+    private final Alert gyroDisconnectedAlert;
+    private final Alert[] driveMotorDisconnectedAlerts = new Alert[4];
+    private final Alert[] steerMotorDisconnectedAlerts = new Alert[4];
+    private final Alert[] steerEncoderDisconnectedAlerts = new Alert[4];
 
     private final SysIdRoutine driveCharacterizationSysIdRoutine;
     private final SysIdRoutine steerCharacterizationSysIdRoutine;
@@ -225,7 +279,7 @@ public class SwerveDrive extends SubsystemBase {
                 new ModuleIO() {},
                 new ModuleIO() {}
             };
-            gyroIO = new GyroIOPigeon2();
+            gyroIO = new GyroIOPigeon2(swerveConfig.gyro);
         } else {
             modules = new ModuleIO[] {
                 new ModuleIOTalonFX(moduleGeneralConfig, swerveConfig.frontLeft),
@@ -233,8 +287,18 @@ public class SwerveDrive extends SubsystemBase {
                 new ModuleIOTalonFX(moduleGeneralConfig, swerveConfig.backLeft),
                 new ModuleIOTalonFX(moduleGeneralConfig, swerveConfig.backRight)
             };
-            gyroIO = new GyroIOPigeon2();
+            gyroIO = new GyroIOPigeon2(swerveConfig.gyro);
             PhoenixOdometryThread.getInstance().start();
+        }
+        enableConnectionAlerts = !useSimulation && Constants.currentMode != Constants.Mode.REPLAY;
+        gyroDisconnectedAlert = new Alert("Swerve gyro is disconnected.", AlertType.kWarning);
+        for (int i = 0; i < 4; i++) {
+            driveMotorDisconnectedAlerts[i] =
+                new Alert("Swerve " + MODULE_ALERT_NAMES[i] + " drive motor is disconnected.", AlertType.kWarning);
+            steerMotorDisconnectedAlerts[i] =
+                new Alert("Swerve " + MODULE_ALERT_NAMES[i] + " steer motor is disconnected.", AlertType.kWarning);
+            steerEncoderDisconnectedAlerts[i] =
+                new Alert("Swerve " + MODULE_ALERT_NAMES[i] + " steer encoder is disconnected.", AlertType.kWarning);
         }
 
         driveControlLoopConfigurator = new DashboardMotorControlLoopConfigurator(
@@ -321,7 +385,7 @@ public class SwerveDrive extends SubsystemBase {
                 drivetrainConfig.followPathCrossTrackKI,
                 drivetrainConfig.followPathCrossTrackKD
             )
-        ).withDefaultShouldFlip();
+        ).withDefaultShouldFlip().withTRatioBasedTranslationHandoffs(true);
 
         // Configure omega override PID controllers with velocity limiting
         omegaOverridePIDController = new PIDController(
@@ -329,7 +393,6 @@ public class SwerveDrive extends SubsystemBase {
             drivetrainConfig.omegaOverrideKI,
             drivetrainConfig.omegaOverrideKD
         );
-        omegaOverridePIDController.enableContinuousInput(-Math.PI, Math.PI);
         omegaOverridePIDController.setTolerance(Math.toRadians(drivetrainConfig.rangedRotationToleranceDeg));
 
         snappedOmegaOverridePIDController = new PIDController(
@@ -353,16 +416,22 @@ public class SwerveDrive extends SubsystemBase {
         // The read lock is released only after inputs are written via the write lock
         odometryLock.lock();
         try {
-            Logger.recordOutput("SwerveDrive/stateLockAcquired", true);
             gyroIO.updateInputs(gyroInputs);
-            Logger.processInputs("SwerveDrive/gyro", gyroInputs);
-
             for (int i = 0; i < 4; i++) {
                 modules[i].updateInputs(moduleInputs[i]);
-                Logger.processInputs("SwerveDrive/module" + i, moduleInputs[i]);
             }
         } finally {
             odometryLock.unlock();
+        }
+        Logger.processInputs("SwerveDrive/gyro", gyroInputs);
+        for (int i = 0; i < 4; i++) {
+            Logger.processInputs("SwerveDrive/module" + i, moduleInputs[i]);
+        }
+        gyroDisconnectedAlert.set(enableConnectionAlerts && !gyroInputs.isConnected);
+        for (int i = 0; i < 4; i++) {
+            driveMotorDisconnectedAlerts[i].set(enableConnectionAlerts && !moduleInputs[i].driveMotorConnected);
+            steerMotorDisconnectedAlerts[i].set(enableConnectionAlerts && !moduleInputs[i].steerMotorConnected);
+            steerEncoderDisconnectedAlerts[i].set(enableConnectionAlerts && !moduleInputs[i].steerEncoderConnected);
         }
 
         for (int i = 0; i < 4; i++) {
@@ -372,18 +441,24 @@ public class SwerveDrive extends SubsystemBase {
             );
         }
 
-        if (driveControlLoopConfigurator.hasChanged()) {
-            for (ModuleIO module : modules) {
-                module.configureDriveControlLoop(driveControlLoopConfigurator.getConfig());
+        pendingDriveControlLoopConfigApply |= driveControlLoopConfigurator.hasChanged();
+        pendingSteerControlLoopConfigApply |= steerControlLoopConfigurator.hasChanged();
+        if (DriverStation.isDisabled()) {
+            if (pendingDriveControlLoopConfigApply) {
+                for (ModuleIO module : modules) {
+                    module.configureDriveControlLoop(driveControlLoopConfigurator.getConfig());
+                }
+                pendingDriveControlLoopConfigApply = false;
             }
-        }
-        if (steerControlLoopConfigurator.hasChanged()) {
-            for (ModuleIO module : modules) {
-                module.configureSteerControlLoop(steerControlLoopConfigurator.getConfig());
+            if (pendingSteerControlLoopConfigApply) {
+                for (ModuleIO module : modules) {
+                    module.configureSteerControlLoop(steerControlLoopConfigurator.getConfig());
+                }
+                pendingSteerControlLoopConfigApply = false;
             }
         }
 
-        ArrayList<Pose2d> updatedPoses = new ArrayList<Pose2d>();
+        ArrayList<Pose2d> updatedPoses = Constants.VERBOSE_LOGGING_ENABLED ? new ArrayList<Pose2d>() : null;
 
         double[] odometryTimestampsSeconds = moduleInputs[0].odometryTimestampsSeconds;
         for (int i = 0; i < odometryTimestampsSeconds.length; i++) {
@@ -411,15 +486,20 @@ public class SwerveDrive extends SubsystemBase {
                 )
             );
 
-            updatedPoses.add(RobotState.getInstance().getEstimatedPose());
+            if (updatedPoses != null) {
+                updatedPoses.add(RobotState.getInstance().getEstimatedPose());
+            }
         }
 
-        Logger.recordOutput("SwerveDrive/updatedPoses", updatedPoses.toArray(new Pose2d[0]));
+        if (Constants.VERBOSE_LOGGING_ENABLED && updatedPoses != null) {
+            Logger.recordOutput("SwerveDrive/updatedPoses", updatedPoses.toArray(new Pose2d[0]));
+        }
         Logger.recordOutput("SwerveDrive/measuredModuleStates", moduleStates);
         Logger.recordOutput("SwerveDrive/measuredModulePositions", modulePositions);
 
         // FSM processing
         handleStateTransitions();
+
         handleCurrentState();
 
         Logger.recordOutput("SwerveDrive/CurrentCommand", this.getCurrentCommand() == null ? "" : this.getCurrentCommand().toString());
@@ -436,8 +516,11 @@ public class SwerveDrive extends SubsystemBase {
             case IDLE:
                 currentSystemState = CurrentSystemState.IDLE;
                 break;
-            case TELEOP:
-                currentSystemState = CurrentSystemState.TELEOP;
+            case TELOP_FIELD_RELATIVE:
+                currentSystemState = CurrentSystemState.TELOP_FIELD_RELATIVE;
+                break;
+            case TELOP_ROBOT_RELATIVE:
+                currentSystemState = CurrentSystemState.TELOP_ROBOT_RELATIVE;
                 break;
 
             case FOLLOW_PATH:
@@ -471,11 +554,13 @@ public class SwerveDrive extends SubsystemBase {
                 currentOmegaOverrideState = CurrentOmegaOverrideState.NONE;
                 break;
             case RANGED_ROTATION:
-                if (isWithinRotationRange()) {
-                    currentOmegaOverrideState = CurrentOmegaOverrideState.RANGED_NOMINAL;
-                } else {
-                    currentOmegaOverrideState = CurrentOmegaOverrideState.RANGED_RETURNING;
-                }
+                currentOmegaOverrideState = resolveAndLogRangedRotationState(false);
+                break;
+            case RANGED_ROTATION_CAPPED:
+                currentOmegaOverrideState = resolveAndLogRangedRotationState(true);
+                break;
+            case CAPPED:
+                currentOmegaOverrideState = CurrentOmegaOverrideState.CAPPED;
                 break;
             case SNAPPED:
                 if (isAtSnapTarget()) {
@@ -510,8 +595,11 @@ public class SwerveDrive extends SubsystemBase {
             case IDLE:
                 handleIdleSystemState();
                 break;
-            case TELEOP:
-                handleTeleopSystemState();
+            case TELOP_FIELD_RELATIVE:
+                handleFieldRelativeTeleopSystemState();
+                break;
+            case TELOP_ROBOT_RELATIVE:
+                handleRobotRelativeTeleopSystemState();
                 break;
             case FOLLOW_PATH:
                 handleFollowPathSystemState();
@@ -532,10 +620,19 @@ public class SwerveDrive extends SubsystemBase {
                 handleNoneOmegaOverrideState();
                 break;
             case RANGED_NOMINAL:
-                handleRangedRotationNominalOmegaOverrideState();
+                handleRangedRotationNominalOmegaOverrideState(false);
                 break;
             case RANGED_RETURNING:
-                handleRangedRotationReturningOmegaOverrideState();
+                handleRangedRotationReturningOmegaOverrideState(false);
+                break;
+            case RANGED_CAPPED_NOMINAL:
+                handleRangedRotationNominalOmegaOverrideState(true);
+                break;
+            case RANGED_CAPPED_RETURNING:
+                handleRangedRotationReturningOmegaOverrideState(true);
+                break;
+            case CAPPED:
+                handleCappedOmegaOverrideState();
                 break;
             case SNAPPED_NOMINAL:
                 handleSnappedNominalOmegaOverrideState();
@@ -567,9 +664,6 @@ public class SwerveDrive extends SubsystemBase {
     }
 
     private void handleDISABLEDSystemState() {
-        if (previousSystemState != CurrentSystemState.DISABLED) {
-            setWheelCoast(true);
-        }
         cancelPathCommand();
         
         driveFieldRelative(new ChassisSpeeds(0, 0, 0));
@@ -578,9 +672,6 @@ public class SwerveDrive extends SubsystemBase {
     }
 
     private void handleIdleSystemState() {
-        if (previousSystemState == CurrentSystemState.DISABLED) {
-            setWheelCoast(false);
-        }
         cancelPathCommand();
 
         // Only cancel running commands, but don't null out finished commands
@@ -593,29 +684,39 @@ public class SwerveDrive extends SubsystemBase {
         previousSystemState = CurrentSystemState.IDLE;
     }
 
-    private void handleTeleopSystemState() {
-        if (previousSystemState == CurrentSystemState.DISABLED) {
-            setWheelCoast(false);
-        }
+    private void handleFieldRelativeTeleopSystemState() {
         cancelPathCommand();
 
         invert = Constants.shouldFlipPath() ? -1 : 1;
 
         ChassisSpeeds desiredFieldRelativeSpeeds = new ChassisSpeeds(
-            vxNormalizedSupplier.getAsDouble() * drivetrainConfig.maxTranslationalVelocityMetersPerSec * invert,
-            vyNormalizedSupplier.getAsDouble() * drivetrainConfig.maxTranslationalVelocityMetersPerSec * invert,
-            omegaNormalizedSupplier.getAsDouble() * drivetrainConfig.maxAngularVelocityRadiansPerSec
+            fieldRelativeVxNormalizedSupplier.getAsDouble() * drivetrainConfig.maxTranslationalVelocityMetersPerSec * invert,
+            fieldRelativeVyNormalizedSupplier.getAsDouble() * drivetrainConfig.maxTranslationalVelocityMetersPerSec * invert,
+            fieldRelativeOmegaNormalizedSupplier.getAsDouble() * drivetrainConfig.maxAngularVelocityRadiansPerSec
         );
         driveFieldRelative(desiredFieldRelativeSpeeds);
 
-        previousSystemState = CurrentSystemState.TELEOP;
+        previousSystemState = CurrentSystemState.TELOP_FIELD_RELATIVE;
+    }
+
+    private void handleRobotRelativeTeleopSystemState() {
+        cancelPathCommand();
+
+        ChassisSpeeds desiredRobotRelativeSpeeds = new ChassisSpeeds(
+            robotRelativeVxNormalizedSupplier.getAsDouble() * drivetrainConfig.maxTranslationalVelocityMetersPerSec,
+            robotRelativeVyNormalizedSupplier.getAsDouble() * drivetrainConfig.maxTranslationalVelocityMetersPerSec,
+            robotRelativeOmegaNormalizedSupplier.getAsDouble() * drivetrainConfig.maxAngularVelocityRadiansPerSec
+        );
+        desiredRobotRelativeSpeeds = applyRobotRelativeTeleopHeadingOffset(
+            desiredRobotRelativeSpeeds,
+            robotRelativeTeleopHeadingOffset
+        );
+        driveRobotRelative(desiredRobotRelativeSpeeds);
+
+        previousSystemState = CurrentSystemState.TELOP_ROBOT_RELATIVE;
     }
 
     private void handleFollowPathSystemState() {
-        if (previousSystemState == CurrentSystemState.DISABLED) {
-            setWheelCoast(false);
-        }
-        
         // Schedule path command if not already running
         if (currentPath != null && (currentPathCommand == null || (!currentPathCommand.isScheduled() && !currentPathCommand.isFinished()))) {
             currentPathCommand = buildPathCommand(currentPath);
@@ -627,9 +728,6 @@ public class SwerveDrive extends SubsystemBase {
     }
 
     private void prepareForAuto() {
-        if (previousSystemState != CurrentSystemState.PREPARE_FOR_AUTO && previousSystemState != CurrentSystemState.READY_FOR_AUTO) {
-            setWheelCoast(false);
-        }
         cancelPathCommand();
 
         if (currentPath != null) {
@@ -648,9 +746,6 @@ public class SwerveDrive extends SubsystemBase {
     }
 
     private void handleSysIdSystemState() {
-        if (previousSystemState == CurrentSystemState.DISABLED) {
-            setWheelCoast(false);
-        }
         cancelPathCommand();
 
         previousSystemState = CurrentSystemState.SYSID;
@@ -660,32 +755,48 @@ public class SwerveDrive extends SubsystemBase {
 
     private void handleNoneOmegaOverrideState() {
         shouldOverrideOmega = false;
-        omegaOverride = 0.0;
+        shouldOverrideOmegaVelocityCap = false;
 
         previousOmegaOverrideState = CurrentOmegaOverrideState.NONE;
     }
     
-    private void handleRangedRotationOmegaOverrideState() {
+    private void handleRangedRotationOmegaOverrideState(boolean shouldReturnToRange, boolean shouldCapOmegaVelocity) {
         shouldOverrideOmega = true;
-        if (isWithinRotationRange(RANGED_ROTATION_BUFFER_RAD - Math.toRadians(drivetrainConfig.rangedRotationToleranceDeg))) {
-            omegaOverride = limitOmegaForRange(lastUnoverriddenOmega); // TODO: BAD FIX
-        } else {
-            omegaOverride = calculateReturnToRangeOmega();
-        }
+        boolean shouldApplyOmegaVelocityCap = shouldApplyRangedRotationOmegaVelocityCap(
+            shouldReturnToRange,
+            shouldCapOmegaVelocity
+        );
+        shouldOverrideOmegaVelocityCap = shouldApplyOmegaVelocityCap;
+        omegaOverride = shouldReturnToRange
+            ? calculateReturnToRangeOmega()
+            : limitOmegaForRange(lastUnoverriddenOmega);
+        Logger.recordOutput("SwerveDrive/rangedRotation/shouldReturnToRange", shouldReturnToRange);
+        Logger.recordOutput("SwerveDrive/rangedRotation/shouldCapOmegaVelocity", shouldCapOmegaVelocity);
+        Logger.recordOutput("SwerveDrive/rangedRotation/shouldApplyOmegaVelocityCap", shouldApplyOmegaVelocityCap);
+        Logger.recordOutput(
+            "SwerveDrive/rangedRotation/shouldBypassOmegaVelocityCapForRecovery",
+            shouldCapOmegaVelocity && shouldReturnToRange && !shouldApplyOmegaVelocityCap
+        );
+        Logger.recordOutput("SwerveDrive/rangedRotation/omegaOverride", omegaOverride);
     }
 
-    private void handleRangedRotationNominalOmegaOverrideState() {
-        handleRangedRotationOmegaOverrideState();
-        previousOmegaOverrideState = CurrentOmegaOverrideState.RANGED_NOMINAL;
+    private void handleRangedRotationNominalOmegaOverrideState(boolean shouldCapOmegaVelocity) {
+        handleRangedRotationOmegaOverrideState(false, shouldCapOmegaVelocity);
+        previousOmegaOverrideState = shouldCapOmegaVelocity
+            ? CurrentOmegaOverrideState.RANGED_CAPPED_NOMINAL
+            : CurrentOmegaOverrideState.RANGED_NOMINAL;
     }
     
-    private void handleRangedRotationReturningOmegaOverrideState() {
-        handleRangedRotationOmegaOverrideState();
-        previousOmegaOverrideState = CurrentOmegaOverrideState.RANGED_RETURNING;
+    private void handleRangedRotationReturningOmegaOverrideState(boolean shouldCapOmegaVelocity) {
+        handleRangedRotationOmegaOverrideState(true, shouldCapOmegaVelocity);
+        previousOmegaOverrideState = shouldCapOmegaVelocity
+            ? CurrentOmegaOverrideState.RANGED_CAPPED_RETURNING
+            : CurrentOmegaOverrideState.RANGED_RETURNING;
     }
 
     private void handleSnappedOmegaOverrideState() {
         shouldOverrideOmega = true;
+        shouldOverrideOmegaVelocityCap = false;
         omegaOverride = calculateSnapOmega();
     }
 
@@ -699,8 +810,15 @@ public class SwerveDrive extends SubsystemBase {
         previousOmegaOverrideState = CurrentOmegaOverrideState.SNAPPED_RETURNING;
     }
 
+    private void handleCappedOmegaOverrideState() {
+        shouldOverrideOmega = false;
+        shouldOverrideOmegaVelocityCap = true;
+
+        previousOmegaOverrideState = CurrentOmegaOverrideState.CAPPED;
+    }
+
     private void handleNoneTranslationOverrideState() {
-        shouldOverrideVelocityCap = false;
+        shouldOverrideTranslationVelocityCap = false;
         shouldOverrideTranslationalSpeedsFrozen = false;
 
         previousTranslationOverrideState = CurrentTranslationOverrideState.NONE;
@@ -708,7 +826,7 @@ public class SwerveDrive extends SubsystemBase {
 
     private void handleFrozenTranslationOverrideState() {
         shouldOverrideTranslationalSpeedsFrozen = true;
-        shouldOverrideVelocityCap = false;
+        shouldOverrideTranslationVelocityCap = false;
 
         if (previousTranslationOverrideState != CurrentTranslationOverrideState.FROZEN) {
             frozenVxMetersPerSec = RobotState.getInstance().getFieldRelativeSpeeds().vxMetersPerSecond;
@@ -719,7 +837,7 @@ public class SwerveDrive extends SubsystemBase {
     }
 
     private void handleCappedTranslationOverrideState() {
-        shouldOverrideVelocityCap = true;
+        shouldOverrideTranslationVelocityCap = true;
         shouldOverrideTranslationalSpeedsFrozen = false;
 
         previousTranslationOverrideState = CurrentTranslationOverrideState.CAPPED;
@@ -730,9 +848,15 @@ public class SwerveDrive extends SubsystemBase {
      */
     private Command buildPathCommand(Path path) {
         if (shouldResetPose) {
-            return followPathBuilder.withPoseReset(RobotState.getInstance()::resetPose).build(path);
+            return followPathBuilder
+                .withShouldMirror(() -> shouldMirrorCurrentPath)
+                .withPoseReset(RobotState.getInstance()::resetPose)
+                .build(path);
         }
-        return followPathBuilder.withPoseReset((Pose2d pose) -> {}).build(path);
+        return followPathBuilder
+            .withShouldMirror(() -> shouldMirrorCurrentPath)
+            .withPoseReset((Pose2d pose) -> {})
+            .build(path);
     }
 
     /**
@@ -748,25 +872,98 @@ public class SwerveDrive extends SubsystemBase {
         return Math.abs(errorRad) <= Math.toRadians(drivetrainConfig.snappedToleranceDeg);
     }
 
+    private double getRangedRotationOuterSafetyBufferRadians() {
+        return Math.max(0.0, Math.toRadians(drivetrainConfig.rangedRotationToleranceDeg));
+    }
+
+    private double getRangedRotationRecoveryBufferRadians() {
+        return resolveBufferedRotationRange(
+            rotationRangeMinAbsRad,
+            rotationRangeMaxAbsRad,
+            RANGED_ROTATION_BUFFER_RAD
+        ).bufferRad();
+    }
+
+    private CurrentOmegaOverrideState resolveAndLogRangedRotationState(boolean shouldCapOmegaVelocity) {
+        boolean isWithinRange = isWithinRotationRange();
+        double recoveryBuffer = getRangedRotationRecoveryBufferRadians();
+        boolean isWithinNominalRange = isWithinRotationRange(recoveryBuffer);
+        RotationRangeBounds outerSafetyBounds = resolveBufferedRotationRange(
+            rotationRangeMinAbsRad,
+            rotationRangeMaxAbsRad,
+            getRangedRotationOuterSafetyBufferRadians()
+        );
+        RotationRangeBounds recoveryBounds = resolveBufferedRotationRange(
+            rotationRangeMinAbsRad,
+            rotationRangeMaxAbsRad,
+            recoveryBuffer
+        );
+        Logger.recordOutput("SwerveDrive/rangedRotation/isWithinRange", isWithinRange);
+        Logger.recordOutput("SwerveDrive/rangedRotation/isWithinNominalRange", isWithinNominalRange);
+        Logger.recordOutput("SwerveDrive/rangedRotation/effectiveOuterSafetyMinRad", outerSafetyBounds.minRad());
+        Logger.recordOutput("SwerveDrive/rangedRotation/effectiveOuterSafetyMaxRad", outerSafetyBounds.maxRad());
+        Logger.recordOutput("SwerveDrive/rangedRotation/effectiveOuterSafetyBufferRad", outerSafetyBounds.bufferRad());
+        Logger.recordOutput("SwerveDrive/rangedRotation/effectiveRecoveryMinRad", recoveryBounds.minRad());
+        Logger.recordOutput("SwerveDrive/rangedRotation/effectiveRecoveryMaxRad", recoveryBounds.maxRad());
+        Logger.recordOutput("SwerveDrive/rangedRotation/effectiveRecoveryBufferRad", recoveryBounds.bufferRad());
+        return resolveRangedRotationState(
+            previousOmegaOverrideState,
+            isWithinRange,
+            isWithinNominalRange,
+            shouldCapOmegaVelocity
+        );
+    }
+
+    static CurrentOmegaOverrideState resolveRangedRotationState(
+        CurrentOmegaOverrideState previousOmegaOverrideState,
+        boolean isWithinRange,
+        boolean isWithinNominalRange
+    ) {
+        return resolveRangedRotationState(
+            previousOmegaOverrideState,
+            isWithinRange,
+            isWithinNominalRange,
+            false
+        );
+    }
+
+    static CurrentOmegaOverrideState resolveRangedRotationState(
+        CurrentOmegaOverrideState previousOmegaOverrideState,
+        boolean isWithinRange,
+        boolean isWithinNominalRange,
+        boolean shouldCapOmegaVelocity
+    ) {
+        CurrentOmegaOverrideState nominalState = shouldCapOmegaVelocity
+            ? CurrentOmegaOverrideState.RANGED_CAPPED_NOMINAL
+            : CurrentOmegaOverrideState.RANGED_NOMINAL;
+        CurrentOmegaOverrideState returningState = shouldCapOmegaVelocity
+            ? CurrentOmegaOverrideState.RANGED_CAPPED_RETURNING
+            : CurrentOmegaOverrideState.RANGED_RETURNING;
+        boolean wasReturning = previousOmegaOverrideState == CurrentOmegaOverrideState.RANGED_RETURNING
+            || previousOmegaOverrideState == CurrentOmegaOverrideState.RANGED_CAPPED_RETURNING;
+        if (wasReturning) {
+            return isWithinNominalRange
+                ? nominalState
+                : returningState;
+        }
+        return isWithinRange
+            ? nominalState
+            : returningState;
+    }
+
     /**
      * Checks if robot rotation is within the specified range with an optional buffer.
      * @param buffer The buffer in radians to constrict the range by (applied to both min and max)
      */
     private boolean isWithinRotationRange(double buffer) {
-        Rotation2d currentRotation = RobotState.getInstance().getEstimatedPose().getRotation();
-        
-        // Normalize angles to -PI to PI for comparison
-        double current = MathUtil.angleModulus(currentRotation.getRadians());
-        double min = MathUtil.angleModulus(rotationRangeMin.getRadians() + buffer);
-        double max = MathUtil.angleModulus(rotationRangeMax.getRadians() - buffer);
-        
-        // Handle wrap-around case
-        if (min <= max) {
-            return current >= min && current <= max;
-        } else {
-            // Range wraps around (e.g., min=170deg, max=-170deg)
-            return current >= min || current <= max;
-        }
+        double current = RobotState.getInstance().getAccumulatedYawRadians();
+        RotationRangeBounds bounds = resolveBufferedRotationRange(
+            rotationRangeMinAbsRad,
+            rotationRangeMaxAbsRad,
+            buffer
+        );
+        hasWarnedInvalidBufferedRotationRange = false;
+        return current >= bounds.minRad() && current <= bounds.maxRad();
     }
 
     /**
@@ -776,55 +973,52 @@ public class SwerveDrive extends SubsystemBase {
      * moving towards a boundary.
      */
     private double limitOmegaForRange(double desiredOmega) {
-        Rotation2d currentRotation = RobotState.getInstance().getEstimatedPose().getRotation();
+        double current = RobotState.getInstance().getAccumulatedYawRadians();
         double currentOmega = RobotState.getInstance().getYawVelocityRadPerSec();
-        
-        double current = currentRotation.getRadians();
-        // Use padded range bounds (constricted by buffer)
-        double min = rotationRangeMin.getRadians() + RANGED_ROTATION_BUFFER_RAD;
-        double max = rotationRangeMax.getRadians() - RANGED_ROTATION_BUFFER_RAD;
-        
-        // Calculate distance to padded bounds (using Rotation2d for proper wrapping)
-        double distToMin = Math.abs(MathUtil.angleModulus(current - min));
-        double distToMax = Math.abs(MathUtil.angleModulus(max - current));
-        
-        double maxAngularAccel = drivetrainConfig.maxAngularAccelerationRadiansPerSecSec;
-        
-        // Calculate stopping distance from current velocity: d = ω² / (2α)
-        double stoppingDistFromCurrent = (currentOmega * currentOmega) / (2 * maxAngularAccel);
-        
-        // Adjust effective distances based on current velocity direction
-        // If moving towards a boundary, reduce effective distance by stopping distance
-        double effectiveDistToMax = distToMax;
-        double effectiveDistToMin = distToMin;
-        
-        if (currentOmega > 0) {
-            // Moving towards max, reduce effective distance to max
-            effectiveDistToMax = Math.max(0, distToMax - stoppingDistFromCurrent);
-        } else if (currentOmega < 0) {
-            // Moving towards min (negative omega), reduce effective distance to min
-            effectiveDistToMin = Math.max(0, distToMin - stoppingDistFromCurrent);
-        }
-        
-        // sqrt(2*a*d) formula for max velocity to stop at boundary using effective distances
-        double maxOmegaToMin = Math.sqrt(2 * maxAngularAccel * effectiveDistToMin);
-        double maxOmegaToMax = Math.sqrt(2 * maxAngularAccel * effectiveDistToMax);
+        RotationRangeBounds outerSafetyBounds = resolveBufferedRotationRange(
+            rotationRangeMinAbsRad,
+            rotationRangeMaxAbsRad,
+            getRangedRotationOuterSafetyBufferRadians()
+        );
+        RotationRangeBounds recoveryBounds = resolveBufferedRotationRange(
+            rotationRangeMinAbsRad,
+            rotationRangeMaxAbsRad,
+            getRangedRotationRecoveryBufferRadians()
+        );
+        RecoveryBoundaryFeedforward boundaryFeedforward = applyClosingRecoveryBoundaryFeedforward(
+            desiredOmega,
+            current,
+            rotationRangeMinAbsRad,
+            rotationRangeMaxAbsRad,
+            recoveryBounds.minRad(),
+            recoveryBounds.maxRad(),
+            recoveryMinBoundaryVelocityRadPerSec,
+            recoveryMaxBoundaryVelocityRadPerSec,
+            drivetrainConfig.maxAngularVelocityRadiansPerSec
+        );
 
-        if (currentRotation.getRadians() < min) {
-            return Math.max(desiredOmega, 0);
-        }
-        if (currentRotation.getRadians() > max) {
-            return Math.min(desiredOmega, 0);
-        }        
-
-        // Clamp omega based on direction
-        if (desiredOmega > 0) {
-            // Rotating towards max bound
-            return Math.min(desiredOmega, maxOmegaToMax);
-        } else {
-            // Rotating towards min bound
-            return Math.max(desiredOmega, -maxOmegaToMin);
-        }
+        double limitedOmega = limitOmegaForRange(
+            boundaryFeedforward.adjustedOmega(),
+            current,
+            currentOmega,
+            outerSafetyBounds.minRad(),
+            outerSafetyBounds.maxRad(),
+            drivetrainConfig.maxAngularAccelerationRadiansPerSecSec
+        );
+        Logger.recordOutput(
+            "SwerveDrive/rangedRotation/boundaryMotionFeedforward/activeBoundary",
+            boundaryFeedforward.activeBoundary()
+        );
+        Logger.recordOutput(
+            "SwerveDrive/rangedRotation/boundaryMotionFeedforward/feedforwardOmegaRadPerSec",
+            boundaryFeedforward.feedforwardOmegaRadPerSec()
+        );
+        Logger.recordOutput(
+            "SwerveDrive/rangedRotation/boundaryMotionFeedforward/adjustedDesiredOmegaRadPerSec",
+            boundaryFeedforward.adjustedOmega()
+        );
+        Logger.recordOutput("SwerveDrive/rangedRotation/outerSafetyLimitedOmega", limitedOmega);
+        return limitedOmega;
     }
 
     /**
@@ -832,34 +1026,172 @@ public class SwerveDrive extends SubsystemBase {
      * Uses an internal buffer to target slightly inside the range to prevent oscillation at boundaries.
      */
     private double calculateReturnToRangeOmega() {
-        Rotation2d currentRotation = RobotState.getInstance().getEstimatedPose().getRotation();
-        
-        double current = currentRotation.getRadians();
-        double min = rotationRangeMin.getRadians();
-        double max = rotationRangeMax.getRadians();
-        
-        // Find closest bound
-        double distToMin = Math.abs(MathUtil.angleModulus(current - min));
-        double distToMax = Math.abs(MathUtil.angleModulus(current - max));
-        
-        double targetAngle;
-        if (distToMin < distToMax) {
-            // Target slightly inside the min boundary (add buffer)
-            targetAngle = min + RANGED_ROTATION_BUFFER_RAD;
-        } else {
-            // Target slightly inside the max boundary (subtract buffer)
-            targetAngle = max - RANGED_ROTATION_BUFFER_RAD;
-        }
-        
-        // Calculate PID output
-        omegaOverridePIDController.setSetpoint(targetAngle);
-        double pidOutput = omegaOverridePIDController.calculate(current);
-        
-        // Apply velocity limit (0.6 of max omega)
-        double maxOmega = drivetrainConfig.maxAngularVelocityRadiansPerSec * RANGED_ROTATION_MAX_VELOCITY_FACTOR;
+        double current = RobotState.getInstance().getAccumulatedYawRadians();
+        RotationRangeBounds recoveryBounds = resolveBufferedRotationRange(
+            rotationRangeMinAbsRad,
+            rotationRangeMaxAbsRad,
+            getRangedRotationRecoveryBufferRadians()
+        );
+        double targetAngle = resolveReturnToRangeTargetAngle(
+            current,
+            recoveryBounds.minRad(),
+            recoveryBounds.maxRad()
+        );
 
-        
-        return MathUtil.clamp(pidOutput, -maxOmega, maxOmega);
+        omegaOverridePIDController.setSetpoint(targetAngle);
+        double rawPidOutput = omegaOverridePIDController.calculate(current);
+        double maxOmega = drivetrainConfig.maxAngularVelocityRadiansPerSec * OMEGA_OVERRIDE_CONTROLLER_MAX_VELOCITY_FACTOR;
+        double clampedPidOutput = MathUtil.clamp(rawPidOutput, -maxOmega, maxOmega);
+
+        Logger.recordOutput("SwerveDrive/rangedRotation/recoveryTargetAngleRad", targetAngle);
+        Logger.recordOutput("SwerveDrive/rangedRotation/rawReturnOmega", rawPidOutput);
+        Logger.recordOutput("SwerveDrive/rangedRotation/clampedReturnOmega", clampedPidOutput);
+
+        return clampedPidOutput;
+    }
+
+    static boolean shouldApplyRangedRotationOmegaVelocityCap(
+        boolean shouldReturnToRange,
+        boolean shouldCapOmegaVelocity
+    ) {
+        return shouldCapOmegaVelocity && !shouldReturnToRange;
+    }
+
+    static RotationRangeBounds resolveBufferedRotationRange(
+        double minRad,
+        double maxRad,
+        double requestedBufferRad
+    ) {
+        double safeMinRad = Math.min(minRad, maxRad);
+        double safeMaxRad = Math.max(minRad, maxRad);
+        double rangeWidthRad = Math.max(0.0, safeMaxRad - safeMinRad);
+        double effectiveBufferRad = MathUtil.clamp(
+            Math.max(0.0, requestedBufferRad),
+            0.0,
+            rangeWidthRad / 2.0
+        );
+        return new RotationRangeBounds(
+            safeMinRad + effectiveBufferRad,
+            safeMaxRad - effectiveBufferRad,
+            effectiveBufferRad
+        );
+    }
+
+    static RecoveryBoundaryFeedforward applyClosingRecoveryBoundaryFeedforward(
+        double desiredOmegaRadPerSec,
+        double currentRad,
+        double rangeMinRad,
+        double rangeMaxRad,
+        double recoveryMinRad,
+        double recoveryMaxRad,
+        double recoveryMinVelocityRadPerSec,
+        double recoveryMaxVelocityRadPerSec,
+        double maxFeedforwardOmegaMagnitudeRadPerSec
+    ) {
+        boolean inMinBuffer = currentRad >= rangeMinRad && currentRad < recoveryMinRad;
+        boolean inMaxBuffer = currentRad <= rangeMaxRad && currentRad > recoveryMaxRad;
+
+        if (!inMinBuffer && !inMaxBuffer) {
+            return new RecoveryBoundaryFeedforward(
+                desiredOmegaRadPerSec,
+                0.0,
+                RecoveryBoundaryFeedforward.NO_ACTIVE_BOUNDARY
+            );
+        }
+
+        int activeBoundary = RecoveryBoundaryFeedforward.NO_ACTIVE_BOUNDARY;
+        if (inMinBuffer && inMaxBuffer) {
+            double distToMinBoundary = Math.abs(currentRad - rangeMinRad);
+            double distToMaxBoundary = Math.abs(rangeMaxRad - currentRad);
+            activeBoundary = distToMinBoundary <= distToMaxBoundary
+                ? RecoveryBoundaryFeedforward.MIN_BOUNDARY
+                : RecoveryBoundaryFeedforward.MAX_BOUNDARY;
+        } else if (inMinBuffer) {
+            activeBoundary = RecoveryBoundaryFeedforward.MIN_BOUNDARY;
+        } else {
+            activeBoundary = RecoveryBoundaryFeedforward.MAX_BOUNDARY;
+        }
+
+        if (activeBoundary == RecoveryBoundaryFeedforward.MIN_BOUNDARY) {
+            double clampedFeedforwardOmega = MathUtil.clamp(
+                recoveryMinVelocityRadPerSec,
+                -maxFeedforwardOmegaMagnitudeRadPerSec,
+                maxFeedforwardOmegaMagnitudeRadPerSec
+            );
+            if (clampedFeedforwardOmega > 0.0) {
+                return new RecoveryBoundaryFeedforward(
+                    Math.max(desiredOmegaRadPerSec, clampedFeedforwardOmega),
+                    clampedFeedforwardOmega,
+                    activeBoundary
+                );
+            }
+            return new RecoveryBoundaryFeedforward(desiredOmegaRadPerSec, 0.0, activeBoundary);
+        }
+
+        double clampedFeedforwardOmega = MathUtil.clamp(
+            recoveryMaxVelocityRadPerSec,
+            -maxFeedforwardOmegaMagnitudeRadPerSec,
+            maxFeedforwardOmegaMagnitudeRadPerSec
+        );
+        if (clampedFeedforwardOmega < 0.0) {
+            return new RecoveryBoundaryFeedforward(
+                Math.min(desiredOmegaRadPerSec, clampedFeedforwardOmega),
+                clampedFeedforwardOmega,
+                activeBoundary
+            );
+        }
+        return new RecoveryBoundaryFeedforward(desiredOmegaRadPerSec, 0.0, activeBoundary);
+    }
+
+    static double limitOmegaForRange(
+        double desiredOmega,
+        double currentRad,
+        double currentOmegaRadPerSec,
+        double minSafeRad,
+        double maxSafeRad,
+        double maxAngularAccelRadPerSec2
+    ) {
+        if (currentRad < minSafeRad) {
+            return Math.max(desiredOmega, 0);
+        }
+        if (currentRad > maxSafeRad) {
+            return Math.min(desiredOmega, 0);
+        }
+
+        double distToMin = currentRad - minSafeRad;
+        double distToMax = maxSafeRad - currentRad;
+
+        double safeMaxAngularAccel = Math.max(maxAngularAccelRadPerSec2, 1e-9);
+        double stoppingDistFromCurrent = (currentOmegaRadPerSec * currentOmegaRadPerSec) / (2 * safeMaxAngularAccel);
+
+        double effectiveDistToMax = distToMax;
+        double effectiveDistToMin = distToMin;
+
+        if (currentOmegaRadPerSec > 0) {
+            effectiveDistToMax = Math.max(0, distToMax - stoppingDistFromCurrent);
+        } else if (currentOmegaRadPerSec < 0) {
+            effectiveDistToMin = Math.max(0, distToMin - stoppingDistFromCurrent);
+        }
+
+        double maxOmegaToMin = Math.sqrt(2 * safeMaxAngularAccel * effectiveDistToMin);
+        double maxOmegaToMax = Math.sqrt(2 * safeMaxAngularAccel * effectiveDistToMax);
+
+        if (desiredOmega > 0) {
+            return Math.min(desiredOmega, maxOmegaToMax);
+        }
+        return Math.max(desiredOmega, -maxOmegaToMin);
+    }
+
+    static double resolveReturnToRangeTargetAngle(
+        double currentRad,
+        double minRecoveryRad,
+        double maxRecoveryRad
+    ) {
+        double distToMin = Math.abs(currentRad - minRecoveryRad);
+        double distToMax = Math.abs(currentRad - maxRecoveryRad);
+        return distToMin < distToMax
+            ? minRecoveryRad
+            : maxRecoveryRad;
     }
 
     private double calculateSnapOmega() {
@@ -870,41 +1202,340 @@ public class SwerveDrive extends SubsystemBase {
         snappedOmegaOverridePIDController.setSetpoint(target);
         double pidOutput = snappedOmegaOverridePIDController.calculate(current);
 
-        double maxOmega = drivetrainConfig.maxAngularVelocityRadiansPerSec;
+        double maxOmega = drivetrainConfig.maxAngularVelocityRadiansPerSec * OMEGA_OVERRIDE_CONTROLLER_MAX_VELOCITY_FACTOR;
         return MathUtil.clamp(pidOutput, -maxOmega, maxOmega);
     }
 
     // Supplier setters
-    public void setTeleopInputSuppliers(
+    public void setFieldRelativeTeleopInputSuppliers(
         DoubleSupplier vxNormalized,
         DoubleSupplier vyNormalized,
         DoubleSupplier omegaNormalized
     ) {
-        this.vxNormalizedSupplier = vxNormalized;
-        this.vyNormalizedSupplier = vyNormalized;
-        this.omegaNormalizedSupplier = omegaNormalized;
+        this.fieldRelativeVxNormalizedSupplier = vxNormalized;
+        this.fieldRelativeVyNormalizedSupplier = vyNormalized;
+        this.fieldRelativeOmegaNormalizedSupplier = omegaNormalized;
+    }
+
+    public void setRobotRelativeTeleopInputSuppliers(
+        DoubleSupplier vxNormalized,
+        DoubleSupplier vyNormalized,
+        DoubleSupplier omegaNormalized
+    ) {
+        this.robotRelativeVxNormalizedSupplier = vxNormalized;
+        this.robotRelativeVyNormalizedSupplier = vyNormalized;
+        this.robotRelativeOmegaNormalizedSupplier = omegaNormalized;
+    }
+
+    public void setRobotRelativeTeleopHeadingOffset(Rotation2d headingOffset) {
+        this.robotRelativeTeleopHeadingOffset = headingOffset != null ? headingOffset : new Rotation2d();
     }
 
     public void setCurrentPath(Path path) {
-        this.currentPath = path;
-        this.shouldResetPose = false;
-        // Clear existing command to allow fresh path to be scheduled
-        cancelPathCommand();
+        setCurrentPath(path, false, false);
     }
 
     public void setCurrentPath(Path path, boolean shouldResetPose) {
+        setCurrentPath(path, shouldResetPose, false);
+    }
+
+    public void setCurrentPath(Path path, boolean shouldResetPose, boolean shouldMirrorPath) {
         this.currentPath = path;
         this.shouldResetPose = shouldResetPose;
+        this.shouldMirrorCurrentPath = shouldMirrorPath;
         // Clear existing command to allow fresh path to be scheduled
         cancelPathCommand();
     }
 
-    public void setRotationRange(Rotation2d min, Rotation2d max) {
-        this.rotationRangeMin = min;
-        this.rotationRangeMax = max;
+    public void setPathMirroringHook(BooleanSupplier pathMirroringHook) {
+        this.pathMirroringHook = pathMirroringHook != null ? pathMirroringHook : () -> false;
+    }
 
-        Logger.recordOutput("SwerveDrive/rotationRangeMin", min);
-        Logger.recordOutput("SwerveDrive/rotationRangeMax", max);
+    public Command followPathCommand(Path path) {
+        return followPathCommand(path, () -> false, pathMirroringHook);
+    }
+
+    public Command followPathCommand(Path path, boolean shouldResetPose) {
+        return followPathCommand(path, () -> shouldResetPose, pathMirroringHook);
+    }
+
+    public Command followPathCommand(Path path, boolean shouldResetPose, boolean shouldMirrorPath) {
+        return followPathCommand(path, () -> shouldResetPose, () -> shouldMirrorPath);
+    }
+
+    public Command followPathCommand(
+        Path path,
+        BooleanSupplier shouldResetPoseHook,
+        BooleanSupplier shouldMirrorPathHook
+    ) {
+        BooleanSupplier resolvedResetPoseHook = shouldResetPoseHook != null ? shouldResetPoseHook : () -> false;
+        BooleanSupplier resolvedMirrorPathHook = shouldMirrorPathHook != null ? shouldMirrorPathHook : () -> false;
+
+        return new InstantCommand(() -> setCurrentPath(
+            path,
+            resolvedResetPoseHook.getAsBoolean(),
+            resolvedMirrorPathHook.getAsBoolean()
+        )).andThen(
+            new InstantCommand(() -> setDesiredSystemState(DesiredSystemState.FOLLOW_PATH))
+        ).andThen(
+            new WaitUntilCommand(() -> currentPathCommand != null)
+        ).andThen(
+            new WaitUntilCommand(() -> getCurrentSystemState() == CurrentSystemState.IDLE)
+        );
+    }
+
+    public void setRotationRangeAccumulatedDegrees(double minAbsDeg, double maxAbsDeg) {
+        AccumulatedRotationRangeResolution resolution = resolveAccumulatedRotationRangeDegrees(
+            minAbsDeg,
+            maxAbsDeg
+        );
+        if (resolution.swappedInputs()) {
+            if (!hasWarnedInvalidAccumulatedRotationRange) {
+                DriverStation.reportWarning(
+                    "SwerveDrive accumulated rotation bounds were reversed. Swapping min/max.",
+                    false
+                );
+                hasWarnedInvalidAccumulatedRotationRange = true;
+            }
+        } else {
+            hasWarnedInvalidAccumulatedRotationRange = false;
+        }
+
+        applyAbsoluteRotationRangeDegrees(
+            resolution.minAbsDeg(),
+            resolution.maxAbsDeg(),
+            RotationRangeFrame.ACCUMULATED_UNBOUNDED
+        );
+        logRotationRangeResolution(
+            minAbsDeg,
+            maxAbsDeg,
+            resolution.minAbsDeg(),
+            resolution.maxAbsDeg(),
+            resolution.swappedInputs(),
+            Double.NaN,
+            0L
+        );
+    }
+
+    public void setRotationRangeWrappedDegrees(double minWrappedDeg, double maxWrappedDeg) {
+        double wrappedReferenceDeg = normalizeWrappedDegrees(
+            RobotState.getInstance().getEstimatedPose().getRotation().getDegrees()
+        );
+        WrappedRotationRangeResolution resolution = resolveWrappedRotationRangeDegrees(
+            minWrappedDeg,
+            maxWrappedDeg,
+            wrappedReferenceDeg
+        );
+
+        if (resolution.swappedInputs()) {
+            if (!hasWarnedInvalidWrappedRotationRange) {
+                DriverStation.reportWarning(
+                    "SwerveDrive wrapped rotation bounds were reversed after normalization. Swapping min/max.",
+                    false
+                );
+                hasWarnedInvalidWrappedRotationRange = true;
+            }
+        } else {
+            hasWarnedInvalidWrappedRotationRange = false;
+        }
+
+        applyAbsoluteRotationRangeDegrees(
+            resolution.absoluteRange().minAbsDeg(),
+            resolution.absoluteRange().maxAbsDeg(),
+            RotationRangeFrame.WRAPPED_ONE_TURN
+        );
+        Logger.recordOutput("SwerveDrive/rotationRange/normalizedMinDeg", resolution.normalizedMinDeg());
+        Logger.recordOutput("SwerveDrive/rotationRange/normalizedMaxDeg", resolution.normalizedMaxDeg());
+        logRotationRangeResolution(
+            minWrappedDeg,
+            maxWrappedDeg,
+            resolution.absoluteRange().minAbsDeg(),
+            resolution.absoluteRange().maxAbsDeg(),
+            resolution.swappedInputs(),
+            wrappedReferenceDeg,
+            resolution.absoluteRange().turnShift()
+        );
+    }
+
+    private void logRotationRangeResolution(
+        double inputMinDeg,
+        double inputMaxDeg,
+        double resolvedMinAbsDeg,
+        double resolvedMaxAbsDeg,
+        boolean swappedInputs,
+        double referenceDeg,
+        long turnShift
+    ) {
+        Logger.recordOutput("SwerveDrive/rotationRange/inputMinDeg", inputMinDeg);
+        Logger.recordOutput("SwerveDrive/rotationRange/inputMaxDeg", inputMaxDeg);
+        Logger.recordOutput("SwerveDrive/rotationRange/minAbsDeg", resolvedMinAbsDeg);
+        Logger.recordOutput("SwerveDrive/rotationRange/maxAbsDeg", resolvedMaxAbsDeg);
+        Logger.recordOutput("SwerveDrive/rotationRange/swappedInputs", swappedInputs);
+        Logger.recordOutput("SwerveDrive/rotationRange/referenceDeg", referenceDeg);
+        Logger.recordOutput("SwerveDrive/rotationRange/turnShift", turnShift);
+    }
+
+    private void applyAbsoluteRotationRangeDegrees(
+        double minAbsDeg,
+        double maxAbsDeg,
+        RotationRangeFrame rotationRangeFrame
+    ) {
+        double newMinAbsRad = Math.toRadians(minAbsDeg);
+        double newMaxAbsRad = Math.toRadians(maxAbsDeg);
+        updateRecoveryBoundaryVelocities(newMinAbsRad, newMaxAbsRad, rotationRangeFrame);
+
+        rotationRangeMinAbsRad = newMinAbsRad;
+        rotationRangeMaxAbsRad = newMaxAbsRad;
+        
+        Logger.recordOutput("SwerveDrive/rotationRange/min", Rotation2d.fromRadians(rotationRangeMinAbsRad));
+        Logger.recordOutput("SwerveDrive/rotationRange/max", Rotation2d.fromRadians(rotationRangeMaxAbsRad));
+        Logger.recordOutput("SwerveDrive/rotationRange/frame", rotationRangeFrame.ordinal());
+    }
+
+    private void updateRecoveryBoundaryVelocities(
+        double newMinAbsRad,
+        double newMaxAbsRad,
+        RotationRangeFrame rotationRangeFrame
+    ) {
+        RotationRangeBounds newRecoveryBounds = resolveBufferedRotationRange(
+            newMinAbsRad,
+            newMaxAbsRad,
+            RANGED_ROTATION_BUFFER_RAD
+        );
+        double nowSeconds = Timer.getTimestamp();
+        boolean canComputeVelocity = lastRotationRangeFrame == rotationRangeFrame
+            && Double.isFinite(lastRecoveryMinBoundaryRad)
+            && Double.isFinite(lastRecoveryMaxBoundaryRad)
+            && Double.isFinite(lastRotationRangeUpdateTimestampSec)
+            && nowSeconds > lastRotationRangeUpdateTimestampSec
+            && nowSeconds - lastRotationRangeUpdateTimestampSec <= RANGED_ROTATION_BOUNDARY_VELOCITY_MAX_SAMPLE_AGE_S;
+
+        if (canComputeVelocity) {
+            double dtSeconds = nowSeconds - lastRotationRangeUpdateTimestampSec;
+            recoveryMinBoundaryVelocityRadPerSec = (newRecoveryBounds.minRad() - lastRecoveryMinBoundaryRad) / dtSeconds;
+            recoveryMaxBoundaryVelocityRadPerSec = (newRecoveryBounds.maxRad() - lastRecoveryMaxBoundaryRad) / dtSeconds;
+        } else {
+            recoveryMinBoundaryVelocityRadPerSec = 0.0;
+            recoveryMaxBoundaryVelocityRadPerSec = 0.0;
+        }
+
+        lastRotationRangeFrame = rotationRangeFrame;
+        lastRecoveryMinBoundaryRad = newRecoveryBounds.minRad();
+        lastRecoveryMaxBoundaryRad = newRecoveryBounds.maxRad();
+        lastRotationRangeUpdateTimestampSec = nowSeconds;
+
+        Logger.recordOutput(
+            "SwerveDrive/rangedRotation/recoveryMinBoundaryVelocityRadPerSec",
+            recoveryMinBoundaryVelocityRadPerSec
+        );
+        Logger.recordOutput(
+            "SwerveDrive/rangedRotation/recoveryMaxBoundaryVelocityRadPerSec",
+            recoveryMaxBoundaryVelocityRadPerSec
+        );
+    }
+
+    record AbsoluteRotationRange(
+        double minAbsDeg,
+        double maxAbsDeg,
+        double midpointDeg,
+        long turnShift
+    ) {}
+
+    record RotationRangeBounds(
+        double minRad,
+        double maxRad,
+        double bufferRad
+    ) {}
+
+    record RecoveryBoundaryFeedforward(
+        double adjustedOmega,
+        double feedforwardOmegaRadPerSec,
+        int activeBoundary
+    ) {
+        static final int NO_ACTIVE_BOUNDARY = -1;
+        static final int MIN_BOUNDARY = 0;
+        static final int MAX_BOUNDARY = 1;
+    }
+
+    record AccumulatedRotationRangeResolution(
+        double minAbsDeg,
+        double maxAbsDeg,
+        boolean swappedInputs
+    ) {}
+
+    record WrappedRotationRangeResolution(
+        double normalizedMinDeg,
+        double normalizedMaxDeg,
+        boolean swappedInputs,
+        AbsoluteRotationRange absoluteRange
+    ) {}
+
+    static WrappedRotationRangeResolution resolveWrappedRotationRangeDegrees(
+        double minWrappedDeg,
+        double maxWrappedDeg,
+        double referenceDeg
+    ) {
+        double normalizedMinDeg = normalizeWrappedDegrees(minWrappedDeg);
+        double normalizedMaxDeg = normalizeWrappedDegrees(maxWrappedDeg);
+        boolean swappedInputs = false;
+        if (normalizedMinDeg > normalizedMaxDeg) {
+            swappedInputs = true;
+            double temp = normalizedMinDeg;
+            normalizedMinDeg = normalizedMaxDeg;
+            normalizedMaxDeg = temp;
+        }
+        AbsoluteRotationRange absoluteRange = resolveAbsoluteRotationRangeDegrees(
+            normalizedMinDeg,
+            normalizedMaxDeg,
+            referenceDeg
+        );
+        return new WrappedRotationRangeResolution(
+            normalizedMinDeg,
+            normalizedMaxDeg,
+            swappedInputs,
+            absoluteRange
+        );
+    }
+
+    static AccumulatedRotationRangeResolution resolveAccumulatedRotationRangeDegrees(
+        double minAbsDeg,
+        double maxAbsDeg
+    ) {
+        boolean swappedInputs = false;
+        if (minAbsDeg > maxAbsDeg) {
+            swappedInputs = true;
+            double temp = minAbsDeg;
+            minAbsDeg = maxAbsDeg;
+            maxAbsDeg = temp;
+        }
+        return new AccumulatedRotationRangeResolution(minAbsDeg, maxAbsDeg, swappedInputs);
+    }
+
+    static AbsoluteRotationRange resolveAbsoluteRotationRangeDegrees(
+        double minDeg,
+        double maxDeg,
+        double referenceDeg
+    ) {
+        if (minDeg > maxDeg) {
+            double temp = minDeg;
+            minDeg = maxDeg;
+            maxDeg = temp;
+        }
+        double midpointDeg = (minDeg + maxDeg) / 2.0;
+        long nearestTurnShift = Math.round((referenceDeg - midpointDeg) / 360.0);
+        double absoluteMinDeg = minDeg + nearestTurnShift * 360.0;
+        double absoluteMaxDeg = maxDeg + nearestTurnShift * 360.0;
+        return new AbsoluteRotationRange(
+            absoluteMinDeg,
+            absoluteMaxDeg,
+            (absoluteMinDeg + absoluteMaxDeg) / 2.0,
+            nearestTurnShift
+        );
+    }
+
+    static double normalizeWrappedDegrees(double angleDeg) {
+        double normalized = MathUtil.inputModulus(angleDeg, -180.0, 180.0);
+        return Math.abs(normalized - 180.0) < 1e-9 ? -180.0 : normalized;
     }
 
     public void setSnapTargetAngle(Rotation2d angle) {
@@ -912,8 +1543,12 @@ public class SwerveDrive extends SubsystemBase {
         Logger.recordOutput("SwerveDrive/snapTargetAngle", angle);
     }
 
-    public void setVelocityCapMaxVelocityMetersPerSec(double maxVelocity) {
-        this.velocityCapMaxVelocityMetersPerSec = maxVelocity;
+    public void setTranslationVelocityCapMaxVelocityMetersPerSec(double maxVelocity) {
+        this.translationVelocityCapMaxVelocityMetersPerSec = maxVelocity;
+    }
+
+    public void setOmegaVelocityCapMaxRadiansPerSec(double maxOmegaVelocity) {
+        this.omegaVelocityCapMaxRadiansPerSec = maxOmegaVelocity;
     }
 
     // System State getters/setters
@@ -927,8 +1562,58 @@ public class SwerveDrive extends SubsystemBase {
         return currentSystemState;
     }
 
+    @AutoLogOutput(key = "SwerveDrive/hasCurrentPathCommand")
+    public boolean hasCurrentPathCommand() {
+        return currentPathCommand != null;
+    }
+
+    @AutoLogOutput(key = "SwerveDrive/currentPathCommandScheduled")
+    public boolean isCurrentPathCommandScheduled() {
+        return currentPathCommand != null && currentPathCommand.isScheduled();
+    }
+
+    @AutoLogOutput(key = "SwerveDrive/currentPathCommandFinished")
+    public boolean isCurrentPathCommandFinished() {
+        return currentPathCommand != null && currentPathCommand.isFinished();
+    }
+
     public void setDesiredSystemState(DesiredSystemState desiredState) {
         this.desiredSystemState = desiredState;
+    }
+
+    public void toggleTeleopDriveMode() {
+        desiredSystemState = toggleTeleopDriveMode(desiredSystemState);
+    }
+
+    @AutoLogOutput(key = "SwerveDrive/robotRelativeTeleopHeadingOffsetDeg")
+    public double getRobotRelativeTeleopHeadingOffsetDegrees() {
+        return robotRelativeTeleopHeadingOffset.getDegrees();
+    }
+
+    static DesiredSystemState toggleTeleopDriveMode(DesiredSystemState desiredState) {
+        switch (desiredState) {
+            case TELOP_FIELD_RELATIVE:
+                return DesiredSystemState.TELOP_ROBOT_RELATIVE;
+            case TELOP_ROBOT_RELATIVE:
+                return DesiredSystemState.TELOP_FIELD_RELATIVE;
+            default:
+                return desiredState;
+        }
+    }
+
+    static ChassisSpeeds applyRobotRelativeTeleopHeadingOffset(
+        ChassisSpeeds speeds,
+        Rotation2d headingOffset
+    ) {
+        Translation2d rotatedTranslation = new Translation2d(
+            speeds.vxMetersPerSecond,
+            speeds.vyMetersPerSecond
+        ).rotateBy(headingOffset);
+        return new ChassisSpeeds(
+            rotatedTranslation.getX(),
+            rotatedTranslation.getY(),
+            speeds.omegaRadiansPerSecond
+        );
     }
 
     // Omega Override State getters/setters
@@ -957,11 +1642,77 @@ public class SwerveDrive extends SubsystemBase {
         return currentTranslationOverrideState;
     }
 
+    @AutoLogOutput(key = "SwerveDrive/isGyroConnected")
+    public boolean isGyroConnected() {
+        return gyroInputs.isConnected;
+    }
+
+    @AutoLogOutput(key = "SwerveDrive/isFrontLeftDriveMotorConnected")
+    public boolean isFrontLeftDriveMotorConnected() {
+        return moduleInputs[FRONT_LEFT_INDEX].driveMotorConnected;
+    }
+
+    @AutoLogOutput(key = "SwerveDrive/isFrontLeftSteerMotorConnected")
+    public boolean isFrontLeftSteerMotorConnected() {
+        return moduleInputs[FRONT_LEFT_INDEX].steerMotorConnected;
+    }
+
+    @AutoLogOutput(key = "SwerveDrive/isFrontLeftSteerEncoderConnected")
+    public boolean isFrontLeftSteerEncoderConnected() {
+        return moduleInputs[FRONT_LEFT_INDEX].steerEncoderConnected;
+    }
+
+    @AutoLogOutput(key = "SwerveDrive/isFrontRightDriveMotorConnected")
+    public boolean isFrontRightDriveMotorConnected() {
+        return moduleInputs[FRONT_RIGHT_INDEX].driveMotorConnected;
+    }
+
+    @AutoLogOutput(key = "SwerveDrive/isFrontRightSteerMotorConnected")
+    public boolean isFrontRightSteerMotorConnected() {
+        return moduleInputs[FRONT_RIGHT_INDEX].steerMotorConnected;
+    }
+
+    @AutoLogOutput(key = "SwerveDrive/isFrontRightSteerEncoderConnected")
+    public boolean isFrontRightSteerEncoderConnected() {
+        return moduleInputs[FRONT_RIGHT_INDEX].steerEncoderConnected;
+    }
+
+    @AutoLogOutput(key = "SwerveDrive/isBackLeftDriveMotorConnected")
+    public boolean isBackLeftDriveMotorConnected() {
+        return moduleInputs[BACK_LEFT_INDEX].driveMotorConnected;
+    }
+
+    @AutoLogOutput(key = "SwerveDrive/isBackLeftSteerMotorConnected")
+    public boolean isBackLeftSteerMotorConnected() {
+        return moduleInputs[BACK_LEFT_INDEX].steerMotorConnected;
+    }
+
+    @AutoLogOutput(key = "SwerveDrive/isBackLeftSteerEncoderConnected")
+    public boolean isBackLeftSteerEncoderConnected() {
+        return moduleInputs[BACK_LEFT_INDEX].steerEncoderConnected;
+    }
+
+    @AutoLogOutput(key = "SwerveDrive/isBackRightDriveMotorConnected")
+    public boolean isBackRightDriveMotorConnected() {
+        return moduleInputs[BACK_RIGHT_INDEX].driveMotorConnected;
+    }
+
+    @AutoLogOutput(key = "SwerveDrive/isBackRightSteerMotorConnected")
+    public boolean isBackRightSteerMotorConnected() {
+        return moduleInputs[BACK_RIGHT_INDEX].steerMotorConnected;
+    }
+
+    @AutoLogOutput(key = "SwerveDrive/isBackRightSteerEncoderConnected")
+    public boolean isBackRightSteerEncoderConnected() {
+        return moduleInputs[BACK_RIGHT_INDEX].steerEncoderConnected;
+    }
+
     public void setDesiredTranslationOverrideState(DesiredTranslationOverrideState desiredTranslationOverrideState) {
         this.desiredTranslationOverrideState = desiredTranslationOverrideState;
     }
 
     // Existing drive methods
+    @SuppressWarnings("unused")
     private ChassisSpeeds compensateRobotRelativeSpeeds(ChassisSpeeds speeds) {
         Rotation2d angularVelocity = new Rotation2d(speeds.omegaRadiansPerSecond * drivetrainConfig.rotationCompensationCoefficient);
         if (angularVelocity.getRadians() != 0.0) {
@@ -1000,7 +1751,7 @@ public class SwerveDrive extends SubsystemBase {
         return true;
     }
 
-    public void driveRobotRelative(ChassisSpeeds speeds) {
+    private void driveRobotRelative(ChassisSpeeds speeds) {
         double dt = Timer.getTimestamp() - prevDriveTime; 
         prevDriveTime = Timer.getTimestamp();
 
@@ -1015,8 +1766,20 @@ public class SwerveDrive extends SubsystemBase {
             );
         }
 
-        if (shouldOverrideVelocityCap) {
-            double maxVelocity = velocityCapMaxVelocityMetersPerSec;
+        if (shouldOverrideOmegaVelocityCap) {
+            desiredRobotRelativeSpeeds = new ChassisSpeeds(
+                desiredRobotRelativeSpeeds.vxMetersPerSecond,
+                desiredRobotRelativeSpeeds.vyMetersPerSecond,
+                MathUtil.clamp(
+                    desiredRobotRelativeSpeeds.omegaRadiansPerSecond,
+                    -omegaVelocityCapMaxRadiansPerSec,
+                    omegaVelocityCapMaxRadiansPerSec
+                )
+            );
+        }
+
+        if (shouldOverrideTranslationVelocityCap) {
+            double maxVelocity = translationVelocityCapMaxVelocityMetersPerSec;
             double currentMagnitude = Math.hypot(desiredRobotRelativeSpeeds.vxMetersPerSecond, desiredRobotRelativeSpeeds.vyMetersPerSecond);
             if (currentMagnitude > maxVelocity && currentMagnitude > 0) {
                 double scale = maxVelocity / currentMagnitude;
@@ -1073,7 +1836,7 @@ public class SwerveDrive extends SubsystemBase {
         Logger.recordOutput("SwerveDrive/optimizedModuleSetpoints", moduleSetpoints);
     }
 
-    public void driveFieldRelative(ChassisSpeeds speeds) {
+    private void driveFieldRelative(ChassisSpeeds speeds) {
         speeds = ChassisSpeeds.fromFieldRelativeSpeeds(speeds, RobotState.getInstance().getEstimatedPose().getRotation());
         driveRobotRelative(speeds);
     }
@@ -1086,10 +1849,68 @@ public class SwerveDrive extends SubsystemBase {
         return gyroInputs.gyroOrientation.toRotation2d();
     }
 
-    public void setWheelCoast(boolean isCoast) {
-        for (ModuleIO module : modules) {
-            module.setWheelCoast(isCoast);
-        }
+    public void enableFrontLeftDriveEStop() {
+        modules[FRONT_LEFT_INDEX].enableDriveEStop();
+    }
+
+    public void disableFrontLeftDriveEStop() {
+        modules[FRONT_LEFT_INDEX].disableDriveEStop();
+    }
+
+    public void enableFrontLeftSteerEStop() {
+        modules[FRONT_LEFT_INDEX].enableSteerEStop();
+    }
+
+    public void disableFrontLeftSteerEStop() {
+        modules[FRONT_LEFT_INDEX].disableSteerEStop();
+    }
+
+    public void enableFrontRightDriveEStop() {
+        modules[FRONT_RIGHT_INDEX].enableDriveEStop();
+    }
+
+    public void disableFrontRightDriveEStop() {
+        modules[FRONT_RIGHT_INDEX].disableDriveEStop();
+    }
+
+    public void enableFrontRightSteerEStop() {
+        modules[FRONT_RIGHT_INDEX].enableSteerEStop();
+    }
+
+    public void disableFrontRightSteerEStop() {
+        modules[FRONT_RIGHT_INDEX].disableSteerEStop();
+    }
+
+    public void enableBackLeftDriveEStop() {
+        modules[BACK_LEFT_INDEX].enableDriveEStop();
+    }
+
+    public void disableBackLeftDriveEStop() {
+        modules[BACK_LEFT_INDEX].disableDriveEStop();
+    }
+
+    public void enableBackLeftSteerEStop() {
+        modules[BACK_LEFT_INDEX].enableSteerEStop();
+    }
+
+    public void disableBackLeftSteerEStop() {
+        modules[BACK_LEFT_INDEX].disableSteerEStop();
+    }
+
+    public void enableBackRightDriveEStop() {
+        modules[BACK_RIGHT_INDEX].enableDriveEStop();
+    }
+
+    public void disableBackRightDriveEStop() {
+        modules[BACK_RIGHT_INDEX].disableDriveEStop();
+    }
+
+    public void enableBackRightSteerEStop() {
+        modules[BACK_RIGHT_INDEX].enableSteerEStop();
+    }
+
+    public void disableBackRightSteerEStop() {
+        modules[BACK_RIGHT_INDEX].disableSteerEStop();
     }
 
     public Command getDynamicDriveCharacterizationSysIdRoutine(Direction direction) {

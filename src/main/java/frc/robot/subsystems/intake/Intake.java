@@ -3,6 +3,9 @@ package frc.robot.subsystems.intake;
 import org.littletonrobotics.junction.AutoLogOutput;
 import org.littletonrobotics.junction.Logger;
 
+import edu.wpi.first.wpilibj.Alert;
+import edu.wpi.first.wpilibj.Alert.AlertType;
+import edu.wpi.first.wpilibj.DriverStation;
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
 import frc.robot.configs.IntakeConfig;
 import frc.robot.constants.Constants;
@@ -20,6 +23,7 @@ public class Intake extends SubsystemBase {
     }
 
     public enum IntakeSetpoint {
+        DISABLED,
         STOWED,
         DEPLOYED,
         INTAKING,
@@ -33,6 +37,11 @@ public class Intake extends SubsystemBase {
 
     private final DashboardMotorControlLoopConfigurator rollerControlLoopConfigurator;
     private final DashboardMotorControlLoopConfigurator pivotControlLoopConfigurator;
+    private boolean pendingRollerControlLoopConfigApply = false;
+    private boolean pendingPivotControlLoopConfigApply = false;
+    private final boolean enableConnectionAlerts;
+    private final Alert rollerDisconnectedAlert;
+    private final Alert pivotDisconnectedAlert;
 
     private double rollerSetpointRPS = 0.0;
     private double pivotSetpointRotations = 0.0;
@@ -45,6 +54,9 @@ public class Intake extends SubsystemBase {
             IntakeConfig.class
         );
         intakeIO = useSimulation ? new IntakeIOSim(config) : new IntakeIOTalonFX(config);
+        enableConnectionAlerts = !useSimulation && Constants.currentMode != Constants.Mode.REPLAY;
+        rollerDisconnectedAlert = new Alert("Intake roller motor is disconnected.", AlertType.kWarning);
+        pivotDisconnectedAlert = new Alert("Intake pivot motor is disconnected.", AlertType.kWarning);
 
         rollerControlLoopConfigurator = new DashboardMotorControlLoopConfigurator("Intake/rollerControlLoop",
             new DashboardMotorControlLoopConfigurator.MotorControlLoopConfig(
@@ -63,7 +75,8 @@ public class Intake extends SubsystemBase {
                 config.pivotKD,
                 config.pivotKS,
                 config.pivotKV,
-                config.pivotKA
+                config.pivotKA,
+                config.pivotKG
             )
         );
     }
@@ -73,13 +86,21 @@ public class Intake extends SubsystemBase {
         intakeIO.updateInputs(intakeInputs);
         Logger.processInputs("Intake", intakeInputs);
 
-        if (rollerControlLoopConfigurator.hasChanged()) {
-            intakeIO.configureControlLoop(rollerControlLoopConfigurator.getConfig());
-        }
-        if (pivotControlLoopConfigurator.hasChanged()) {
-            intakeIO.configurePivotControlLoop(pivotControlLoopConfigurator.getConfig());
-        }
+        rollerDisconnectedAlert.set(enableConnectionAlerts && !intakeInputs.rollerMotorConnected);
+        pivotDisconnectedAlert.set(enableConnectionAlerts && !intakeInputs.pivotMotorConnected);
 
+        pendingRollerControlLoopConfigApply |= rollerControlLoopConfigurator.hasChanged();
+        pendingPivotControlLoopConfigApply |= pivotControlLoopConfigurator.hasChanged();
+        if (DriverStation.isDisabled()) {
+            if (pendingRollerControlLoopConfigApply) {
+                intakeIO.configureControlLoop(rollerControlLoopConfigurator.getConfig());
+                pendingRollerControlLoopConfigApply = false;
+            }
+            if (pendingPivotControlLoopConfigApply) {
+                intakeIO.configurePivotControlLoop(pivotControlLoopConfigurator.getConfig());
+                pendingPivotControlLoopConfigApply = false;
+            }
+        }
     }
 
     private void setRollerVelocity(double velocityRotationsPerSec) {
@@ -96,6 +117,10 @@ public class Intake extends SubsystemBase {
 
     public void setSetpoint(IntakeSetpoint setpoint) {
         switch (setpoint) {
+            case DISABLED:
+                setPivotAngle(intakeInputs.pivotAngleRotations);
+                setRollerVelocity(0.0);
+                break;
             case STOWED:
                 setPivotAngle(config.pivotUpAngleRotations);
                 setRollerVelocity(0.0);
@@ -123,15 +148,50 @@ public class Intake extends SubsystemBase {
         return intakeInputs.pivotAngleRotations;
     }
 
+    public void enableRollerEStop() {
+        intakeIO.enableRollerEStop();
+    }
+
+    public void disableRollerEStop() {
+        intakeIO.disableRollerEStop();
+    }
+
+    public void enablePivotEStop() {
+        intakeIO.enablePivotEStop();
+    }
+
+    public void disablePivotEStop() {
+        intakeIO.disablePivotEStop();
+    }
+
     @AutoLogOutput(key = "Intake/isRollerAtSetpoint")
     public boolean isRollerAtSetpoint() {
-        return Math.abs(intakeInputs.rollerVelocityRotationsPerSec - rollerSetpointRPS)
+        return intakeInputs.rollerMotorConnected
+            && Math.abs(intakeInputs.rollerVelocityRotationsPerSec - rollerSetpointRPS)
             < config.rollerVelocityToleranceRPS;
     }
 
     @AutoLogOutput(key = "Intake/isPivotAtSetpoint")
     public boolean isPivotAtSetpoint() {
-        return Math.abs(intakeInputs.pivotAngleRotations - pivotSetpointRotations)
+        return intakeInputs.pivotMotorConnected
+            && Math.abs(intakeInputs.pivotAngleRotations - pivotSetpointRotations)
             < config.pivotAngleToleranceRotations;
+    }
+
+    @AutoLogOutput(key = "Intake/isStowed")
+    public boolean isStowed() {
+        return intakeInputs.pivotMotorConnected
+            && Math.abs(intakeInputs.pivotAngleRotations - config.pivotUpAngleRotations)
+            < config.pivotAngleToleranceRotations;
+    }
+
+    @AutoLogOutput(key = "Intake/isRollerMotorConnected")
+    public boolean isRollerMotorConnected() {
+        return intakeInputs.rollerMotorConnected;
+    }
+
+    @AutoLogOutput(key = "Intake/isPivotMotorConnected")
+    public boolean isPivotMotorConnected() {
+        return intakeInputs.pivotMotorConnected;
     }
 }

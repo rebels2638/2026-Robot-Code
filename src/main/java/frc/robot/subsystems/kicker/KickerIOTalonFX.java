@@ -25,6 +25,7 @@ import frc.robot.lib.util.DashboardMotorControlLoopConfigurator.MotorControlLoop
 import frc.robot.lib.util.PhoenixUtil;
 
 public class KickerIOTalonFX implements KickerIO {
+    private final KickerConfig config;
     private final TalonFX kickerMotor;
 
     private final StatusSignal<AngularVelocity> kickerVelocityStatusSignal;
@@ -32,11 +33,12 @@ public class KickerIOTalonFX implements KickerIO {
     private final StatusSignal<Current> kickerTorqueCurrent;
     private final StatusSignal<Temperature> kickerTemperature;
 
-    private final VelocityVoltage kickerMotorRequest = new VelocityVoltage(0).withSlot(0);
+    private final VelocityVoltage kickerMotorRequest = new VelocityVoltage(0).withSlot(0).withEnableFOC(true);
 
     private final TalonFXConfiguration kickerConfig;
 
     public KickerIOTalonFX(KickerConfig config) {
+        this.config = config;
         // Kicker motor configuration (velocity control)
         kickerConfig = new TalonFXConfiguration();
 
@@ -74,18 +76,29 @@ public class KickerIOTalonFX implements KickerIO {
         kickerVelocityStatusSignal = kickerMotor.getVelocity().clone();
         kickerMotorVoltage = kickerMotor.getMotorVoltage().clone();
 
-        BaseStatusSignal.setUpdateFrequencyForAll(100,
+        BaseStatusSignal.setUpdateFrequencyForAll(50,
             kickerTorqueCurrent, kickerTemperature,
             kickerVelocityStatusSignal, kickerMotorVoltage);
+
+        PhoenixUtil.registerSignals(
+            config.canBusName,
+            kickerTorqueCurrent,
+            kickerTemperature,
+            kickerVelocityStatusSignal,
+            kickerMotorVoltage
+        );
 
         kickerMotor.optimizeBusUtilization();
     }
 
     @Override
     public void updateInputs(KickerIOInputs inputs) {
-        BaseStatusSignal.refreshAll(
-            kickerTorqueCurrent, kickerTemperature,
-            kickerVelocityStatusSignal, kickerMotorVoltage);
+        inputs.kickerMotorConnected = BaseStatusSignal.isAllGood(
+            kickerTorqueCurrent,
+            kickerTemperature,
+            kickerVelocityStatusSignal,
+            kickerMotorVoltage
+        );
 
         inputs.velocityRotationsPerSec = kickerVelocityStatusSignal.getValue().in(RotationsPerSecond);
         inputs.appliedVolts = kickerMotorVoltage.getValue().in(Volts);
@@ -112,6 +125,18 @@ public class KickerIOTalonFX implements KickerIO {
         kickerConfig.Slot0.kV = config.kV();
         kickerConfig.Slot0.kA = config.kA();
 
+        PhoenixUtil.tryUntilOk(5, () -> kickerMotor.getConfigurator().apply(kickerConfig, 0.25));
+    }
+
+    @Override
+    public void enableEStop() {
+        kickerConfig.CurrentLimits.StatorCurrentLimit = 0;
+        PhoenixUtil.tryUntilOk(5, () -> kickerMotor.getConfigurator().apply(kickerConfig, 0.25));
+    }
+
+    @Override
+    public void disableEStop() {
+        kickerConfig.CurrentLimits.StatorCurrentLimit = config.kickerStatorCurrentLimit;
         PhoenixUtil.tryUntilOk(5, () -> kickerMotor.getConfigurator().apply(kickerConfig, 0.25));
     }
 }

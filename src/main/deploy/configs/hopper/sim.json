@@ -6,13 +6,14 @@
   "hopperPeakForwardTorqueCurrent": 40.0,
   "hopperPeakReverseTorqueCurrent": -40.0,
   "hopperKS": 0.0,
-  "hopperKV": 0.03,
+  "hopperKV": 0.189,
   "hopperKA": 0.0,
-  "hopperKP": 0.02,
+  "hopperKP": 0.005,
   "hopperKI": 0.0,
   "hopperKD": 0.0,
   "hopperMotorToOutputShaftRatio": 5.0,
   "feedingVelocityRPS": 35.0,
+  "feedingIdleVoltage": 4.0,
   "reverseVelocityRPS": -35.0,
   "hopperVelocityToleranceRPS": 5.0
 }

@@ -8,6 +8,7 @@ import org.littletonrobotics.junction.Logger;
 import edu.wpi.first.math.geometry.Pose3d;
 import edu.wpi.first.math.geometry.Rotation3d;
 import edu.wpi.first.math.geometry.Translation3d;
+import edu.wpi.first.wpilibj.RobotBase;
 import edu.wpi.first.wpilibj.Timer;
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
 
@@ -105,15 +106,18 @@ public class ProjectileVisualizer extends SubsystemBase {
     }
 
     private final ArrayList<ProjectileInstance> projectiles = new ArrayList<>();
-    private final ArrayList<Translation3d> translations = new ArrayList<>(32);
     private int nextId = 0;
+    private Supplier<Double> timestampSupplier = Timer::getFPGATimestamp;
 
     private ProjectileVisualizer() {
     }
 
     @Override
     public void periodic() {
-        double now = Timer.getFPGATimestamp();
+        if (!RobotBase.isSimulation()) {
+            return;
+        }
+        double now = timestampSupplier.get();
         Iterator<ProjectileInstance> iterator = projectiles.iterator();
 
         while (iterator.hasNext()) {
@@ -123,17 +127,40 @@ public class ProjectileVisualizer extends SubsystemBase {
             }
 
             projectile.update(now);
-            translations.set(projectile.id, projectile.currentPosition);
 
             if (projectile.isFinished()) {
                 projectile.clearLogs();
-                translations.set(projectile.id, new Translation3d());
                 iterator.remove();
             }
         }
 
-        Logger.recordOutput("ProjectileVisualizer/Translations", translations.toArray(new Translation3d[0]));
+        // Reset nextId when no projectiles are active
+        if (projectiles.isEmpty()) {
+            nextId = 0;
+        }
+
+        // Build translations array from only active projectiles
+        Translation3d[] activeTranslations = null;
+        activeTranslations = new Translation3d[projectiles.size()];
+        for (int i = 0; i < projectiles.size(); i++) {
+            activeTranslations[i] = projectiles.get(i).currentPosition;
+        }
+        
+
+        Logger.recordOutput("ProjectileVisualizer/Translations", activeTranslations);
         Logger.recordOutput("ProjectileVisualizer/ActiveCount", projectiles.size());
+    }
+
+    void setTimestampSupplierForTesting(Supplier<Double> timestampSupplier) {
+        this.timestampSupplier = timestampSupplier != null ? timestampSupplier : Timer::getFPGATimestamp;
+    }
+
+    void resetTimestampSupplierForTesting() {
+        this.timestampSupplier = Timer::getFPGATimestamp;
+    }
+
+    int getActiveProjectileCountForTesting() {
+        return projectiles.size();
     }
 
     private int addProjectileInternal(
@@ -144,11 +171,7 @@ public class ProjectileVisualizer extends SubsystemBase {
             Supplier<Double> finalZSupplier,
             Supplier<Double> spinRateRPMSupplier) {
         int id = nextId++;
-        while (translations.size() <= id) {
-            translations.add(new Translation3d());
-        }
         projectiles.add(new ProjectileInstance(
-                id,
                 robotVxSupplier,
                 robotVySupplier,
                 launchVelocitySupplier,
@@ -163,14 +186,13 @@ public class ProjectileVisualizer extends SubsystemBase {
             projectile.clearLogs();
         }
         projectiles.clear();
-        translations.clear();
         nextId = 0;
         Logger.recordOutput("ProjectileVisualizer/Translations", new Translation3d[0]);
+        
         Logger.recordOutput("ProjectileVisualizer/ActiveCount", 0);
     }
 
     private static final class ProjectileInstance {
-        private final int id;
         private final Supplier<Double> robotVxSupplier;
         private final Supplier<Double> robotVySupplier;
         private final Supplier<Double> launchVelocitySupplier;
@@ -191,14 +213,12 @@ public class ProjectileVisualizer extends SubsystemBase {
         private ProjectileState state;
 
         private ProjectileInstance(
-                int id,
                 Supplier<Double> robotVxSupplier,
                 Supplier<Double> robotVySupplier,
                 Supplier<Double> launchVelocitySupplier,
                 Supplier<Pose3d> launchPoseSupplier,
                 Supplier<Double> finalZSupplier,
                 Supplier<Double> spinRateRPMSupplier) {
-            this.id = id;
             this.robotVxSupplier = robotVxSupplier;
             this.robotVySupplier = robotVySupplier;
             this.launchVelocitySupplier = launchVelocitySupplier;
@@ -216,6 +236,7 @@ public class ProjectileVisualizer extends SubsystemBase {
             Logger.recordOutput(logKey("LaunchAngleDegrees"), Math.toDegrees(launchAngle));
             Logger.recordOutput(logKey("LaunchVelocity"), launchVelocitySupplier.get());
             Logger.recordOutput(logKey("SpinRateRPM"), spinRateRPMSupplier.get());
+            
             initialized = true;
         }
 
@@ -282,6 +303,7 @@ public class ProjectileVisualizer extends SubsystemBase {
             Logger.recordOutput(logKey("ElapsedTime"), elapsedTotal);
             Logger.recordOutput(logKey("Height"), state.z());
             Logger.recordOutput(logKey("VelocityMagnitude"), state.speed());
+            
         }
 
         private void clearLogs() {

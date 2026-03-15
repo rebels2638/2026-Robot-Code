@@ -25,6 +25,7 @@ import frc.robot.lib.util.DashboardMotorControlLoopConfigurator.MotorControlLoop
 import frc.robot.lib.util.PhoenixUtil;
 
 public class HopperIOTalonFX implements HopperIO {
+    private final HopperConfig config;
     private final TalonFX hopperMotor;
 
     private final StatusSignal<AngularVelocity> hopperVelocityStatusSignal;
@@ -32,11 +33,12 @@ public class HopperIOTalonFX implements HopperIO {
     private final StatusSignal<Current> hopperTorqueCurrent;
     private final StatusSignal<Temperature> hopperTemperature;
 
-    private final VelocityVoltage hopperMotorRequest = new VelocityVoltage(0).withSlot(0);
+    private final VelocityVoltage hopperMotorRequest = new VelocityVoltage(0).withSlot(0).withEnableFOC(true);
 
     private final TalonFXConfiguration hopperConfig;
 
     public HopperIOTalonFX(HopperConfig config) {
+        this.config = config;
         hopperConfig = new TalonFXConfiguration();
 
         hopperConfig.Slot0.kP = config.hopperKP;
@@ -72,18 +74,29 @@ public class HopperIOTalonFX implements HopperIO {
         hopperVelocityStatusSignal = hopperMotor.getVelocity().clone();
         hopperMotorVoltage = hopperMotor.getMotorVoltage().clone();
 
-        BaseStatusSignal.setUpdateFrequencyForAll(100,
+        BaseStatusSignal.setUpdateFrequencyForAll(50,
             hopperTorqueCurrent, hopperTemperature,
             hopperVelocityStatusSignal, hopperMotorVoltage);
+
+        PhoenixUtil.registerSignals(
+            config.canBusName,
+            hopperTorqueCurrent,
+            hopperTemperature,
+            hopperVelocityStatusSignal,
+            hopperMotorVoltage
+        );
 
         hopperMotor.optimizeBusUtilization();
     }
 
     @Override
     public void updateInputs(HopperIOInputs inputs) {
-        BaseStatusSignal.refreshAll(
-            hopperTorqueCurrent, hopperTemperature,
-            hopperVelocityStatusSignal, hopperMotorVoltage);
+        inputs.hopperMotorConnected = BaseStatusSignal.isAllGood(
+            hopperTorqueCurrent,
+            hopperTemperature,
+            hopperVelocityStatusSignal,
+            hopperMotorVoltage
+        );
 
         inputs.velocityRotationsPerSec = hopperVelocityStatusSignal.getValue().in(RotationsPerSecond);
         inputs.appliedVolts = hopperMotorVoltage.getValue().in(Volts);
@@ -110,6 +123,18 @@ public class HopperIOTalonFX implements HopperIO {
         hopperConfig.Slot0.kV = config.kV();
         hopperConfig.Slot0.kA = config.kA();
 
+        PhoenixUtil.tryUntilOk(5, () -> hopperMotor.getConfigurator().apply(hopperConfig, 0.25));
+    }
+
+    @Override
+    public void enableEStop() {
+        hopperConfig.CurrentLimits.StatorCurrentLimit = 0;
+        PhoenixUtil.tryUntilOk(5, () -> hopperMotor.getConfigurator().apply(hopperConfig, 0.25));
+    }
+
+    @Override
+    public void disableEStop() {
+        hopperConfig.CurrentLimits.StatorCurrentLimit = config.hopperStatorCurrentLimit;
         PhoenixUtil.tryUntilOk(5, () -> hopperMotor.getConfigurator().apply(hopperConfig, 0.25));
     }
 }

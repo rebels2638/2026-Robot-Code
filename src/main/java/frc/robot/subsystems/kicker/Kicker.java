@@ -3,6 +3,9 @@ package frc.robot.subsystems.kicker;
 import org.littletonrobotics.junction.AutoLogOutput;
 import org.littletonrobotics.junction.Logger;
 
+import edu.wpi.first.wpilibj.Alert;
+import edu.wpi.first.wpilibj.Alert.AlertType;
+import edu.wpi.first.wpilibj.DriverStation;
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
 import frc.robot.configs.KickerConfig;
 import frc.robot.constants.Constants;
@@ -21,7 +24,7 @@ public class Kicker extends SubsystemBase {
 
     public enum KickerSetpoint {
         OFF(0.0),
-        FEEDING(Double.NaN),
+        REVERSE(Double.NaN),
         KICKING(Double.NaN);
 
         private final double rps;
@@ -40,6 +43,9 @@ public class Kicker extends SubsystemBase {
     private final KickerConfig config;
 
     private final DashboardMotorControlLoopConfigurator kickerControlLoopConfigurator;
+    private boolean pendingKickerControlLoopConfigApply = false;
+    private final boolean enableConnectionAlerts;
+    private final Alert kickerDisconnectedAlert;
 
     private double kickerSetpointRPS = 0.0;
 
@@ -51,6 +57,8 @@ public class Kicker extends SubsystemBase {
             KickerConfig.class
         );
         kickerIO = useSimulation ? new KickerIOSim(config) : new KickerIOTalonFX(config);
+        enableConnectionAlerts = !useSimulation && Constants.currentMode != Constants.Mode.REPLAY;
+        kickerDisconnectedAlert = new Alert("Kicker motor is disconnected.", AlertType.kWarning);
 
         kickerControlLoopConfigurator = new DashboardMotorControlLoopConfigurator("Kicker/kickerControlLoop",
             new DashboardMotorControlLoopConfigurator.MotorControlLoopConfig(
@@ -69,22 +77,25 @@ public class Kicker extends SubsystemBase {
         kickerIO.updateInputs(kickerInputs);
         Logger.processInputs("Kicker", kickerInputs);
 
-        // Handle control loop configuration updates
-        if (kickerControlLoopConfigurator.hasChanged()) {
-            kickerIO.configureControlLoop(kickerControlLoopConfigurator.getConfig());
-        }
+        kickerDisconnectedAlert.set(enableConnectionAlerts && !kickerInputs.kickerMotorConnected);
 
+        // Handle control loop configuration updates
+        pendingKickerControlLoopConfigApply |= kickerControlLoopConfigurator.hasChanged();
+        if (DriverStation.isDisabled() && pendingKickerControlLoopConfigApply) {
+            kickerIO.configureControlLoop(kickerControlLoopConfigurator.getConfig());
+            pendingKickerControlLoopConfigApply = false;
+        }
     }
 
-    private void setKickerVelocity(double velocityRotationsPerSec) {
+    public void setKickerVelocity(double velocityRotationsPerSec) {
         kickerSetpointRPS = velocityRotationsPerSec;
         Logger.recordOutput("Kicker/velocitySetpointRPS", velocityRotationsPerSec);
         kickerIO.setVelocity(velocityRotationsPerSec);
     }
 
     public void setSetpoint(KickerSetpoint setpoint) {
-        double targetRps = setpoint == KickerSetpoint.FEEDING
-            ? config.feedingVelocityRPS
+        double targetRps = setpoint == KickerSetpoint.REVERSE
+            ? config.reverseVelocityRPS
             : setpoint == KickerSetpoint.KICKING ? config.kickingVelocityRPS : setpoint.getRps();
         setKickerVelocity(targetRps);
     }
@@ -94,10 +105,24 @@ public class Kicker extends SubsystemBase {
         return kickerInputs.velocityRotationsPerSec;
     }
 
+    public void enableEStop() {
+        kickerIO.enableEStop();
+    }
+
+    public void disableEStop() {
+        kickerIO.disableEStop();
+    }
+
     // Setpoint check methods
     @AutoLogOutput(key = "Kicker/isKickerAtSetpoint")
     public boolean isKickerAtSetpoint() {
-        return Math.abs(kickerInputs.velocityRotationsPerSec - kickerSetpointRPS) < config.kickerVelocityToleranceRPS;
+        return kickerInputs.kickerMotorConnected
+            && Math.abs(kickerInputs.velocityRotationsPerSec - kickerSetpointRPS) < config.kickerVelocityToleranceRPS;
+    }
+
+    @AutoLogOutput(key = "Kicker/isKickerMotorConnected")
+    public boolean isKickerMotorConnected() {
+        return kickerInputs.kickerMotorConnected;
     }
 
 }

@@ -13,12 +13,16 @@ import org.littletonrobotics.junction.wpilog.WPILOGWriter;
 
 import com.ctre.phoenix6.SignalLogger;
 
+import edu.wpi.first.cameraserver.CameraServer;
+import edu.wpi.first.cscore.HttpCamera;
 import edu.wpi.first.net.WebServer;
 import edu.wpi.first.wpilibj.Filesystem;
 import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.CommandScheduler;
 import frc.robot.constants.Constants;
+import frc.robot.constants.FieldConstants;
 import frc.robot.lib.BLine.FollowPath;
+import frc.robot.lib.util.PhoenixUtil;
 
 /**
  * The VM is configured to automatically run this class, and to call the
@@ -30,6 +34,8 @@ import frc.robot.lib.BLine.FollowPath;
  * project.
  */
 public class Robot extends LoggedRobot {
+    private static final String ELASTIC_LIMELIGHT_STREAM_NAME = "limelight-fr";
+
     private Command m_autonomousCommand;
     private RobotContainer m_robotContainer;
 
@@ -92,6 +98,7 @@ public class Robot extends LoggedRobot {
         Logger.start();
         // for elastic dashboard
         WebServer.start(5800, Filesystem.getDeployDirectory().getPath());
+        startElasticCameraPublishers();
 
         m_robotContainer = RobotContainer.getInstance();
 
@@ -110,6 +117,7 @@ public class Robot extends LoggedRobot {
      */
     @Override
     public void robotPeriodic() {
+        PhoenixUtil.refreshAll();
         // Runs the Scheduler. This is responsible for polling buttons, adding
         // newly-scheduled
         // commands, running already-scheduled commands, removing finished or
@@ -118,6 +126,7 @@ public class Robot extends LoggedRobot {
         // robot's periodic
         // block in order for anything in the Command-based framework to work.
         CommandScheduler.getInstance().run();
+        Logger.recordOutput("shot/shotDistanceMeters", RobotState.getInstance().getEstimatedPose().getTranslation().getDistance(FieldConstants.Hub.hubCenter.toTranslation2d()));
     }
 
     /** This function is called once each time the robot enters Disabled mode. */
@@ -130,25 +139,49 @@ public class Robot extends LoggedRobot {
     public void disabledPeriodic() {
     }
 
+    private void startElasticCameraPublishers() {
+        if (Constants.currentMode == Constants.Mode.REPLAY
+            || Constants.shouldUseSimulation(Constants.SimOnlySubsystems.VISION)) {
+            return;
+        }
+
+        startElasticCameraPublisher(ELASTIC_LIMELIGHT_STREAM_NAME);
+    }
+
+    private void startElasticCameraPublisher(String cameraName) {
+        // Publish the Limelight MJPEG stream so Elastic can discover it as a CameraServer source.
+        HttpCamera camera =
+            new HttpCamera(cameraName, "http://" + cameraName + ".local:5800/stream.mjpg");
+        CameraServer.startAutomaticCapture(camera);
+    }
+
     private void linkFollowPathLogging() {
         // Pose logging consumer
         FollowPath.setPoseLoggingConsumer(pair -> {
-            Logger.recordOutput(pair.getFirst(), pair.getSecond());
+            if (Constants.VERBOSE_LOGGING_ENABLED) {
+                Logger.recordOutput(pair.getFirst(), pair.getSecond());
+            }
         });
 
         // Translation list logging consumer
         FollowPath.setTranslationListLoggingConsumer(pair -> {
-            Logger.recordOutput(pair.getFirst(), pair.getSecond());
+            if (Constants.VERBOSE_LOGGING_ENABLED) {
+                Logger.recordOutput(pair.getFirst(), pair.getSecond());
+            }
         });
 
         // Double logging consumer
         FollowPath.setDoubleLoggingConsumer(pair -> {
-            Logger.recordOutput(pair.getFirst(), pair.getSecond());
+            if (Constants.VERBOSE_LOGGING_ENABLED) {
+                Logger.recordOutput(pair.getFirst(), pair.getSecond());
+            }
         });
 
         // Boolean logging consumer
         FollowPath.setBooleanLoggingConsumer(pair -> {
-            Logger.recordOutput(pair.getFirst(), pair.getSecond());
+            if (Constants.VERBOSE_LOGGING_ENABLED) {
+                Logger.recordOutput(pair.getFirst(), pair.getSecond());
+            }
         });
     }
     

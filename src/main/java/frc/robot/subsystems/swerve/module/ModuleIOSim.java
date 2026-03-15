@@ -35,14 +35,14 @@ public class ModuleIOSim implements ModuleIO {
 
     private boolean isSteerClosedLoop = true;
     private boolean isDriveClosedLoop = true;
+    private boolean isDriveEStopped = false;
+    private boolean isSteerEStopped = false;
 
     private SwerveModuleState lastDesiredState = new SwerveModuleState();
 
     private double lastTimeInputs = Timer.getTimestamp();
     
-    private final int moduleID;
     public ModuleIOSim(SwerveModuleGeneralConfig config, int moduleID) {
-        this.moduleID = moduleID;
         steerFeedback.enableContinuousInput(-Math.PI, Math.PI);
     }
 
@@ -51,7 +51,9 @@ public class ModuleIOSim implements ModuleIO {
         double dt = Timer.getTimestamp() - lastTimeInputs;
         lastTimeInputs = Timer.getTimestamp();
 
-        if (isDriveClosedLoop) {
+        if (isDriveEStopped) {
+            driveSim.setInputVoltage(0);
+        } else if (isDriveClosedLoop) {
             driveSim.setInputVoltage(
                 MathUtil.clamp(
                     driveFeedforward.calculate(lastDesiredState.speedMetersPerSecond) +
@@ -62,7 +64,9 @@ public class ModuleIOSim implements ModuleIO {
             );
         }
 
-        if (isSteerClosedLoop) {
+        if (isSteerEStopped) {
+            steerSim.setInputVoltage(0);
+        } else if (isSteerClosedLoop) {
             steerSim.setInputVoltage(
                 MathUtil.clamp(
                     steerFeedback.calculate(steerSim.getAngularPositionRad()),
@@ -74,6 +78,10 @@ public class ModuleIOSim implements ModuleIO {
 
         steerSim.update(dt);
         driveSim.update(dt);
+
+        inputs.driveMotorConnected = true;
+        inputs.steerMotorConnected = true;
+        inputs.steerEncoderConnected = true;
         
         inputs.drivePositionMeters = driveSim.getAngularPositionRad() * 0.0485614385; // wheel radius in meters
         inputs.driveVelocityMetersPerSec = driveSim.getAngularVelocityRadPerSec() * 0.0485614385;
@@ -96,11 +104,21 @@ public class ModuleIOSim implements ModuleIO {
 
     @Override
     public void setState(SwerveModuleState state) {
-        driveFeedback.setSetpoint(state.speedMetersPerSecond);
-        steerFeedback.setSetpoint(state.angle.getRadians());
+        if (isDriveEStopped) {
+            driveSim.setInputVoltage(0);
+            isDriveClosedLoop = false;
+        } else {
+            driveFeedback.setSetpoint(state.speedMetersPerSecond);
+            isDriveClosedLoop = true;
+        }
 
-        isDriveClosedLoop = true;
-        isSteerClosedLoop = true;
+        if (isSteerEStopped) {
+            steerSim.setInputVoltage(0);
+            isSteerClosedLoop = false;
+        } else {
+            steerFeedback.setSetpoint(state.angle.getRadians());
+            isSteerClosedLoop = true;
+        }
 
         lastDesiredState = state;
     }
@@ -108,18 +126,18 @@ public class ModuleIOSim implements ModuleIO {
     @Override
     public void setSteerTorqueCurrentFOC(double torqueCurrentFOC, double driveVelocityMetersPerSec) {
         // In sim, treat torqueCurrentFOC as voltage for simplicity
-        steerSim.setInputVoltage(torqueCurrentFOC);
+        steerSim.setInputVoltage(isSteerEStopped ? 0 : torqueCurrentFOC);
 
         isDriveClosedLoop = false;
-        isSteerClosedLoop = true;
+        isSteerClosedLoop = !isSteerEStopped;
     }
 
     @Override
     public void setDriveTorqueCurrentFOC(double torqueCurrentFOC, Rotation2d steerAngle) {
         // In sim, treat torqueCurrentFOC as voltage for simplicity
-        driveSim.setInputVoltage(torqueCurrentFOC);
+        driveSim.setInputVoltage(isDriveEStopped ? 0 : torqueCurrentFOC);
 
-        isDriveClosedLoop = false;
+        isDriveClosedLoop = !isDriveEStopped;
         isSteerClosedLoop = true;
     }
 
@@ -131,5 +149,29 @@ public class ModuleIOSim implements ModuleIO {
     @Override
     public void configureSteerControlLoop(MotorControlLoopConfig config) {
         // No-op in sim
+    }
+
+    @Override
+    public void enableDriveEStop() {
+        isDriveEStopped = true;
+        driveSim.setInputVoltage(0);
+        isDriveClosedLoop = false;
+    }
+
+    @Override
+    public void disableDriveEStop() {
+        isDriveEStopped = false;
+    }
+
+    @Override
+    public void enableSteerEStop() {
+        isSteerEStopped = true;
+        steerSim.setInputVoltage(0);
+        isSteerClosedLoop = false;
+    }
+
+    @Override
+    public void disableSteerEStop() {
+        isSteerEStopped = false;
     }
 }

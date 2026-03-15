@@ -1,6 +1,5 @@
 package frc.robot.configs;
 
-import edu.wpi.first.math.controller.PIDController;
 import edu.wpi.first.math.geometry.Translation2d;
 
 public class SwerveDrivetrainConfig {
@@ -21,9 +20,7 @@ public class SwerveDrivetrainConfig {
 
     public double rotationCompensationCoefficient;
 
-    public double translationControllerKP;
-    public double translationControllerKI;
-    public double translationControllerKD;
+
 
     public double translationToleranceMeters;
     public double translationVelocityToleranceMeters;
@@ -62,9 +59,4 @@ public class SwerveDrivetrainConfig {
         return new Translation2d(backRightX, backRightY);
     }
 
-    public PIDController getTranslationController() {
-        PIDController controller = new PIDController(translationControllerKP, translationControllerKI, translationControllerKD);
-        controller.setTolerance(translationToleranceMeters, translationVelocityToleranceMeters);
-        return controller;
-    }
 }

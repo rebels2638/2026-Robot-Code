@@ -7,6 +7,7 @@ import frc.robot.lib.util.DashboardMotorControlLoopConfigurator.MotorControlLoop
 public interface ClimberIO {
     @AutoLog
     class ClimberIOInputs {
+        public boolean climberMotorConnected = false;
         public double positionRotations = 0;
         public double velocityRotationsPerSec = 0;
         public double appliedVolts = 0;
@@ -15,7 +16,13 @@ public interface ClimberIO {
     }
 
     public default void updateInputs(ClimberIOInputs inputs) {}
-    public default void setPosition(double positionRotations) {}
+    public default void setPosition(
+        double positionRotations,
+        double maxVelocityRotationsPerSec,
+        double maxAccelerationRotationsPerSec2
+    ) {}
     public default void setVoltage(double voltage) {}
     public default void configureControlLoop(MotorControlLoopConfig config) {}
+    public default void enableEStop() {}
+    public default void disableEStop() {}
 }

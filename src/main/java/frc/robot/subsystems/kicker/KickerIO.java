@@ -7,6 +7,7 @@ import frc.robot.lib.util.DashboardMotorControlLoopConfigurator.MotorControlLoop
 public interface KickerIO {
     @AutoLog
     class KickerIOInputs {
+        public boolean kickerMotorConnected = false;
         public double velocityRotationsPerSec = 0;
         public double appliedVolts = 0;
         public double torqueCurrent = 0;
@@ -17,4 +18,6 @@ public interface KickerIO {
     public default void setVelocity(double velocityRotationsPerSec) {}
     public default void setVoltage(double voltage) {}
     public default void configureControlLoop(MotorControlLoopConfig config) {}
+    public default void enableEStop() {}
+    public default void disableEStop() {}
 }

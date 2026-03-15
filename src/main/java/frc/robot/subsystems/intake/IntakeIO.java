@@ -7,11 +7,13 @@ import frc.robot.lib.util.DashboardMotorControlLoopConfigurator.MotorControlLoop
 public interface IntakeIO {
     @AutoLog
     class IntakeIOInputs {
+        public boolean rollerMotorConnected = false;
         public double rollerVelocityRotationsPerSec = 0;
         public double rollerAppliedVolts = 0;
         public double rollerTorqueCurrent = 0;
         public double rollerTemperatureFahrenheit = 0;
 
+        public boolean pivotMotorConnected = false;
         public double pivotAngleRotations = 0;
         public double pivotVelocityRotationsPerSec = 0;
         public double pivotAppliedVolts = 0;
@@ -25,4 +27,8 @@ public interface IntakeIO {
     public default void setPivotAngle(double angleRotations) {}
     public default void configureControlLoop(MotorControlLoopConfig config) {}
     public default void configurePivotControlLoop(MotorControlLoopConfig config) {}
+    public default void enableRollerEStop() {}
+    public default void disableRollerEStop() {}
+    public default void enablePivotEStop() {}
+    public default void disablePivotEStop() {}
 }
