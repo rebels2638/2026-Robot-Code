@@ -67,8 +67,6 @@ public class RobotContainer {
     private final Intake intake = Intake.getInstance();
     private final Superstructure superstructure = Superstructure.getInstance();
     private final SendableChooser<Command> autoChooser;
-    private Superstructure.DesiredIntakeState competitionDriveIntakeReleaseState =
-        Superstructure.DesiredIntakeState.DEPLOYED;
 
     LoggedNetworkNumber shooterFlywheelSet = new LoggedNetworkNumber("flywheelSet", 0);
     LoggedNetworkNumber turret = new LoggedNetworkNumber("turretSet", 180);
@@ -135,12 +133,7 @@ public class RobotContainer {
     }
 
     private void configureBindings() {
-        // bindCompetitionDriveHelpers();
-        xboxDriver.getAButton().whileTrue(
-            new RunCommand(this::runAlliancePassHelper)
-        ).onFalse(
-            new InstantCommand(() -> superstructure.setDesiredSystemState(Superstructure.DesiredSystemState.TRACKING))
-        );        
+        bindCompetitionDriveHelpers();
         // xboxDriver.getXButton().onTrue(
         //     new InstantCommand(() -> robotState.resetPose(new Pose2d(robotState.getEstimatedPose().getTranslation(), new Rotation2d(0))))
         // );
@@ -216,34 +209,36 @@ public class RobotContainer {
     }
 
     private void bindCompetitionDriveHelpers() {
-        xboxDriver.getRightTriggerButton(DRIVE_HELPER_TRIGGER_THRESHOLD).whileTrue(
-            new RunCommand(this::runHubShootingHelper)
+        Trigger leftBumperOnlyTrigger = xboxDriver.getLeftBumper().and(xboxDriver.getRightBumper().negate());
+        Trigger rightBumperOnlyTrigger = xboxDriver.getRightBumper().and(xboxDriver.getLeftBumper().negate());
+        Trigger autoClimbTrigger = xboxDriver.getRightBumper().and(xboxDriver.getLeftBumper());
+
+        leftBumperOnlyTrigger.onTrue(
+            new InstantCommand(() -> superstructure.setDesiredIntakeState(Superstructure.DesiredIntakeState.ALTERNATING))
         ).onFalse(
-            new InstantCommand(() -> superstructure.setDesiredSystemState(Superstructure.DesiredSystemState.TRACKING))
+            new InstantCommand(() -> superstructure.setDesiredIntakeState(Superstructure.DesiredIntakeState.DEPLOYED))
         );
 
-        xboxDriver.getLeftTriggerButton(DRIVE_HELPER_TRIGGER_THRESHOLD).whileTrue(
-            new RunCommand(() -> superstructure.setDesiredIntakeState(Superstructure.DesiredIntakeState.INTAKING))
-        ).onFalse(
-            new InstantCommand(this::restoreCompetitionDriveIntakeState)
+        rightBumperOnlyTrigger.onTrue(
+            new InstantCommand(() -> superstructure.setDesiredIntakeState(Superstructure.DesiredIntakeState.STOWED))
         );
 
-        xboxDriver.getLeftBumper().onTrue(
-            new InstantCommand(() -> setCompetitionDriveIntakeReleaseState(
-                Superstructure.DesiredIntakeState.ALTERNATING
-            ))
+        xboxDriver.getLeftTriggerButton(DRIVE_HELPER_TRIGGER_THRESHOLD).onTrue(
+            new InstantCommand(() -> superstructure.setDesiredIntakeState(Superstructure.DesiredIntakeState.INTAKING))
+        ).onFalse(
+            new InstantCommand(() -> superstructure.setDesiredIntakeState(Superstructure.DesiredIntakeState.DEPLOYED))
         );
 
-        xboxDriver.getRightBumper().whileTrue(
-            new RunCommand(this::runClimbAlignmentHelper)
-        ).onFalse(
-            new InstantCommand(this::releaseClimbAlignmentHelper)
-        );
+        autoClimbTrigger.whileTrue(new AutoClimbCommand(ClimbingConstants.TOWER));
 
         xboxDriver.getXButton().onTrue(
-            new InstantCommand(swerveDrive::toggleTeleopDriveMode)
+            new InstantCommand(() -> swerveDrive.setDesiredSystemState(
+                SwerveDrive.DesiredSystemState.TELOP_ROBOT_RELATIVE
+            ))
         ).onFalse(
-            new InstantCommand(swerveDrive::toggleTeleopDriveMode)    
+            new InstantCommand(() -> swerveDrive.setDesiredSystemState(
+                SwerveDrive.DesiredSystemState.TELOP_FIELD_RELATIVE
+            ))
         );
 
         xboxDriver.getBButton().whileTrue(
@@ -253,9 +248,11 @@ public class RobotContainer {
         );
 
         xboxDriver.getYButton().onTrue(
-            new InstantCommand(() -> superstructure.setDesiredIntakeState(Superstructure.DesiredIntakeState.REVERSING))
-        ).onFalse(
-            new InstantCommand(this::restoreCompetitionDriveIntakeState)
+            new InstantCommand(() -> superstructure.setDesiredClimbState(Superstructure.DesiredClimbState.EXTENDED))
+        );
+
+        xboxDriver.getAButton().onTrue(
+            new InstantCommand(() -> superstructure.setDesiredClimbState(Superstructure.DesiredClimbState.CLIMBED))
         );
     }
 
@@ -274,31 +271,11 @@ public class RobotContainer {
         );
     }
 
-    private void runClimbAlignmentHelper() {
-        superstructure.setDesiredClimbState(Superstructure.DesiredClimbState.EXTENDED);
-        superstructure.setDesiredSystemState(Superstructure.DesiredSystemState.BUMP);
-    }
-
-    private void releaseClimbAlignmentHelper() {
-        superstructure.setDesiredSystemState(Superstructure.DesiredSystemState.HOME);
-        superstructure.setDesiredClimbState(Superstructure.DesiredClimbState.CLIMBED);
-    }
-
-    private void setCompetitionDriveIntakeReleaseState(Superstructure.DesiredIntakeState intakeState) {
-        competitionDriveIntakeReleaseState = intakeState;
-        superstructure.setDesiredIntakeState(intakeState);
-    }
-
-    private void restoreCompetitionDriveIntakeState() {
-        superstructure.setDesiredIntakeState(competitionDriveIntakeReleaseState);
-    }
-
     public void teleopInit() {
         // Ensure we're in teleop state
-        competitionDriveIntakeReleaseState = Superstructure.DesiredIntakeState.DEPLOYED;
         swerveDrive.setDesiredSystemState(SwerveDrive.DesiredSystemState.TELOP_FIELD_RELATIVE);
         superstructure.setDesiredSystemState(Superstructure.DesiredSystemState.HOME);
-        superstructure.setDesiredIntakeState(competitionDriveIntakeReleaseState);
+        superstructure.setDesiredIntakeState(Superstructure.DesiredIntakeState.STOWED);
         // dont set climb state leave up to driver
     }
 
