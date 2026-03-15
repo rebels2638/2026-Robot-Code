@@ -22,7 +22,6 @@ import java.util.NoSuchElementException;
 import org.littletonrobotics.junction.AutoLogOutput;
 import org.littletonrobotics.junction.Logger;
 
-// TODO: Make it so that if it is tracking / shooting, the center of rotation for the robot is around the shooter's position
 public class RobotState {
     private static final double OBSERVATION_LOG_PERIOD_SECONDS = 0.1;
 
