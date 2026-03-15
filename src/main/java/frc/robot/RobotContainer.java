@@ -24,14 +24,12 @@ import frc.robot.lib.BLine.Path.Waypoint;
 import frc.robot.lib.input.XboxController;
 import frc.robot.lib.util.ballistics.ProjectileVisualizer;
 import frc.robot.subsystems.Superstructure;
-import frc.robot.subsystems.intake.Intake;
+import frc.robot.subsystems.Superstructure.DesiredState;
 import frc.robot.subsystems.shooter.Shooter;
 import frc.robot.subsystems.swerve.SwerveDrive;
 // import frc.robot.subsystems.vision.Vision;
-import frc.robot.subsystems.vision.BallTargeting;
 import frc.robot.subsystems.vision.Vision;
 
-//: TODO: make sure all lisences in tuner are activated
 public class RobotContainer {
     public static RobotContainer instance = null;
 
@@ -48,10 +46,11 @@ public class RobotContainer {
 
     private final RobotState robotState = RobotState.getInstance();
     private final SwerveDrive swerveDrive = SwerveDrive.getInstance();
-    // private final Superstructure superstructure = Superstructure.getInstance();
-    private final Vision vision = Vision.getInstance();
+    private final Superstructure superstructure = Superstructure.getInstance();
+    // private final Vision vision = Vision.getInstance();
     @SuppressWarnings("unused")
     private final ProjectileVisualizer projectileVisualizer = ProjectileVisualizer.getInstance();
+
 
     private RobotContainer() {
         registerEventTriggers();
@@ -63,104 +62,97 @@ public class RobotContainer {
         // Configure teleop input suppliers for SwerveDrive FSM
         // Using normalized inputs (-1 to 1) with deadband applied
         swerveDrive.setTeleopInputSuppliers(
-                () -> -MathUtil.applyDeadband(xboxDriver.getLeftY(), Constants.OperatorConstants.LEFT_Y_DEADBAND),
-                () -> -MathUtil.applyDeadband(xboxDriver.getLeftX(), Constants.OperatorConstants.LEFT_X_DEADBAND),
-                () -> -MathUtil.applyDeadband(xboxDriver.getRightX(), Constants.OperatorConstants.RIGHT_X_DEADBAND));
+            () -> -MathUtil.applyDeadband(xboxDriver.getLeftY(), Constants.OperatorConstants.LEFT_Y_DEADBAND),
+            () -> -MathUtil.applyDeadband(xboxDriver.getLeftX(), Constants.OperatorConstants.LEFT_X_DEADBAND),
+            () -> -MathUtil.applyDeadband(xboxDriver.getRightX(), Constants.OperatorConstants.RIGHT_X_DEADBAND)
+        );
 
         // Set default state to TELEOP
         swerveDrive.setDesiredSystemState(SwerveDrive.DesiredSystemState.TELEOP);
-
+        
         // Set default superstructure state to HOME
-        // superstructure.setDesiredSystemState(Superstructure.DesiredSystemState.HOME);
-        // superstructure.setDesiredIntakeState(Superstructure.DesiredIntakeState.STOWED);
+        superstructure.setDesiredState(Superstructure.DesiredState.HOME);
 
-        // superstructure.setDesiredTargetState(Superstructure.TargetState.PASS_ALLIANCE_TOP);
 
         configureBindings();
     }
 
     private void registerEventTriggers() {
-        // FollowPath.registerEventTrigger("test1", new InstantCommand(() -> {
-        // Logger.recordOutput("In a command", true);
-        // }));
-        // FollowPath.registerEventTrigger("test2", () -> {
-        // System.out.println("As a runnable");
-        // });
+        FollowPath.registerEventTrigger("test1", new InstantCommand(() -> {
+            Logger.recordOutput("In a command", true);
+        }));
+        FollowPath.registerEventTrigger("test2", () -> {
+            System.out.println("As a runnable");
+        });
     }
 
     private void configureBindings() {
-        xboxDriver.getXButton().onTrue(
-                new InstantCommand(() -> robotState
-                        .resetPose(new Pose2d(robotState.getEstimatedPose().getTranslation(), new Rotation2d(0)))));
-        // xboxDriver.getAButton().onTrue(
-        // new InstantCommand(() ->
-        // superstructure.setDesiredSystemState(Superstructure.DesiredSystemState.HOME))
-        // );
-        // xboxDriver.getBButton().onTrue(
-        // new InstantCommand(() ->
-        // superstructure.setDesiredSystemState(Superstructure.DesiredSystemState.SHOOTING))
+        // Path toClimb = new Path(new Waypoint(1,3, new Rotation2d(0)));
+        // xboxDriver.getXButton().onTrue(
+        //     new InstantCommand(() -> currentPath = toClimb).andThen(
+        //         new InstantCommand(() -> swerveDrive.setDesiredSystemState(SwerveDrive.DesiredSystemState.FOLLOW_PATH)).andThen(
+        //             new WaitUntilCommand(() -> swerveDrive.getCurrentSystemState() == SwerveDrive.CurrentSystemState.IDLE)).andThen(
+        //                 new InstantCommand(() -> swerveDrive.setDesiredSystemState(SwerveDrive.DesiredSystemState.TELEOP))
+        //             )
+        //         )
         // );
 
-        // xboxOperator.getYButton().onTrue(
-        // new InstantCommand(() ->
-        // superstructure.setDesiredTargetState(Superstructure.TargetState.HUB))
-        // );
-        // xboxOperator.getUpDpad().onTrue(
-        // new InstantCommand(() ->
-        // superstructure.setDesiredTargetState(Superstructure.TargetState.PASS_ALLIANCE_TOP))
-        // );
-        // xboxOperator.getRightDpad().onTrue(
-        // new InstantCommand(() ->
-        // superstructure.setDesiredTargetState(Superstructure.TargetState.PASS_ALLIANCE_CENTER))
-        // );
-        // xboxOperator.getDownDpad().onTrue(
-        // new InstantCommand(() ->
-        // superstructure.setDesiredTargetState(Superstructure.TargetState.PASS_ALLIANCE_BOTTOM))
-        // );
-        // xboxOperator.getLeftBumper().onTrue(
-        // new InstantCommand(() ->
-        // superstructure.setDesiredTargetState(Superstructure.TargetState.PASS_NEUTRAL_TOP))
-        // );
-        // xboxOperator.getLeftDpad().onTrue(
-        // new InstantCommand(() ->
-        // superstructure.setDesiredTargetState(Superstructure.TargetState.PASS_NEUTRAL_CENTER))
-        // );
-        // xboxOperator.getRightBumper().onTrue(
-        // new InstantCommand(() ->
-        // superstructure.setDesiredTargetState(Superstructure.TargetState.PASS_NEUTRAL_BOTTOM))
+        // xboxDriver.getXButton().onFalse(new InstantCommand(() -> robotState.resetPose(new Pose2d(0,0, new Rotation2d(0)))));
+
+        // xboxDriver.getAButton().onTrue(new InstantCommand(() -> {
+        //         ProjectileVisualizer.addProjectile(
+        //             0, // vx
+        //             0, // vy
+        //             10, // exitVelocity
+        //             new Pose3d(0, 0, 2, new Rotation3d(0, Math.PI/4, 0)), // position & rotation
+        //             3 // hub height
+        //         );
+        //     })
         // );
 
-        // Split-state pattern example:
-        // superstructure.setDesiredSystemState(Superstructure.DesiredSystemState.TRACKING);
-        // superstructure.setDesiredIntakeState(Superstructure.DesiredIntakeState.INTAKING);
+        xboxDriver.getAButton().onTrue(
+            new InstantCommand(() -> superstructure.setDesiredState(DesiredState.SHOOTING))
+        );
+        xboxDriver.getBButton().onTrue(
+            new InstantCommand(() -> superstructure.setDesiredState(DesiredState.TRACKING))
+        );
 
         // xboxDriver.getAButton().onTrue(
-        // new InstantCommand(() ->
-        // Intake.getInstance().setSetpoint(Intake.IntakeSetpoint.INTAKING))
-        // );
-        // xboxDriver.getBButton().onTrue(
-        // new InstantCommand(() ->
-        // Intake.getInstance().setSetpoint(Intake.IntakeSetpoint.STOWED))
+        //     new ConditionalCommand(
+        //         new SequentialCommandGroup(
+        //             followPath(
+        //                 new Path(
+        //                     new PathConstraints()
+        //                         .setMaxVelocityMetersPerSec(AlignmentConstants.Tower.INTERMEDIARY_MAX_VELOCITY_METERS_PER_SEC)
+        //                         .setEndTranslationToleranceMeters(AlignmentConstants.Tower.INTERMEDIARY_TRANSLATION_TOLERANCE_METERS)
+        //                         .setEndRotationToleranceDeg(AlignmentConstants.Tower.INTERMEDIARY_ROTATION_TOLERANCE_DEG),
+        //                     new Waypoint(AlignmentConstants.Tower.Left.INTERMEDIATE_WAYPOINT)),
+        //                 false
+        //             ),
+        //             followPath(
+        //                 new Path(
+        //                     new PathConstraints().setMaxVelocityMetersPerSec(AlignmentConstants.Tower.APPROACH_MAX_VELOCITY_METERS_PER_SEC),
+        //                     new Waypoint(AlignmentConstants.Tower.Left.FINAL_WAYPOINT)),
+        //                 false
+        //             )                
+        //         ),
+        //         new InstantCommand(() -> {}),
+        //         () -> AlignmentConstants.Tower.isWithinBounds(robotState.getEstimatedPose(), AlignmentConstants.Tower.Left.BOUNDS)
+        //     )
         // );
 
-        // Test snap-to-angle bindings with split superstructure states:
-        // xboxDriver.getAButton().onTrue(new InstantCommand(() ->
-        // superstructure.setDesiredSystemState(Superstructure.DesiredSystemState.BUMP)));
-        // xboxDriver.getAButton().onFalse(new InstantCommand(() ->
-        // superstructure.setDesiredSystemState(Superstructure.DesiredSystemState.HOME)));
-
-        // Vision-assisted ball alignment: enable assist while intake trigger is held
-        xboxDriver.getRightTriggerButton(0.5)
-                .onTrue(new InstantCommand(() -> BallTargeting.getInstance().setAssistEnabled(true)))
-                .onFalse(new InstantCommand(() -> BallTargeting.getInstance().setAssistEnabled(false)));
+        // Test snap-to-angle bindings
+        // xboxDriver.getAButton().onTrue(new InstantCommand(() -> superstructure.setDesiredState(Superstructure.DesiredState.BUMP)));
+        // xboxDriver.getAButton().onFalse(new InstantCommand(() -> superstructure.setDesiredState(Superstructure.DesiredState.HOME)));
     }
 
     private Command followPath(Path path, boolean shouldResetPose) {
-        return new InstantCommand(() -> {
-            swerveDrive.setCurrentPath(path, shouldResetPose);
-        })
-                .andThen(setSwerveDriveState(SwerveDrive.DesiredSystemState.FOLLOW_PATH)).andThen(new WaitUntilCommand(
-                        () -> swerveDrive.getCurrentSystemState() == SwerveDrive.CurrentSystemState.IDLE));
+        return 
+            new InstantCommand(() -> {
+                swerveDrive.setCurrentPath(path, shouldResetPose);
+            })
+            .andThen(setSwerveDriveState(SwerveDrive.DesiredSystemState.FOLLOW_PATH)).
+            andThen(new WaitUntilCommand(() -> swerveDrive.getCurrentSystemState() == SwerveDrive.CurrentSystemState.IDLE));
     }
 
     private Command setSwerveDriveState(SwerveDrive.DesiredSystemState state) {
@@ -170,22 +162,21 @@ public class RobotContainer {
     public void teleopInit() {
         // Ensure we're in teleop state
         swerveDrive.setDesiredSystemState(SwerveDrive.DesiredSystemState.TELEOP);
-        // superstructure.setDesiredSystemState(Superstructure.DesiredSystemState.HOME);
+        superstructure.setDesiredState(Superstructure.DesiredState.HOME);
     }
 
     public void autonomousInit() {
         // Set up for autonomous
-        // superstructure.setDesiredSystemState(Superstructure.DesiredSystemState.HOME);
+        superstructure.setDesiredState(DesiredState.HOME);
         swerveDrive.setDesiredSystemState(SwerveDrive.DesiredSystemState.IDLE);
     }
 
     public void disabledInit() {
-        // superstructure.setDesiredSystemState(Superstructure.DesiredSystemState.DISABLED);
+        superstructure.setDesiredState(Superstructure.DesiredState.DISABLED);
         swerveDrive.setDesiredSystemState(SwerveDrive.DesiredSystemState.DISABLED);
     }
 
     public Command getAutonomousCommand() {
-        return followPath(new Path("1"), true).andThen(followPath(new Path("2"), false));
-        // return null;
+        return null;
     }
 }

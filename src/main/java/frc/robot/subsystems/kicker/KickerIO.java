@@ -17,6 +17,4 @@ public interface KickerIO {
     public default void setVelocity(double velocityRotationsPerSec) {}
     public default void setVoltage(double voltage) {}
     public default void configureControlLoop(MotorControlLoopConfig config) {}
-    public default void enableEStop() {}
-    public default void disableEStop() {}
 }

@@ -104,15 +104,15 @@ public class ShooterIOTalonFX implements ShooterIO {
 
         // Software limits for hood angle
         hoodConfig.SoftwareLimitSwitch.ForwardSoftLimitEnable = true;
-        hoodConfig.SoftwareLimitSwitch.ForwardSoftLimitThreshold = config.hoodMaxAngleDegrees / 360.0;
+        hoodConfig.SoftwareLimitSwitch.ForwardSoftLimitThreshold = config.hoodMaxAngleRotations;
         hoodConfig.SoftwareLimitSwitch.ReverseSoftLimitEnable = true;
-        hoodConfig.SoftwareLimitSwitch.ReverseSoftLimitThreshold = config.hoodMinAngleDegrees / 360.0;
+        hoodConfig.SoftwareLimitSwitch.ReverseSoftLimitThreshold = config.hoodMinAngleRotations;
 
         hoodConfig.FutureProofConfigs = false;
 
         hoodMotor = new TalonFX(config.hoodCanId, new CANBus(config.canBusName));
         PhoenixUtil.tryUntilOk(5, () -> hoodMotor.getConfigurator().apply(hoodConfig, 0.25));
-        PhoenixUtil.tryUntilOk(5, () -> hoodMotor.setPosition(config.hoodStartingAngleDegrees / 360.0, 0.25));
+        PhoenixUtil.tryUntilOk(5, () -> hoodMotor.setPosition(config.hoodStartingAngleRotations, 0.25));
 
         // Turret motor configuration (positional control, mirrors hood, Motion Magic)
         turretConfig = new TalonFXConfiguration();
@@ -292,14 +292,14 @@ public class ShooterIOTalonFX implements ShooterIO {
     @Override
     public void setAngle(double angleRotations) {
         // Clamp angle within software limits
-        double minRot = config.hoodMinAngleDegrees / 360.0;
-        double maxRot = config.hoodMaxAngleDegrees / 360.0;
-        double clampedAngle = Math.max(minRot, Math.min(maxRot, angleRotations));
+        double clampedAngle = Math.max(config.hoodMinAngleRotations,
+            Math.min(config.hoodMaxAngleRotations, angleRotations));
         hoodMotor.setControl(hoodMotorRequest.withPosition(clampedAngle));
     }
 
     @Override
     public void setTurretAngle(double angleRotations) {
+        // Clamp angle within software limits
         double minRot = config.turretMinAngleDeg / 360.0;
         double maxRot = config.turretMaxAngleDeg / 360.0;
         double clampedAngle = Math.max(minRot, Math.min(maxRot, angleRotations));
@@ -362,45 +362,5 @@ public class ShooterIOTalonFX implements ShooterIO {
         flywheelConfig.Slot0.kA = config.kA();
 
         PhoenixUtil.tryUntilOk(5, () -> flywheelMotor.getConfigurator().apply(flywheelConfig, 0.25));
-    }
-
-    @Override
-    public void enableHoodEStop() {
-        hoodConfig.CurrentLimits.StatorCurrentLimit = 0;
-        PhoenixUtil.tryUntilOk(5, () -> hoodMotor.getConfigurator().apply(hoodConfig, 0.25));
-    }
-
-    @Override
-    public void disableHoodEStop() {
-        hoodConfig.CurrentLimits.StatorCurrentLimit = config.hoodStatorCurrentLimit;
-        PhoenixUtil.tryUntilOk(5, () -> hoodMotor.getConfigurator().apply(hoodConfig, 0.25));
-    }
-
-    @Override
-    public void enableTurretEStop() {
-        turretConfig.CurrentLimits.StatorCurrentLimit = 0;
-        PhoenixUtil.tryUntilOk(5, () -> turretMotor.getConfigurator().apply(turretConfig, 0.25));
-    }
-
-    @Override
-    public void disableTurretEStop() {
-        turretConfig.CurrentLimits.StatorCurrentLimit = config.turretStatorCurrentLimit;
-        PhoenixUtil.tryUntilOk(5, () -> turretMotor.getConfigurator().apply(turretConfig, 0.25));
-    }
-
-    @Override
-    public void enableFlywheelEStop() {
-        flywheelConfig.CurrentLimits.StatorCurrentLimit = 0;
-        flywheelFollowerConfig.CurrentLimits.StatorCurrentLimit = 0;
-        PhoenixUtil.tryUntilOk(5, () -> flywheelMotor.getConfigurator().apply(flywheelConfig, 0.25));
-        PhoenixUtil.tryUntilOk(5, () -> flywheelFollowerMotor.getConfigurator().apply(flywheelFollowerConfig, 0.25));
-    }
-
-    @Override
-    public void disableFlywheelEStop() {
-        flywheelConfig.CurrentLimits.StatorCurrentLimit = config.flywheelStatorCurrentLimit;
-        flywheelFollowerConfig.CurrentLimits.StatorCurrentLimit = config.flywheelStatorCurrentLimit;
-        PhoenixUtil.tryUntilOk(5, () -> flywheelMotor.getConfigurator().apply(flywheelConfig, 0.25));
-        PhoenixUtil.tryUntilOk(5, () -> flywheelFollowerMotor.getConfigurator().apply(flywheelFollowerConfig, 0.25));
     }
 }

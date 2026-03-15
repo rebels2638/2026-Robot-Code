@@ -18,6 +18,4 @@ public interface ClimberIO {
     public default void setPosition(double positionRotations) {}
     public default void setVoltage(double voltage) {}
     public default void configureControlLoop(MotorControlLoopConfig config) {}
-    public default void enableEStop() {}
-    public default void disableEStop() {}
 }

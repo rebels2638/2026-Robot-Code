@@ -20,7 +20,6 @@ public class Intake extends SubsystemBase {
     }
 
     public enum IntakeSetpoint {
-        DISABLED,
         STOWED,
         DEPLOYED,
         INTAKING,
@@ -64,8 +63,7 @@ public class Intake extends SubsystemBase {
                 config.pivotKD,
                 config.pivotKS,
                 config.pivotKV,
-                config.pivotKA,
-                config.pivotKG
+                config.pivotKA
             )
         );
     }
@@ -81,6 +79,7 @@ public class Intake extends SubsystemBase {
         if (pivotControlLoopConfigurator.hasChanged()) {
             intakeIO.configurePivotControlLoop(pivotControlLoopConfigurator.getConfig());
         }
+
     }
 
     private void setRollerVelocity(double velocityRotationsPerSec) {
@@ -97,10 +96,6 @@ public class Intake extends SubsystemBase {
 
     public void setSetpoint(IntakeSetpoint setpoint) {
         switch (setpoint) {
-            case DISABLED:
-                setPivotAngle(intakeInputs.pivotAngleRotations);
-                setRollerVelocity(0.0);
-                break;
             case STOWED:
                 setPivotAngle(config.pivotUpAngleRotations);
                 setRollerVelocity(0.0);
@@ -128,22 +123,6 @@ public class Intake extends SubsystemBase {
         return intakeInputs.pivotAngleRotations;
     }
 
-    public void enableRollerEStop() {
-        intakeIO.enableRollerEStop();
-    }
-
-    public void disableRollerEStop() {
-        intakeIO.disableRollerEStop();
-    }
-
-    public void enablePivotEStop() {
-        intakeIO.enablePivotEStop();
-    }
-
-    public void disablePivotEStop() {
-        intakeIO.disablePivotEStop();
-    }
-
     @AutoLogOutput(key = "Intake/isRollerAtSetpoint")
     public boolean isRollerAtSetpoint() {
         return Math.abs(intakeInputs.rollerVelocityRotationsPerSec - rollerSetpointRPS)
@@ -153,12 +132,6 @@ public class Intake extends SubsystemBase {
     @AutoLogOutput(key = "Intake/isPivotAtSetpoint")
     public boolean isPivotAtSetpoint() {
         return Math.abs(intakeInputs.pivotAngleRotations - pivotSetpointRotations)
-            < config.pivotAngleToleranceRotations;
-    }
-
-    @AutoLogOutput(key = "Intake/isStowed")
-    public boolean isStowed() {
-        return Math.abs(intakeInputs.pivotAngleRotations - config.pivotUpAngleRotations)
             < config.pivotAngleToleranceRotations;
     }
 }

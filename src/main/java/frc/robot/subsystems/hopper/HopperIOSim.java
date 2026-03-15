@@ -24,7 +24,6 @@ public class HopperIOSim implements HopperIO {
 
     private boolean isHopperClosedLoop = true;
     private double desiredHopperVelocityRotationsPerSec = 0;
-    private boolean isHopperEStopped = false;
 
     private double lastTimeInputs = Timer.getTimestamp();
 
@@ -38,13 +37,11 @@ public class HopperIOSim implements HopperIO {
         double dt = Timer.getTimestamp() - lastTimeInputs;
         lastTimeInputs = Timer.getTimestamp();
 
-        if (isHopperEStopped) {
-            hopperSim.setInputVoltage(0);
-        } else if (isHopperClosedLoop) {
+        if (isHopperClosedLoop) {
             hopperSim.setInputVoltage(
                 MathUtil.clamp(
                     hopperFeedforward.calculate(desiredHopperVelocityRotationsPerSec) +
-                    hopperFeedback.calculate(hopperSim.getAngularVelocityRadPerSec() / (2 * Math.PI)),
+                    hopperFeedback.calculate(hopperSim.getAngularVelocityRadPerSec()),
                     -12,
                     12
                 )
@@ -53,7 +50,7 @@ public class HopperIOSim implements HopperIO {
 
         hopperSim.update(dt);
 
-        inputs.velocityRotationsPerSec = hopperSim.getAngularVelocityRadPerSec() / (2 * Math.PI);
+        inputs.velocityRotationsPerSec = hopperSim.getAngularVelocityRadPerSec();
         inputs.appliedVolts = hopperSim.getInputVoltage();
         inputs.torqueCurrent = hopperSim.getCurrentDrawAmps();
         inputs.temperatureFahrenheit = 70.0;
@@ -61,11 +58,6 @@ public class HopperIOSim implements HopperIO {
 
     @Override
     public void setVelocity(double velocityRotationsPerSec) {
-        if (isHopperEStopped) {
-            hopperSim.setInputVoltage(0);
-            isHopperClosedLoop = false;
-            return;
-        }
         hopperFeedback.setSetpoint(velocityRotationsPerSec);
         desiredHopperVelocityRotationsPerSec = velocityRotationsPerSec;
         isHopperClosedLoop = true;
@@ -73,7 +65,7 @@ public class HopperIOSim implements HopperIO {
 
     @Override
     public void setVoltage(double voltage) {
-        hopperSim.setInputVoltage(isHopperEStopped ? 0 : voltage);
+        hopperSim.setInputVoltage(voltage);
         isHopperClosedLoop = false;
     }
 
@@ -86,17 +78,5 @@ public class HopperIOSim implements HopperIO {
         hopperFeedforward.setKs(config.kS());
         hopperFeedforward.setKv(config.kV());
         hopperFeedforward.setKa(config.kA());
-    }
-
-    @Override
-    public void enableEStop() {
-        isHopperEStopped = true;
-        hopperSim.setInputVoltage(0);
-        isHopperClosedLoop = false;
-    }
-
-    @Override
-    public void disableEStop() {
-        isHopperEStopped = false;
     }
 }

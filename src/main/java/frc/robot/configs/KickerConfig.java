@@ -19,7 +19,7 @@ public class KickerConfig {
 
     public double kickerMotorToOutputShaftRatio;
 
-    public double reverseVelocityRPS;
+    public double feedingVelocityRPS;
     public double kickingVelocityRPS;
 
     public double kickerVelocityToleranceRPS;

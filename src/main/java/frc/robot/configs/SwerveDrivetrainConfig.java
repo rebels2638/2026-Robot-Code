@@ -21,11 +21,9 @@ public class SwerveDrivetrainConfig {
 
     public double rotationCompensationCoefficient;
 
-    //TODO: these are usless constants remove translationControllerKP ...
     public double translationControllerKP;
     public double translationControllerKI;
     public double translationControllerKD;
-    // ^^
 
     public double translationToleranceMeters;
     public double translationVelocityToleranceMeters;
@@ -65,7 +63,6 @@ public class SwerveDrivetrainConfig {
     }
 
     public PIDController getTranslationController() {
-        //TODO: these are usless constants remove
         PIDController controller = new PIDController(translationControllerKP, translationControllerKI, translationControllerKD);
         controller.setTolerance(translationToleranceMeters, translationVelocityToleranceMeters);
         return controller;

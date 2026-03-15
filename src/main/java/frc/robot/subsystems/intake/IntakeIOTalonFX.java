@@ -10,11 +10,10 @@ import com.ctre.phoenix6.BaseStatusSignal;
 import com.ctre.phoenix6.CANBus;
 import com.ctre.phoenix6.StatusSignal;
 import com.ctre.phoenix6.configs.TalonFXConfiguration;
-import com.ctre.phoenix6.controls.MotionMagicVoltage;
+import com.ctre.phoenix6.controls.PositionVoltage;
 import com.ctre.phoenix6.controls.VelocityVoltage;
 import com.ctre.phoenix6.controls.VoltageOut;
 import com.ctre.phoenix6.hardware.TalonFX;
-import com.ctre.phoenix6.signals.GravityTypeValue;
 import com.ctre.phoenix6.signals.InvertedValue;
 import com.ctre.phoenix6.signals.NeutralModeValue;
 import com.ctre.phoenix6.signals.StaticFeedforwardSignValue;
@@ -45,7 +44,7 @@ public class IntakeIOTalonFX implements IntakeIO {
     private final StatusSignal<Temperature> pivotTemperature;
 
     private final VelocityVoltage rollerMotorRequest = new VelocityVoltage(0).withSlot(0);
-    private final MotionMagicVoltage pivotMotorRequest = new MotionMagicVoltage(0).withSlot(0);
+    private final PositionVoltage pivotMotorRequest = new PositionVoltage(0).withSlot(0);
 
     private final TalonFXConfiguration rollerConfig;
     private final TalonFXConfiguration pivotConfig;
@@ -90,13 +89,7 @@ public class IntakeIOTalonFX implements IntakeIO {
         pivotConfig.Slot0.kS = config.pivotKS;
         pivotConfig.Slot0.kV = config.pivotKV;
         pivotConfig.Slot0.kA = config.pivotKA;
-        pivotConfig.Slot0.kG = config.pivotKG;
-        // CTRE arm gravity compensation expects 0 rotations to be horizontal.
-        pivotConfig.Slot0.GravityType = GravityTypeValue.Arm_Cosine;
         pivotConfig.Slot0.StaticFeedforwardSign = StaticFeedforwardSignValue.UseVelocitySign;
-        pivotConfig.MotionMagic.MotionMagicCruiseVelocity = config.pivotMaxVelocityRotationsPerSec;
-        pivotConfig.MotionMagic.MotionMagicAcceleration = config.pivotMaxAccelerationRotationsPerSec2;
-        pivotConfig.MotionMagic.MotionMagicJerk = config.pivotMaxJerkRotationsPerSec3;
 
         pivotConfig.ClosedLoopGeneral.ContinuousWrap = false;
         pivotConfig.Feedback.SensorToMechanismRatio = config.pivotMotorToOutputShaftRatio;
@@ -202,32 +195,7 @@ public class IntakeIOTalonFX implements IntakeIO {
         pivotConfig.Slot0.kS = config.kS();
         pivotConfig.Slot0.kV = config.kV();
         pivotConfig.Slot0.kA = config.kA();
-        pivotConfig.Slot0.kG = config.kG();
 
-        PhoenixUtil.tryUntilOk(5, () -> pivotMotor.getConfigurator().apply(pivotConfig, 0.25));
-    }
-
-    @Override
-    public void enableRollerEStop() {
-        rollerConfig.CurrentLimits.StatorCurrentLimit = 0;
-        PhoenixUtil.tryUntilOk(5, () -> rollerMotor.getConfigurator().apply(rollerConfig, 0.25));
-    }
-
-    @Override
-    public void disableRollerEStop() {
-        rollerConfig.CurrentLimits.StatorCurrentLimit = config.rollerStatorCurrentLimit;
-        PhoenixUtil.tryUntilOk(5, () -> rollerMotor.getConfigurator().apply(rollerConfig, 0.25));
-    }
-
-    @Override
-    public void enablePivotEStop() {
-        pivotConfig.CurrentLimits.StatorCurrentLimit = 0;
-        PhoenixUtil.tryUntilOk(5, () -> pivotMotor.getConfigurator().apply(pivotConfig, 0.25));
-    }
-
-    @Override
-    public void disablePivotEStop() {
-        pivotConfig.CurrentLimits.StatorCurrentLimit = config.pivotStatorCurrentLimit;
         PhoenixUtil.tryUntilOk(5, () -> pivotMotor.getConfigurator().apply(pivotConfig, 0.25));
     }
 }

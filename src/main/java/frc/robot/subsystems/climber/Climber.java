@@ -94,14 +94,6 @@ public class Climber extends SubsystemBase {
         climberIO.setVoltage(0);
     }
 
-    public void enableEStop() {
-        climberIO.enableEStop();
-    }
-
-    public void disableEStop() {
-        climberIO.disableEStop();
-    }
-
     public double getClimberPositionRotations() {
         return climberInputs.positionRotations;
     }

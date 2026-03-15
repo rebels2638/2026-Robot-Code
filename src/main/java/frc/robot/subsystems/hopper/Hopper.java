@@ -75,7 +75,7 @@ public class Hopper extends SubsystemBase {
 
     }
 
-    public void setHopperVelocity(double velocityRotationsPerSec) {
+    private void setHopperVelocity(double velocityRotationsPerSec) {
         hopperSetpointRPS = velocityRotationsPerSec;
         Logger.recordOutput("Hopper/velocitySetpointRPS", velocityRotationsPerSec);
         hopperIO.setVelocity(velocityRotationsPerSec);
@@ -90,14 +90,6 @@ public class Hopper extends SubsystemBase {
 
     public double getHopperVelocityRotationsPerSec() {
         return hopperInputs.velocityRotationsPerSec;
-    }
-
-    public void enableEStop() {
-        hopperIO.enableEStop();
-    }
-
-    public void disableEStop() {
-        hopperIO.disableEStop();
     }
 
     @AutoLogOutput(key = "Hopper/isHopperAtSetpoint")

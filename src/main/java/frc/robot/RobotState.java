@@ -49,7 +49,8 @@ public class RobotState {
     ) {}
 
 
-    private final TimeInterpolatableBuffer<Pose2d> poseBuffer;
+    private static final double poseBufferSizeSeconds = 2.0;
+    private final TimeInterpolatableBuffer<Pose2d> poseBuffer = TimeInterpolatableBuffer.createBuffer(poseBufferSizeSeconds);
 
     private SwerveDrivePoseEstimator swerveDrivePoseEstimator;
 
@@ -58,6 +59,7 @@ public class RobotState {
     private int visionObservationsRejected = 0;
 
     private double lastGyroResetTime = Timer.getTimestamp();
+    private double gyroTimeoutSeconds = 1.0;
 
     private Rotation3d lastGyroAngle = new Rotation3d();
 
@@ -72,9 +74,6 @@ public class RobotState {
 
     private double lastYawVelocityRadPerSec = 0;
     private ChassisSpeeds lastRobotRelativeSpeeds = new ChassisSpeeds();
-    private double accumulatedYawRad = 0.0;
-    private double lastWrappedYawRad = 0.0;
-    private boolean hasYawSample = false;
 
     private final SwerveDrivetrainConfig drivetrainConfig;
     private final RobotStateConfig robotStateConfig;
@@ -83,7 +82,6 @@ public class RobotState {
         SwerveConfig swerveConfig = ConfigLoader.load("swerve", SwerveConfig.class);
         drivetrainConfig = swerveConfig.drivetrain;
         robotStateConfig = ConfigLoader.load("robotState", RobotStateConfig.class);
-        poseBuffer = TimeInterpolatableBuffer.createBuffer(robotStateConfig.poseBufferSizeSeconds);
 
         kinematics = new SwerveDriveKinematics(
             drivetrainConfig.getFrontLeftPositionMeters(),
@@ -176,13 +174,12 @@ public class RobotState {
         lastEstimatedPoseUpdateTime = observation.timestampsSeconds(); 
         // Add pose to buffer at timestamp
         poseBuffer.addSample(lastEstimatedPoseUpdateTime, swerveDrivePoseEstimator.getEstimatedPosition()); 
-        updateAccumulatedYawFromEstimatedPose();
     }
 
     public void addVisionObservation(VisionObservation observation) {
         // If measurement is old enough to be outside the pose buffer's timespan, skip.
         try {
-            if (poseBuffer.getInternalBuffer().lastKey() - robotStateConfig.poseBufferSizeSeconds > observation.timestampSeconds()) {
+            if (poseBuffer.getInternalBuffer().lastKey() - poseBufferSizeSeconds > observation.timestampSeconds()) {
                 visionObservationsRejected++;
                 Logger.recordOutput("RobotState/vision/visionObservationsRejected", visionObservationsRejected);
                 return;
@@ -205,9 +202,7 @@ public class RobotState {
         Logger.recordOutput("RobotState/vision/visionLatency", Timer.getFPGATimestamp() - observation.timestampSeconds());
 
 
-        if (DriverStation.isDisabled()
-            && Timer.getTimestamp() - lastGyroResetTime > robotStateConfig.gyroResetTimeoutSeconds
-            && observation.visionMeasurementStdDevs().get(2,0) < robotStateConfig.gyroResetMaxVisionRotationStdDev) {
+        if (DriverStation.isDisabled() && Timer.getTimestamp() - lastGyroResetTime > gyroTimeoutSeconds && observation.visionMeasurementStdDevs().get(2,0) < 300) {
                 resetPose(new Pose2d(getEstimatedPose().getTranslation(), observation.visionRobotPoseMeters().getRotation()));
                 lastGyroResetTime = Timer.getTimestamp();
                 
@@ -229,9 +224,6 @@ public class RobotState {
     public void resetPose(Pose2d initialPose) {
         SwerveDrive.getInstance().resetGyro(initialPose.getRotation());
         swerveDrivePoseEstimator.resetPosition(initialPose.getRotation(), lastWheelPositions, initialPose);
-        accumulatedYawRad = initialPose.getRotation().getRadians();
-        lastWrappedYawRad = initialPose.getRotation().getRadians();
-        hasYawSample = true;
 
         poseBuffer.clear();
     }
@@ -247,21 +239,6 @@ public class RobotState {
 
     public double getYawVelocityRadPerSec() {
         return lastYawVelocityRadPerSec;
-    }
-
-    @AutoLogOutput(key = "RobotState/accumulatedYaw")
-    public Rotation2d getAccumulatedYaw() {
-        return Rotation2d.fromRadians(accumulatedYawRad);
-    }
-
-    @AutoLogOutput(key = "RobotState/accumulatedYawRad")
-    public double getAccumulatedYawRadians() {
-        return accumulatedYawRad;
-    }
-
-    @AutoLogOutput(key = "RobotState/accumulatedYawDeg")
-    public double getAccumulatedYawDegrees() {
-        return Math.toDegrees(accumulatedYawRad);
     }
 
     public ChassisSpeeds getRobotRelativeSpeeds() {
@@ -302,19 +279,6 @@ public class RobotState {
 
     public Pose2d getPredictedPose(double timestamp) {
         return getPredictedPose(timestamp - lastEstimatedPoseUpdateTime, timestamp - lastEstimatedPoseUpdateTime);
-    }
-
-    private void updateAccumulatedYawFromEstimatedPose() {
-        double wrappedYawRad = getEstimatedPose().getRotation().getRadians();
-        if (!hasYawSample) {
-            accumulatedYawRad = wrappedYawRad;
-            lastWrappedYawRad = wrappedYawRad;
-            hasYawSample = true;
-            return;
-        }
-
-        accumulatedYawRad += MathUtil.angleModulus(wrappedYawRad - lastWrappedYawRad);
-        lastWrappedYawRad = wrappedYawRad;
     }
 
 }

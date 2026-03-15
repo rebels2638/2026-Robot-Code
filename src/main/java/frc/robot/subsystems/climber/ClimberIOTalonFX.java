@@ -130,16 +130,4 @@ public class ClimberIOTalonFX implements ClimberIO {
 
         PhoenixUtil.tryUntilOk(5, () -> climberMotor.getConfigurator().apply(climberConfig, 0.25));
     }
-
-    @Override
-    public void enableEStop() {
-        climberConfig.CurrentLimits.StatorCurrentLimit = 0;
-        PhoenixUtil.tryUntilOk(5, () -> climberMotor.getConfigurator().apply(climberConfig, 0.25));
-    }
-
-    @Override
-    public void disableEStop() {
-        climberConfig.CurrentLimits.StatorCurrentLimit = config.climberStatorCurrentLimit;
-        PhoenixUtil.tryUntilOk(5, () -> climberMotor.getConfigurator().apply(climberConfig, 0.25));
-    }
 }

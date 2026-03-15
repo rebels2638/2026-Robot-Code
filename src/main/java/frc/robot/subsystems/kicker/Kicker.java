@@ -21,7 +21,7 @@ public class Kicker extends SubsystemBase {
 
     public enum KickerSetpoint {
         OFF(0.0),
-        REVERSE(Double.NaN),
+        FEEDING(Double.NaN),
         KICKING(Double.NaN);
 
         private final double rps;
@@ -76,15 +76,15 @@ public class Kicker extends SubsystemBase {
 
     }
 
-    public void setKickerVelocity(double velocityRotationsPerSec) {
+    private void setKickerVelocity(double velocityRotationsPerSec) {
         kickerSetpointRPS = velocityRotationsPerSec;
         Logger.recordOutput("Kicker/velocitySetpointRPS", velocityRotationsPerSec);
         kickerIO.setVelocity(velocityRotationsPerSec);
     }
 
     public void setSetpoint(KickerSetpoint setpoint) {
-        double targetRps = setpoint == KickerSetpoint.REVERSE
-            ? config.reverseVelocityRPS
+        double targetRps = setpoint == KickerSetpoint.FEEDING
+            ? config.feedingVelocityRPS
             : setpoint == KickerSetpoint.KICKING ? config.kickingVelocityRPS : setpoint.getRps();
         setKickerVelocity(targetRps);
     }
@@ -92,14 +92,6 @@ public class Kicker extends SubsystemBase {
     // Mechanism getters
     public double getKickerVelocityRotationsPerSec() {
         return kickerInputs.velocityRotationsPerSec;
-    }
-
-    public void enableEStop() {
-        kickerIO.enableEStop();
-    }
-
-    public void disableEStop() {
-        kickerIO.disableEStop();
     }
 
     // Setpoint check methods
