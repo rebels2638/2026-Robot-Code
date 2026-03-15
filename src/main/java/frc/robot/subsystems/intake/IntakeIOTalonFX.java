@@ -6,6 +6,8 @@ import static edu.wpi.first.units.Units.Rotations;
 import static edu.wpi.first.units.Units.RotationsPerSecond;
 import static edu.wpi.first.units.Units.Volts;
 
+import org.littletonrobotics.junction.Logger;
+
 import com.ctre.phoenix6.BaseStatusSignal;
 import com.ctre.phoenix6.CANBus;
 import com.ctre.phoenix6.StatusSignal;
@@ -184,6 +186,8 @@ public class IntakeIOTalonFX implements IntakeIO {
         inputs.pivotAppliedVolts = pivotMotorVoltage.getValue().in(Volts);
         inputs.pivotTorqueCurrent = pivotTorqueCurrent.getValue().in(Amps);
         inputs.pivotTemperatureFahrenheit = pivotTemperature.getValue().in(Fahrenheit);
+
+        Logger.recordOutput("Intake/pivotTalonSetpoint", pivotMotor.getClosedLoopReference().getValueAsDouble());
     }
 
     @Override
