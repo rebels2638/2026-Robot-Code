@@ -41,7 +41,6 @@ public class ModuleIOSim implements ModuleIO {
     private double lastTimeInputs = Timer.getTimestamp();
     
     private final int moduleID;
-    
     public ModuleIOSim(SwerveModuleGeneralConfig config, int moduleID) {
         this.moduleID = moduleID;
         steerFeedback.enableContinuousInput(-Math.PI, Math.PI);
