@@ -145,7 +145,7 @@ public class ModuleIOTalonFX implements ModuleIO {
         steerConfig.Slot0.kS = generalConfig.steerKS;
         steerConfig.Slot0.kV = generalConfig.steerKV;
         steerConfig.Slot0.kA = generalConfig.steerKA;
-        steerConfig.Slot0.StaticFeedforwardSign = StaticFeedforwardSignValue.UseVelocitySign;
+        steerConfig.Slot0.StaticFeedforwardSign = StaticFeedforwardSignValue.UseClosedLoopSign;
 
         steerConfig.MotorOutput.NeutralMode = 
             generalConfig.isSteerNeutralModeBrake ? 
