@@ -112,7 +112,7 @@ public class RobotContainer {
 
         // superstructure.setDesiredTargetState(Superstructure.TargetState.PASS_ALLIANCE_TOP);
 
-        
+        this.xboxDriver.getXButton().onTrue(new InstantCommand( ()->robotState.resetPose(new Pose2d())));
 
         configureBindings();
     }
@@ -229,6 +229,12 @@ public class RobotContainer {
             new InstantCommand(() -> superstructure.setDesiredIntakeState(Superstructure.DesiredIntakeState.DEPLOYED))
         );
 
+        xboxDriver.getRightTriggerButton(DRIVE_HELPER_TRIGGER_THRESHOLD).onTrue(
+            new InstantCommand(this::runHubShootingHelper)
+        ).onFalse(
+            new InstantCommand(this::runHubTrackingHelper)
+        );
+
         autoClimbTrigger.whileTrue(new AutoClimbCommand(ClimbingConstants.TOWER));
 
         xboxDriver.getXButton().onTrue(
@@ -259,6 +265,11 @@ public class RobotContainer {
     private void runHubShootingHelper() {
         superstructure.setDesiredTargetState(TargetState.HUB);
         superstructure.setDesiredSystemState(Superstructure.DesiredSystemState.SHOOTING);
+    }
+
+    private void runHubTrackingHelper() {
+        superstructure.setDesiredTargetState(TargetState.HUB);
+        superstructure.setDesiredSystemState(Superstructure.DesiredSystemState.TRACKING);
     }
 
     private void runAlliancePassHelper() {
