@@ -94,7 +94,7 @@ public class GyroIOPigeon2 implements GyroIO {
         inputs.odometryTimestampsSeconds = copyDoubleQueue(odometryTimestampQueue);
         inputs.odometryRollPositions = copyAngleQueue(rollPositionQueue);
         inputs.odometryPitchPositions = copyAngleQueue(pitchPositionQueue);
-        inputs.odometryYawPositions = copyYawQueue(yawPositionQueue);
+        inputs.odometryYawPositions = copyAngleQueue(yawPositionQueue);
 
         odometryTimestampQueue.clear();
         rollPositionQueue.clear();
@@ -118,10 +118,6 @@ public class GyroIOPigeon2 implements GyroIO {
             values[index++] = Rotation2d.fromDegrees(value);
         }
         return values;
-    }
-
-    private static Rotation2d[] copyYawQueue(Queue<Double> queue) {
-        return copyAngleQueue(queue);
     }
 
     @Override
