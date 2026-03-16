@@ -3,6 +3,7 @@ package frc.robot;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 
+import frc.robot.constants.Constants;
 import frc.robot.lib.util.ballistics.ProjectileVisualizer;
 import java.lang.reflect.Field;
 import java.util.List;
@@ -16,25 +17,29 @@ class VisualizeShotTest {
     }
 
     @Test
-    // Explicit launch velocity constructor should still push one projectile into the visualizer.
-    void explicitVelocityConstructor_addsProjectile() {
+    // VisualizeShot only enqueues projectiles in SIM mode.
+    void explicitVelocityConstructor_respectsSimulationGate() {
         int before = getActiveProjectileCountReflective();
 
         assertDoesNotThrow(() -> new VisualizeShot(9.0));
 
         int after = getActiveProjectileCountReflective();
-        assertEquals(before + 1, after);
+        assertEquals(before + getExpectedProjectileDelta(), after);
     }
 
     @Test
-    // Default constructor should also register one projectile.
-    void defaultConstructor_addsProjectile() {
+    // Default constructor should follow the same SIM-only contract.
+    void defaultConstructor_respectsSimulationGate() {
         int before = getActiveProjectileCountReflective();
 
         assertDoesNotThrow(() -> new VisualizeShot());
 
         int after = getActiveProjectileCountReflective();
-        assertEquals(before + 1, after);
+        assertEquals(before + getExpectedProjectileDelta(), after);
+    }
+
+    private int getExpectedProjectileDelta() {
+        return Constants.currentMode == Constants.Mode.SIM ? 1 : 0;
     }
 
     @SuppressWarnings("unchecked")
