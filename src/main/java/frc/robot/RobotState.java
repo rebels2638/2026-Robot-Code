@@ -149,37 +149,17 @@ public class RobotState {
             );
         lastGyroAngle = gyroOrientation;
 
-        // Reject odometry if robot is tilted too much
-        boolean isTilted = getAngleToFloor().getDegrees() > robotStateConfig.maxTiltAngleDegrees;
-        if (shouldLogObservation) {
-            Logger.recordOutput("RobotState/odometry/isTilted", isTilted);
-        }
-        if (isTilted) {
-            // use old wheel positions
-            swerveDrivePoseEstimator.updateWithTime(
-                observation.timestampsSeconds(), 
-                observation.isGyroConnected() ? 
-                    gyroOrientation.toRotation2d() : 
-                    new Rotation2d(
-                        swerveDrivePoseEstimator.getEstimatedPosition().getRotation().getRadians() + 
-                        kinematics.toTwist2d(lastWheelPositions, observation.modulePositions()).dtheta
-                    ),
-                lastWheelPositions
-            );  
-        } else {
-            swerveDrivePoseEstimator.updateWithTime(
-                observation.timestampsSeconds(), 
-                observation.isGyroConnected() ? 
-                    gyroOrientation.toRotation2d() : 
-                    new Rotation2d(
-                        swerveDrivePoseEstimator.getEstimatedPosition().getRotation().getRadians() + 
-                        kinematics.toTwist2d(lastWheelPositions, observation.modulePositions()).dtheta
-                    ),
-                observation.modulePositions()
-            );    
-
-            lastWheelPositions = observation.modulePositions();
-        }
+        swerveDrivePoseEstimator.updateWithTime(
+            observation.timestampsSeconds(), 
+            observation.isGyroConnected() ? 
+                gyroOrientation.toRotation2d() : 
+                new Rotation2d(
+                    swerveDrivePoseEstimator.getEstimatedPosition().getRotation().getRadians() + 
+                    kinematics.toTwist2d(lastWheelPositions, observation.modulePositions()).dtheta
+                ),
+            observation.modulePositions()
+        );
+        lastWheelPositions = observation.modulePositions();
         
         lastEstimatedPoseUpdateTime = observation.timestampsSeconds(); 
         // Add pose to buffer at timestamp

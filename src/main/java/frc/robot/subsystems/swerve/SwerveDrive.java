@@ -223,13 +223,29 @@ public class SwerveDrive extends SubsystemBase {
         new SwerveModulePosition(),
         new SwerveModulePosition(),
         new SwerveModulePosition()
-    };  
+    };
+    private SwerveModulePosition[] filteredOdometryModulePositions = new SwerveModulePosition[] {
+        new SwerveModulePosition(),
+        new SwerveModulePosition(),
+        new SwerveModulePosition(),
+        new SwerveModulePosition()
+    };
     private SwerveModuleState[] moduleStates = new SwerveModuleState[] {
         new SwerveModuleState(),
         new SwerveModuleState(),
         new SwerveModuleState(),
         new SwerveModuleState()
     };
+    private SwerveModuleState[] filteredOdometryModuleStates = new SwerveModuleState[] {
+        new SwerveModuleState(),
+        new SwerveModuleState(),
+        new SwerveModuleState(),
+        new SwerveModuleState()
+    };
+    private final double[] lastRawOdometryDrivePositionsMeters = new double[4];
+    private final double[] rejectedOdometryDriveDistanceMeters = new double[4];
+    private boolean hasInitializedFilteredOdometry = false;
+    private boolean isRejectingTiltedOdometry = false;
     private Pose2d currentPose = new Pose2d();
 
     private ChassisSpeeds desiredRobotRelativeSpeeds = new ChassisSpeeds();
@@ -463,27 +479,28 @@ public class SwerveDrive extends SubsystemBase {
 
         ArrayList<Pose2d> updatedPoses = Constants.VERBOSE_LOGGING_ENABLED ? new ArrayList<Pose2d>() : null;
 
+        double angleToFloorDegrees = getAngleToFloorDegrees(gyroInputs.gyroOrientation);
+        boolean shouldRejectTiltedOdometry = gyroInputs.isConnected
+            && angleToFloorDegrees > drivetrainConfig.maxOdometryTiltAngleDegrees;
+        isRejectingTiltedOdometry = shouldRejectTiltedOdometry;
+        Logger.recordOutput("SwerveDrive/odometry/angleToFloorDegrees", angleToFloorDegrees);
+        Logger.recordOutput("SwerveDrive/odometry/isRejectingTiltedOdometry", isRejectingTiltedOdometry);
+
         double[] odometryTimestampsSeconds = moduleInputs[0].odometryTimestampsSeconds;
         for (int i = 0; i < odometryTimestampsSeconds.length; i++) {
-            for (int j = 0; j < 4; j++) {
-                modulePositions[j] = new SwerveModulePosition(
-                    moduleInputs[j].odometryDrivePositionsMeters[i],
-                    moduleInputs[j].odometrySteerPositions[i]
-                );
-            }
+            Rotation3d odometryGyroOrientation = getOdometryGyroOrientation(i);
+            boolean shouldRejectOdometrySample = gyroInputs.isConnected
+                && getAngleToFloorDegrees(odometryGyroOrientation) > drivetrainConfig.maxOdometryTiltAngleDegrees;
+            updateOdometryObservation(i, shouldRejectOdometrySample);
             
             RobotState.getInstance().addOdometryObservation(
                 new OdometryObservation(
                     odometryTimestampsSeconds[i],
                     gyroInputs.isConnected,
-                    modulePositions,
-                    moduleStates,
+                    filteredOdometryModulePositions,
+                    filteredOdometryModuleStates,
                     gyroInputs.isConnected ?
-                        new Rotation3d(
-                            gyroInputs.gyroOrientation.getX(),
-                            gyroInputs.gyroOrientation.getY(),
-                            gyroInputs.odometryYawPositions[i].getRadians()
-                        ) :
+                        odometryGyroOrientation :
                         new Rotation3d(),
                     gyroInputs.isConnected ? gyroInputs.yawVelocityRadPerSec : 0
                 )
@@ -499,6 +516,9 @@ public class SwerveDrive extends SubsystemBase {
         }
         Logger.recordOutput("SwerveDrive/measuredModuleStates", moduleStates);
         Logger.recordOutput("SwerveDrive/measuredModulePositions", modulePositions);
+        Logger.recordOutput("SwerveDrive/filteredOdometryModuleStates", filteredOdometryModuleStates);
+        Logger.recordOutput("SwerveDrive/filteredOdometryModulePositions", filteredOdometryModulePositions);
+        Logger.recordOutput("SwerveDrive/rejectedOdometryDriveDistanceMeters", rejectedOdometryDriveDistanceMeters);
 
         currentPose = RobotState.getInstance().getEstimatedPose();
 
@@ -508,6 +528,65 @@ public class SwerveDrive extends SubsystemBase {
         handleCurrentState();
 
         Logger.recordOutput("SwerveDrive/CurrentCommand", this.getCurrentCommand() == null ? "" : this.getCurrentCommand().toString());
+    }
+
+    private void updateOdometryObservation(int odometrySampleIndex, boolean shouldRejectTiltedOdometry) {
+        for (int moduleIndex = 0; moduleIndex < moduleInputs.length; moduleIndex++) {
+            double rawDrivePositionMeters = moduleInputs[moduleIndex].odometryDrivePositionsMeters[odometrySampleIndex];
+            Rotation2d steerPosition = moduleInputs[moduleIndex].odometrySteerPositions[odometrySampleIndex];
+
+            modulePositions[moduleIndex] = new SwerveModulePosition(rawDrivePositionMeters, steerPosition);
+
+            if (!hasInitializedFilteredOdometry) {
+                lastRawOdometryDrivePositionsMeters[moduleIndex] = rawDrivePositionMeters;
+            } else if (shouldRejectTiltedOdometry) {
+                // Absorb unloaded-wheel travel into the offset so filtered distance stays continuous.
+                rejectedOdometryDriveDistanceMeters[moduleIndex] +=
+                    rawDrivePositionMeters - lastRawOdometryDrivePositionsMeters[moduleIndex];
+            }
+
+            filteredOdometryModulePositions[moduleIndex] = new SwerveModulePosition(
+                rawDrivePositionMeters - rejectedOdometryDriveDistanceMeters[moduleIndex],
+                steerPosition
+            );
+            filteredOdometryModuleStates[moduleIndex] = new SwerveModuleState(
+                shouldRejectTiltedOdometry ? 0.0 : moduleInputs[moduleIndex].driveVelocityMetersPerSec,
+                steerPosition
+            );
+            lastRawOdometryDrivePositionsMeters[moduleIndex] = rawDrivePositionMeters;
+        }
+
+        hasInitializedFilteredOdometry = true;
+    }
+
+    private Rotation3d getOdometryGyroOrientation(int odometrySampleIndex) {
+        if (!gyroInputs.isConnected) {
+            return new Rotation3d();
+        }
+
+        double rollRadians = gyroInputs.gyroOrientation.getX();
+        double pitchRadians = gyroInputs.gyroOrientation.getY();
+        double yawRadians = gyroInputs.gyroOrientation.getZ();
+        if (gyroInputs.odometryRollPositions.length > odometrySampleIndex) {
+            rollRadians = gyroInputs.odometryRollPositions[odometrySampleIndex].getRadians();
+        }
+        if (gyroInputs.odometryPitchPositions.length > odometrySampleIndex) {
+            pitchRadians = gyroInputs.odometryPitchPositions[odometrySampleIndex].getRadians();
+        }
+        if (gyroInputs.odometryYawPositions.length > odometrySampleIndex) {
+            yawRadians = gyroInputs.odometryYawPositions[odometrySampleIndex].getRadians();
+        }
+
+        return new Rotation3d(
+            rollRadians,
+            pitchRadians,
+            yawRadians
+        );
+    }
+
+    private double getAngleToFloorDegrees(Rotation3d orientation) {
+        double cosine = Math.cos(orientation.getX()) * Math.cos(orientation.getY());
+        return Math.toDegrees(Math.acos(MathUtil.clamp(cosine, -1.0, 1.0)));
     }
 
     /**

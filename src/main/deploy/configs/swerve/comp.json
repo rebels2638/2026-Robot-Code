@@ -5,6 +5,7 @@
     "maxAngularVelocityRadiansPerSec": 8,
     "maxAngularAccelerationRadiansPerSecSec": 18,
     "maxModuleVelocity": 4.5,
+    "maxOdometryTiltAngleDegrees": 5.0,
     "frontLeftX": 0.244475,
     "frontLeftY": 0.314325,
     "frontRightX": 0.244475,

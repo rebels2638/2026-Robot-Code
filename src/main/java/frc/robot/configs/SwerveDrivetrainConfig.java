@@ -9,6 +9,7 @@ public class SwerveDrivetrainConfig {
     public double maxAngularVelocityRadiansPerSec;
     public double maxAngularAccelerationRadiansPerSecSec;
     public double maxModuleVelocity;
+    public double maxOdometryTiltAngleDegrees;
 
     public double frontLeftX;
     public double frontLeftY;
