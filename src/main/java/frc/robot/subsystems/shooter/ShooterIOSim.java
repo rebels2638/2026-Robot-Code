@@ -162,6 +162,7 @@ public class ShooterIOSim implements ShooterIO {
         inputs.flywheelTorqueCurrent = flywheelSim.getCurrentDrawAmps();
 
         // Follower simulated as identical to leader
+        inputs.flywheelFollowerVelocityRotationsPerSec = inputs.flywheelVelocityRotationsPerSec;
         inputs.flywheelFollowerAppliedVolts = flywheelSim.getInputVoltage();
         inputs.flywheelFollowerTorqueCurrent = flywheelSim.getCurrentDrawAmps();
 

@@ -17,7 +17,6 @@ import com.ctre.phoenix6.signals.MotorAlignmentValue;
 import com.ctre.phoenix6.controls.PositionVoltage;
 import com.ctre.phoenix6.controls.TorqueCurrentFOC;
 import com.ctre.phoenix6.controls.VelocityTorqueCurrentFOC;
-import com.ctre.phoenix6.controls.VelocityVoltage;
 import com.ctre.phoenix6.controls.VoltageOut;
 import com.ctre.phoenix6.hardware.TalonFX;
 import com.ctre.phoenix6.signals.InvertedValue;
@@ -40,6 +39,12 @@ public class ShooterIOTalonFX implements ShooterIO {
         double velocityRotPerSec
     ) {}
 
+    enum FlywheelControlTarget {
+        LEADER,
+        FOLLOWER,
+        NONE
+    }
+
     private final TalonFX hoodMotor;
     private final TalonFX turretMotor;
     private final TalonFX flywheelMotor;
@@ -55,6 +60,7 @@ public class ShooterIOTalonFX implements ShooterIO {
 
     private final StatusSignal<AngularVelocity> flywheelVelocityStatusSignal;
     private final StatusSignal<Voltage> flywheelMotorVoltage;
+    private final StatusSignal<AngularVelocity> flywheelFollowerVelocityStatusSignal;
 
     private final StatusSignal<Current> hoodTorqueCurrent;
     private final StatusSignal<Temperature> hoodTemperature;
@@ -75,12 +81,15 @@ public class ShooterIOTalonFX implements ShooterIO {
     private final PositionVoltage turretMotorRequest = new PositionVoltage(0).withSlot(0).withEnableFOC(true);
 
     private final VelocityTorqueCurrentFOC flywheelMotorRequest = new VelocityTorqueCurrentFOC(0).withSlot(0);
+    private final VelocityTorqueCurrentFOC flywheelFollowerMotorRequest = new VelocityTorqueCurrentFOC(0).withSlot(0);
 
     private final ShooterConfig config;
     private final TalonFXConfiguration hoodConfig;
     private final TalonFXConfiguration turretConfig;
     private final TalonFXConfiguration flywheelConfig;
     private final TalonFXConfiguration flywheelFollowerConfig;
+    private boolean flywheelMotorConnected = false;
+    private boolean flywheelFollowerMotorConnected = false;
 
     public ShooterIOTalonFX(ShooterConfig config) {
         this.config = config;
@@ -202,16 +211,29 @@ public class ShooterIOTalonFX implements ShooterIO {
         flywheelMotor = new TalonFX(config.flywheelCanId, new CANBus(config.canBusName));
         PhoenixUtil.tryUntilOk(5, () -> flywheelMotor.getConfigurator().apply(flywheelConfig, 0.25));
 
-        // Flywheel follower motor configuration - uses same config as leader but set as follower
+        // Flywheel follower motor configuration mirrors the leader so it can take over closed-loop control.
         flywheelFollowerConfig = new TalonFXConfiguration();
 
+        flywheelFollowerConfig.Slot0.kP = config.flywheelKP;
+        flywheelFollowerConfig.Slot0.kI = config.flywheelKI;
+        flywheelFollowerConfig.Slot0.kD = config.flywheelKD;
+        flywheelFollowerConfig.Slot0.kS = config.flywheelKS;
+        flywheelFollowerConfig.Slot0.kV = config.flywheelKV;
+        flywheelFollowerConfig.Slot0.kA = config.flywheelKA;
+        flywheelFollowerConfig.Slot0.StaticFeedforwardSign = StaticFeedforwardSignValue.UseVelocitySign;
+
+        flywheelFollowerConfig.ClosedLoopGeneral.ContinuousWrap = false;
+        flywheelFollowerConfig.Feedback.SensorToMechanismRatio = config.flywheelMotorToOutputShaftRatio;
+
         flywheelFollowerConfig.MotorOutput.NeutralMode = NeutralModeValue.Coast;
+        flywheelFollowerConfig.MotorOutput.Inverted = getFlywheelFollowerInvertedValue(
+            config.isFlywheelInverted,
+            config.isFlywheelFollowerOppositeDirection
+        );
         flywheelFollowerConfig.Voltage.PeakReverseVoltage =
             Math.min(config.flywheelMinOutputVoltage, config.flywheelMaxOutputVoltage);
         flywheelFollowerConfig.Voltage.PeakForwardVoltage =
             Math.max(config.flywheelMinOutputVoltage, config.flywheelMaxOutputVoltage);
-        // Follower inverted state will be handled by the Follower control request
-
         // Current and torque limiting (same as leader)
         flywheelFollowerConfig.CurrentLimits.SupplyCurrentLimitEnable = false;
         flywheelFollowerConfig.CurrentLimits.StatorCurrentLimitEnable = true;
@@ -226,8 +248,7 @@ public class ShooterIOTalonFX implements ShooterIO {
         PhoenixUtil.tryUntilOk(5, () -> flywheelFollowerMotor.getConfigurator().apply(flywheelFollowerConfig, 0.25));
 
         // Set follower to follow the leader motor
-        flywheelFollowerMotor.setControl(new Follower(config.flywheelCanId, 
-            config.isFlywheelFollowerOppositeDirection ? MotorAlignmentValue.Opposed : MotorAlignmentValue.Aligned));
+        setFlywheelFollowerToFollowLeader();
 
         // Status signals
         hoodTorqueCurrent = hoodMotor.getTorqueCurrent().clone();
@@ -242,6 +263,7 @@ public class ShooterIOTalonFX implements ShooterIO {
         flywheelTemperature = flywheelMotor.getDeviceTemp().clone();
         flywheelMotorVoltage = flywheelMotor.getMotorVoltage().clone();
 
+        flywheelFollowerVelocityStatusSignal = flywheelFollowerMotor.getVelocity().clone();
         flywheelFollowerTorqueCurrent = flywheelFollowerMotor.getTorqueCurrent().clone();
         flywheelFollowerTemperature = flywheelFollowerMotor.getDeviceTemp().clone();
         flywheelFollowerMotorVoltage = flywheelFollowerMotor.getMotorVoltage().clone();
@@ -258,6 +280,7 @@ public class ShooterIOTalonFX implements ShooterIO {
             hoodTorqueCurrent, hoodTemperature, hoodMotorVoltage,
             turretTorqueCurrent, turretTemperature, turretMotorVoltage,
             flywheelTorqueCurrent, flywheelTemperature, flywheelMotorVoltage,
+            flywheelFollowerVelocityStatusSignal,
             flywheelFollowerTorqueCurrent, flywheelFollowerTemperature, flywheelFollowerMotorVoltage,
             hoodPositionStatusSignal, hoodVelocityStatusSignal,
             turretPositionStatusSignal, turretVelocityStatusSignal,
@@ -274,6 +297,7 @@ public class ShooterIOTalonFX implements ShooterIO {
             flywheelTorqueCurrent,
             flywheelTemperature,
             flywheelMotorVoltage,
+            flywheelFollowerVelocityStatusSignal,
             flywheelFollowerTorqueCurrent,
             flywheelFollowerTemperature,
             flywheelFollowerMotorVoltage,
@@ -313,10 +337,13 @@ public class ShooterIOTalonFX implements ShooterIO {
             flywheelVelocityStatusSignal
         );
         inputs.flywheelFollowerMotorConnected = BaseStatusSignal.isAllGood(
+            flywheelFollowerVelocityStatusSignal,
             flywheelFollowerTorqueCurrent,
             flywheelFollowerTemperature,
             flywheelFollowerMotorVoltage
         );
+        flywheelMotorConnected = inputs.flywheelMotorConnected;
+        flywheelFollowerMotorConnected = inputs.flywheelFollowerMotorConnected;
 
         inputs.hoodAngleRotations = hoodPositionStatusSignal.getValue().in(Rotations);
         inputs.hoodVelocityRotationsPerSec = hoodVelocityStatusSignal.getValue().in(RotationsPerSecond);
@@ -330,6 +357,8 @@ public class ShooterIOTalonFX implements ShooterIO {
         inputs.flywheelAppliedVolts = flywheelMotorVoltage.getValue().in(Volts);
         inputs.flywheelTorqueCurrent = flywheelTorqueCurrent.getValue().in(Amps);
 
+        inputs.flywheelFollowerVelocityRotationsPerSec =
+            flywheelFollowerVelocityStatusSignal.getValue().in(RotationsPerSecond);
         inputs.flywheelFollowerAppliedVolts = flywheelFollowerMotorVoltage.getValue().in(Volts);
         inputs.flywheelFollowerTorqueCurrent = flywheelFollowerTorqueCurrent.getValue().in(Amps);
 
@@ -405,8 +434,22 @@ public class ShooterIOTalonFX implements ShooterIO {
 
     @Override
     public void setShotVelocity(double velocityRotationsPerSec) {
-        flywheelMotor.setControl(flywheelMotorRequest.withVelocity(velocityRotationsPerSec));
-        // Follower automatically follows the leader
+        FlywheelControlTarget controlTarget =
+            calculateFlywheelControlTarget(flywheelMotorConnected, flywheelFollowerMotorConnected);
+        switch (controlTarget) {
+            case LEADER -> {
+                if (flywheelFollowerMotorConnected) {
+                    setFlywheelFollowerToFollowLeader();
+                }
+                flywheelMotor.setControl(flywheelMotorRequest.withVelocity(velocityRotationsPerSec));
+            }
+            case FOLLOWER -> {
+                flywheelFollowerMotor.setControl(flywheelFollowerMotorRequest.withVelocity(velocityRotationsPerSec));
+            }
+            case NONE -> {
+            }
+        }
+        Logger.recordOutput("Shooter/flywheelControlTarget", controlTarget.name());
     }
 
     @Override
@@ -421,8 +464,22 @@ public class ShooterIOTalonFX implements ShooterIO {
 
     @Override
     public void setFlywheelVoltage(double voltage) {
-        flywheelMotor.setControl(new VoltageOut(voltage));
-        // Follower automatically follows the leader
+        FlywheelControlTarget controlTarget =
+            calculateFlywheelControlTarget(flywheelMotorConnected, flywheelFollowerMotorConnected);
+        switch (controlTarget) {
+            case LEADER -> {
+                if (flywheelFollowerMotorConnected) {
+                    setFlywheelFollowerToFollowLeader();
+                }
+                flywheelMotor.setControl(new VoltageOut(voltage));
+            }
+            case FOLLOWER -> {
+                flywheelFollowerMotor.setControl(new VoltageOut(voltage));
+            }
+            case NONE -> {
+            }
+        }
+        Logger.recordOutput("Shooter/flywheelControlTarget", controlTarget.name());
     }
 
     @Override
@@ -459,6 +516,15 @@ public class ShooterIOTalonFX implements ShooterIO {
         flywheelConfig.Slot0.kA = config.kA();
 
         PhoenixUtil.tryUntilOk(5, () -> flywheelMotor.getConfigurator().apply(flywheelConfig, 0.25));
+
+        flywheelFollowerConfig.Slot0.kP = config.kP();
+        flywheelFollowerConfig.Slot0.kI = config.kI();
+        flywheelFollowerConfig.Slot0.kD = config.kD();
+        flywheelFollowerConfig.Slot0.kS = config.kS();
+        flywheelFollowerConfig.Slot0.kV = config.kV();
+        flywheelFollowerConfig.Slot0.kA = config.kA();
+
+        PhoenixUtil.tryUntilOk(5, () -> flywheelFollowerMotor.getConfigurator().apply(flywheelFollowerConfig, 0.25));
     }
 
     @Override
@@ -499,5 +565,30 @@ public class ShooterIOTalonFX implements ShooterIO {
         flywheelFollowerConfig.CurrentLimits.StatorCurrentLimit = config.flywheelStatorCurrentLimit;
         PhoenixUtil.tryUntilOk(5, () -> flywheelMotor.getConfigurator().apply(flywheelConfig, 0.25));
         PhoenixUtil.tryUntilOk(5, () -> flywheelFollowerMotor.getConfigurator().apply(flywheelFollowerConfig, 0.25));
+    }
+
+    private void setFlywheelFollowerToFollowLeader() {
+        flywheelFollowerMotor.setControl(new Follower(
+            config.flywheelCanId,
+            config.isFlywheelFollowerOppositeDirection ? MotorAlignmentValue.Opposed : MotorAlignmentValue.Aligned
+        ));
+    }
+
+    static FlywheelControlTarget calculateFlywheelControlTarget(boolean leaderConnected, boolean followerConnected) {
+        if (leaderConnected) {
+            return FlywheelControlTarget.LEADER;
+        }
+        if (followerConnected) {
+            return FlywheelControlTarget.FOLLOWER;
+        }
+        return FlywheelControlTarget.NONE;
+    }
+
+    static InvertedValue getFlywheelFollowerInvertedValue(
+        boolean leaderInverted,
+        boolean followerOpposesLeader
+    ) {
+        boolean followerInverted = followerOpposesLeader ? !leaderInverted : leaderInverted;
+        return followerInverted ? InvertedValue.Clockwise_Positive : InvertedValue.CounterClockwise_Positive;
     }
 }

@@ -597,7 +597,7 @@ public class Superstructure extends SubsystemBase {
     private ShotReadinessData calculateShotReadinessData(ShotComputationContext context) {
         double actualHood = shooter.getHoodAngleRotations();
         double actualTurret = shooter.getTurretAngleRotations();
-        double actualFlywheel = shooter.getFlywheelVelocityRotationsPerSec();
+        double actualFlywheel = shooter.getFlywheelVelocityForSetpointCheck();
 
         // Use the commanded (clamped/resolved) shooter setpoints so impact math matches what hardware is tracking.
         double setpointHood = shooter.getHoodSetpointRotations();

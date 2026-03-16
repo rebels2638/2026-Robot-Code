@@ -29,6 +29,7 @@ public interface ShooterIO {
 
         // Flywheel (follower)
         public boolean flywheelFollowerMotorConnected = false;
+        public double flywheelFollowerVelocityRotationsPerSec = 0;
         public double flywheelFollowerAppliedVolts = 0;
         public double flywheelFollowerTorqueCurrent = 0;
 
