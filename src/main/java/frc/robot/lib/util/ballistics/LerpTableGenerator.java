@@ -11,6 +11,8 @@ import java.util.List;
 
 public final class LerpTableGenerator {
     private static final double SIMULATION_DT = 0.002;
+    private static final double MIN_SEARCH_RPS = 5.0;
+    private static final double MAX_SEARCH_RPS = 80.0;
 
     private static final double HUB_HEIGHT_METERS = 1.8034; // 71 inches
     private static final double WAYPOINT_HEIGHT_METERS = 2.1844; // 86 inches
@@ -43,10 +45,10 @@ public final class LerpTableGenerator {
         double shooterHeight = config.shooterPoseZ;
         double minAngle = Math.toRadians(Math.min(config.hoodMinAngleDegrees, config.hoodMaxAngleDegrees));
         double maxAngle = Math.toRadians(Math.max(config.hoodMinAngleDegrees, config.hoodMaxAngleDegrees));
+        List<Double> distancesMeters = getTargetDistancesMeters(config);
 
         List<ShooterConfig.LerpEntry> results = new ArrayList<>();
-        for (double inches : DEFAULT_DISTANCES_INCHES) {
-            double distanceMeters = inches * 0.0254;
+        for (double distanceMeters : distancesMeters) {
             double waypointDistance = Math.max(0.0, distanceMeters - WAYPOINT_OFFSET_METERS);
 
             Solution solution = solve(distanceMeters, waypointDistance, shooterHeight, minAngle, maxAngle, config);
@@ -61,6 +63,23 @@ public final class LerpTableGenerator {
         return results;
     }
 
+    private static List<Double> getTargetDistancesMeters(ShooterConfig config) {
+        List<ShooterConfig.LerpEntry> configuredEntries = config.getShootingLerpEntries();
+        if (configuredEntries != null && !configuredEntries.isEmpty()) {
+            List<Double> configuredDistances = new ArrayList<>();
+            for (ShooterConfig.LerpEntry entry : configuredEntries) {
+                configuredDistances.add(entry.distanceMeters);
+            }
+            return configuredDistances;
+        }
+
+        List<Double> defaultDistances = new ArrayList<>();
+        for (double inches : DEFAULT_DISTANCES_INCHES) {
+            defaultDistances.add(inches * 0.0254);
+        }
+        return defaultDistances;
+    }
+
     private static Solution solve(
         double targetDistance,
         double waypointDistance,
@@ -69,9 +88,15 @@ public final class LerpTableGenerator {
         double maxAngle,
         ShooterConfig config
     ) {
+        if (config.getBallisticsModel() == BallisticsModel.SIMPLE) {
+            return solveSimple(targetDistance, waypointDistance, shooterHeight, minAngle, maxAngle, config);
+        }
+
+        double minRps = getMinSearchRps(config, MIN_SEARCH_RPS);
+        double maxRps = getMaxSearchRps(config, MAX_SEARCH_RPS);
         Solution best = null;
         for (double angle = minAngle; angle <= maxAngle; angle += Math.toRadians(2.0)) {
-            for (double rps = 5.0; rps <= 80.0; rps += 2.0) {
+            for (double rps = minRps; rps <= maxRps; rps += 2.0) {
                 ErrorSample sample = simulate(angle, rps, shooterHeight, waypointDistance, targetDistance, config);
                 if (!sample.valid) {
                     continue;
@@ -94,7 +119,7 @@ public final class LerpTableGenerator {
                 continue;
             }
             for (double rps = best.flywheelRps - 6.0; rps <= best.flywheelRps + 6.0; rps += 0.5) {
-                if (rps <= 0.0) {
+                if (rps < minRps || rps > maxRps) {
                     continue;
                 }
                 ErrorSample sample = simulate(angle, rps, shooterHeight, waypointDistance, targetDistance, config);
@@ -110,6 +135,51 @@ public final class LerpTableGenerator {
         }
 
         return best;
+    }
+
+    private static Solution solveSimple(
+        double targetDistance,
+        double waypointDistance,
+        double shooterHeight,
+        double minAngle,
+        double maxAngle,
+        ShooterConfig config
+    ) {
+        double denominator = waypointDistance * targetDistance * (targetDistance - waypointDistance);
+        if (Math.abs(denominator) < 1e-9) {
+            throw new IllegalStateException("Simple ballistic solution is undefined for distance " + targetDistance + " meters");
+        }
+
+        double waypointDeltaHeight = WAYPOINT_HEIGHT_METERS - shooterHeight;
+        double targetDeltaHeight = HUB_HEIGHT_METERS - shooterHeight;
+        double tanTheta = (
+            waypointDeltaHeight * targetDistance * targetDistance
+                - targetDeltaHeight * waypointDistance * waypointDistance
+        ) / denominator;
+        double dragTerm = (
+            targetDistance * waypointDeltaHeight
+                - waypointDistance * targetDeltaHeight
+        ) / denominator;
+        if (dragTerm <= 0.0) {
+            throw new IllegalStateException("No simple ballistic shooting solution for distance " + targetDistance + " meters");
+        }
+
+        double angle = Math.atan(tanTheta);
+        double velocitySquared = BallisticsConstants.GRAVITY * (1.0 + tanTheta * tanTheta) / (2.0 * dragTerm);
+        double flywheelRps = Math.sqrt(velocitySquared) / calculateExitVelocity(1.0, config);
+        if (angle < minAngle || angle > maxAngle) {
+            throw new IllegalStateException("Simple ballistic shooting solution exceeds hood limits at distance " + targetDistance + " meters");
+        }
+        if (flywheelRps < config.getMinBallisticFlywheelVelocityRPS()
+            || flywheelRps > config.getMaxBallisticFlywheelVelocityRPS()) {
+            throw new IllegalStateException(
+                "Simple ballistic shooting solution exceeds flywheel limits at distance " + targetDistance + " meters"
+            );
+        }
+
+        double exitVelocity = calculateExitVelocity(flywheelRps, config);
+        double flightTimeSeconds = targetDistance / (exitVelocity * Math.cos(angle));
+        return new Solution(Math.toDegrees(angle), flywheelRps, flightTimeSeconds, 0.0);
     }
 
     private static ErrorSample simulate(
@@ -138,7 +208,7 @@ public final class LerpTableGenerator {
         while (state.z() >= 0.0 && state.x() <= targetDistance + 0.1 && elapsed < 5.0) {
             BallisticsPhysics.State2D prev = state;
             double prevElapsed = elapsed;
-            state = BallisticsPhysics.integrateStep2D(state, spinRateRadPerSec, SIMULATION_DT);
+            state = BallisticsPhysics.integrateStep2D(state, spinRateRadPerSec, SIMULATION_DT, config.getBallisticsModel());
             elapsed += SIMULATION_DT;
 
             if (waypointHeight == null && state.x() >= waypointDistance) {
@@ -191,6 +261,14 @@ public final class LerpTableGenerator {
 
     private static double sq(double value) {
         return value * value;
+    }
+
+    private static double getMinSearchRps(ShooterConfig config, double fallback) {
+        return Math.max(fallback, config.getMinBallisticFlywheelVelocityRPS());
+    }
+
+    private static double getMaxSearchRps(ShooterConfig config, double fallback) {
+        return Math.min(fallback, config.getMaxBallisticFlywheelVelocityRPS());
     }
 
     private static double round(double value, int decimals) {

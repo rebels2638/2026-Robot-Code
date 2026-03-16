@@ -8,5 +8,4 @@ public class RobotStateConfig {
     public double visionRotationDevBase;
     public double gyroResetTimeoutSeconds = 1.0;
     public double gyroResetMaxVisionRotationStdDev = 300.0;
-    public double maxTiltAngleDegrees = 15.0;
 }

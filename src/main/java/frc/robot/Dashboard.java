@@ -15,7 +15,7 @@ import edu.wpi.first.wpilibj2.command.InstantCommand;
 import edu.wpi.first.util.sendable.Sendable;
 import edu.wpi.first.util.sendable.SendableBuilder;
 import frc.robot.subsystems.Superstructure;
-import frc.robot.subsystems.Superstructure.CurrentState;
+import frc.robot.subsystems.Superstructure.CurrentSystemState;
 import frc.robot.subsystems.shooter.Shooter;
 import frc.robot.subsystems.swerve.SwerveDrive;
 
@@ -142,8 +142,8 @@ public class Dashboard {
         
         // Superstructure state logging
         Superstructure superstructure = Superstructure.getInstance();   
-        superstructureCurrentState.set(superstructure.getCurrentState().name());
-        superStructureDesiredState.set(superstructure.getDesiredState().name()); 
+        superstructureCurrentState.set(superstructure.getCurrentSystemState().name());
+        superStructureDesiredState.set(superstructure.getDesiredSystemState().name()); 
 
         // Swerve state logging
         SwerveDrive swerveDrive = SwerveDrive.getInstance();
@@ -156,7 +156,7 @@ public class Dashboard {
         flywheelAtSetpoint.set(shooter.isFlywheelAtSetpoint());
         hoodAtSetpoint.set(shooter.isHoodAtSetpoint());
         turretAtSetpoint.set(shooter.isTurretAtSetpoint());
-        shotValid.set(superstructure.getCurrentState() == CurrentState.READY_FOR_SHOT);
+        shotValid.set(superstructure.getCurrentSystemState() == CurrentSystemState.READY_FOR_SHOT);
 
         // Update match data
         matchTimePublisher.set(DriverStation.getMatchTime());

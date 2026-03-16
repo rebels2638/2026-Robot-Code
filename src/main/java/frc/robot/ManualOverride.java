@@ -3,6 +3,7 @@ package frc.robot;
 import java.util.EnumMap;
 import java.util.Map;
 
+import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.networktables.NetworkTable;
 import edu.wpi.first.networktables.NetworkTableEntry;
 import edu.wpi.first.networktables.NetworkTableInstance;
@@ -12,6 +13,7 @@ import frc.robot.subsystems.hopper.Hopper;
 import frc.robot.subsystems.intake.Intake;
 import frc.robot.subsystems.kicker.Kicker;
 import frc.robot.subsystems.shooter.Shooter;
+import frc.robot.subsystems.shooter.Shooter.FlywheelSetpoint;
 import frc.robot.subsystems.swerve.SwerveDrive;
 
 public class ManualOverride {
@@ -50,6 +52,10 @@ public class ManualOverride {
     private static boolean climberEStopEnabled = false;
 
     private static NetworkTableEntry resetGyro;
+
+    private static NetworkTableEntry turretAngle;
+    private static NetworkTableEntry hoodPosition;
+    private static NetworkTableEntry flywheelRPS;
 
     // Swerve Drive set up
     // SwerveDrive toggle -> Module toggles -> Steer/Drive toggles
@@ -112,6 +118,13 @@ public class ManualOverride {
         shooterToggles = new NetworkTableEntry[]{hoodToggle, turretToggle, flywheelToggle};
         shooterEStopsEnabled = new boolean[]{hoodEStopEnabled, turretEStopEnabled, flywheelEStopEnabled};
 
+        turretAngle = table.getEntry("Offsets/TurretAngle");
+        turretAngle.setDouble(shooter.getTurretAngleRotations() * 360);
+        hoodPosition = table.getEntry("Offsets/HoodOffset");
+        hoodPosition.setDouble(shooter.getHoodAngleRotations() * 360);
+        flywheelRPS = table.getEntry("Offsets/FlywheelRPS");
+        flywheelRPS.setDouble(shooter.getFlywheelVelocityRotationsPerSec());
+
         kicker = Kicker.getInstance();
         kickerToggle = table.getEntry("DisableKicker");
         kickerToggle.setBoolean(false);
@@ -158,6 +171,18 @@ public class ManualOverride {
             System.out.println("RESET GYRO");
             resetGyro.setBoolean(false);
         }
+
+        double desiredFlywheelRPS = flywheelRPS.getValue().getDouble();
+        shooter.setFlywheelRPSSupplier(() -> desiredFlywheelRPS);
+        flywheelRPS.setDouble(shooter.getFlywheelVelocityRotationsPerSec());
+
+        double desiredTurretAngle = turretAngle.getValue().getDouble();
+        shooter.setTurretAngleSupplier(() -> Rotation2d.fromDegrees(desiredTurretAngle));
+        turretAngle.setDouble(shooter.getTurretAngleRotations() * 360);
+
+        double desitredHoodPosition = hoodPosition.getValue().getDouble();
+        shooter.setHoodAngleSupplier(() -> Rotation2d.fromDegrees(desitredHoodPosition));
+        hoodPosition.setDouble(shooter.getHoodAngleRotations() * 360);
 
         // ===== SHOOTER CASCADING LOGIC =====
         boolean shooterToggleState = shooterToggle.getValue().getBoolean();

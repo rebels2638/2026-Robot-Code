@@ -29,6 +29,8 @@ public class GyroIOPigeon2 implements GyroIO {
     private final StatusSignal<AngularVelocity> yawVelocitySignal;
 
     private final Queue<Double> odometryTimestampQueue;
+    private final Queue<Double> rollPositionQueue;
+    private final Queue<Double> pitchPositionQueue;
     private final Queue<Double> yawPositionQueue;
 
     public GyroIOPigeon2(SwerveGyroConfig gyroConfig) {
@@ -55,6 +57,8 @@ public class GyroIOPigeon2 implements GyroIO {
         );
 
         odometryTimestampQueue = PhoenixOdometryThread.getInstance().makeTimestampQueue();
+        rollPositionQueue = PhoenixOdometryThread.getInstance().registerSignal(rollSignal.clone());
+        pitchPositionQueue = PhoenixOdometryThread.getInstance().registerSignal(pitchSignal.clone());
         yawPositionQueue = PhoenixOdometryThread.getInstance().registerSignal(yawSignal.clone());
 
         PhoenixUtil.registerSignals(
@@ -88,9 +92,13 @@ public class GyroIOPigeon2 implements GyroIO {
         inputs.yawVelocityRadPerSec = yawVelocitySignal.getValue().in(RadiansPerSecond);
 
         inputs.odometryTimestampsSeconds = copyDoubleQueue(odometryTimestampQueue);
-        inputs.odometryYawPositions = copyYawQueue(yawPositionQueue);
+        inputs.odometryRollPositions = copyAngleQueue(rollPositionQueue);
+        inputs.odometryPitchPositions = copyAngleQueue(pitchPositionQueue);
+        inputs.odometryYawPositions = copyAngleQueue(yawPositionQueue);
 
         odometryTimestampQueue.clear();
+        rollPositionQueue.clear();
+        pitchPositionQueue.clear();
         yawPositionQueue.clear();
     }
 
@@ -103,7 +111,7 @@ public class GyroIOPigeon2 implements GyroIO {
         return values;
     }
 
-    private static Rotation2d[] copyYawQueue(Queue<Double> queue) {
+    private static Rotation2d[] copyAngleQueue(Queue<Double> queue) {
         Rotation2d[] values = new Rotation2d[queue.size()];
         int index = 0;
         for (Double value : queue) {

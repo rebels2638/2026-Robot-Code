@@ -19,7 +19,7 @@ import edu.wpi.first.wpilibj.DriverStation;
  * constants are needed, to reduce verbosity.
  */
 public final class Constants {
-    public static final Mode currentMode = Mode.DEV; // TODO: change this if sim
+    public static final Mode currentMode = Mode.COMP; // TODO: change this if sim
     public static boolean VERBOSE_LOGGING_ENABLED = false;
 
     // public static final boolean isSYSID = true; // TODO: change this if sysid
@@ -41,9 +41,9 @@ public final class Constants {
     public static final class SimOnlySubsystems {
         public static final boolean SWERVE = false;
         public static final boolean SHOOTER = false;
-        public static final boolean KICKER = false;
+        public static final boolean KICKER = true;
         public static final boolean HOPPER = false;
-        public static final boolean INTAKE = true;
+        public static final boolean INTAKE = false;
         public static final boolean CLIMBER = true;
         public static final boolean VISION = false;
 

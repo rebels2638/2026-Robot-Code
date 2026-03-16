@@ -1,10 +1,11 @@
 {
   "drivetrain": {
     "maxTranslationalVelocityMetersPerSec": 4.5,
-    "maxTranslationalAccelerationMetersPerSecSec": 9.0,
+    "maxTranslationalAccelerationMetersPerSecSec": 12.0,
     "maxAngularVelocityRadiansPerSec": 12.24,
     "maxAngularAccelerationRadiansPerSecSec": 22.906585,
     "maxModuleVelocity": 4.5,
+    "maxOdometryTiltAngleDegrees": 5.0,
     "frontLeftX": 0.26,
     "frontLeftY": 0.325,
     "frontRightX": 0.26,

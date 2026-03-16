@@ -22,7 +22,6 @@ import java.util.NoSuchElementException;
 import org.littletonrobotics.junction.AutoLogOutput;
 import org.littletonrobotics.junction.Logger;
 
-// TODO: Make it so that if it is tracking / shooting, the center of rotation for the robot is around the shooter's position
 public class RobotState {
     private static final double OBSERVATION_LOG_PERIOD_SECONDS = 0.1;
 
@@ -150,37 +149,17 @@ public class RobotState {
             );
         lastGyroAngle = gyroOrientation;
 
-        // Reject odometry if robot is tilted too much
-        boolean isTilted = getAngleToFloor().getDegrees() > robotStateConfig.maxTiltAngleDegrees;
-        if (shouldLogObservation) {
-            Logger.recordOutput("RobotState/odometry/isTilted", isTilted);
-        }
-        if (isTilted) {
-            // use old wheel positions
-            swerveDrivePoseEstimator.updateWithTime(
-                observation.timestampsSeconds(), 
-                observation.isGyroConnected() ? 
-                    gyroOrientation.toRotation2d() : 
-                    new Rotation2d(
-                        swerveDrivePoseEstimator.getEstimatedPosition().getRotation().getRadians() + 
-                        kinematics.toTwist2d(lastWheelPositions, observation.modulePositions()).dtheta
-                    ),
-                lastWheelPositions
-            );  
-        } else {
-            swerveDrivePoseEstimator.updateWithTime(
-                observation.timestampsSeconds(), 
-                observation.isGyroConnected() ? 
-                    gyroOrientation.toRotation2d() : 
-                    new Rotation2d(
-                        swerveDrivePoseEstimator.getEstimatedPosition().getRotation().getRadians() + 
-                        kinematics.toTwist2d(lastWheelPositions, observation.modulePositions()).dtheta
-                    ),
-                observation.modulePositions()
-            );    
-
-            lastWheelPositions = observation.modulePositions();
-        }
+        swerveDrivePoseEstimator.updateWithTime(
+            observation.timestampsSeconds(), 
+            observation.isGyroConnected() ? 
+                gyroOrientation.toRotation2d() : 
+                new Rotation2d(
+                    swerveDrivePoseEstimator.getEstimatedPosition().getRotation().getRadians() + 
+                    kinematics.toTwist2d(lastWheelPositions, observation.modulePositions()).dtheta
+                ),
+            observation.modulePositions()
+        );
+        lastWheelPositions = observation.modulePositions();
         
         lastEstimatedPoseUpdateTime = observation.timestampsSeconds(); 
         // Add pose to buffer at timestamp
@@ -218,7 +197,8 @@ public class RobotState {
         boolean didResetGyro = false;
         if (DriverStation.isDisabled()
             && Timer.getTimestamp() - lastGyroResetTime > robotStateConfig.gyroResetTimeoutSeconds
-            && observation.visionMeasurementStdDevs().get(2,0) < robotStateConfig.gyroResetMaxVisionRotationStdDev) {
+            // && observation.visionMeasurementStdDevs().get(2,0) < robotStateConfig.gyroResetMaxVisionRotationStdDev
+            ) {
                 resetPose(new Pose2d(getEstimatedPose().getTranslation(), observation.visionRobotPoseMeters().getRotation()));
                 lastGyroResetTime = Timer.getTimestamp();
                 didResetGyro = true;

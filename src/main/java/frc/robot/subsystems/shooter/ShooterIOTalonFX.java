@@ -17,6 +17,7 @@ import com.ctre.phoenix6.signals.MotorAlignmentValue;
 import com.ctre.phoenix6.controls.PositionVoltage;
 import com.ctre.phoenix6.controls.TorqueCurrentFOC;
 import com.ctre.phoenix6.controls.VelocityTorqueCurrentFOC;
+import com.ctre.phoenix6.controls.VelocityVoltage;
 import com.ctre.phoenix6.controls.VoltageOut;
 import com.ctre.phoenix6.hardware.TalonFX;
 import com.ctre.phoenix6.signals.InvertedValue;
@@ -184,6 +185,10 @@ public class ShooterIOTalonFX implements ShooterIO {
         flywheelConfig.MotorOutput.NeutralMode = NeutralModeValue.Coast;
         flywheelConfig.MotorOutput.Inverted = config.isFlywheelInverted ?
             InvertedValue.Clockwise_Positive : InvertedValue.CounterClockwise_Positive;
+        flywheelConfig.Voltage.PeakReverseVoltage =
+            Math.min(config.flywheelMinOutputVoltage, config.flywheelMaxOutputVoltage);
+        flywheelConfig.Voltage.PeakForwardVoltage =
+            Math.max(config.flywheelMinOutputVoltage, config.flywheelMaxOutputVoltage);
 
         // Current and torque limiting
         flywheelConfig.CurrentLimits.SupplyCurrentLimitEnable = false;
@@ -201,6 +206,10 @@ public class ShooterIOTalonFX implements ShooterIO {
         flywheelFollowerConfig = new TalonFXConfiguration();
 
         flywheelFollowerConfig.MotorOutput.NeutralMode = NeutralModeValue.Coast;
+        flywheelFollowerConfig.Voltage.PeakReverseVoltage =
+            Math.min(config.flywheelMinOutputVoltage, config.flywheelMaxOutputVoltage);
+        flywheelFollowerConfig.Voltage.PeakForwardVoltage =
+            Math.max(config.flywheelMinOutputVoltage, config.flywheelMaxOutputVoltage);
         // Follower inverted state will be handled by the Follower control request
 
         // Current and torque limiting (same as leader)
@@ -245,7 +254,7 @@ public class ShooterIOTalonFX implements ShooterIO {
 
         flywheelVelocityStatusSignal = flywheelMotor.getVelocity().clone();
 
-        BaseStatusSignal.setUpdateFrequencyForAll(100,
+        BaseStatusSignal.setUpdateFrequencyForAll(50,
             hoodTorqueCurrent, hoodTemperature, hoodMotorVoltage,
             turretTorqueCurrent, turretTemperature, turretMotorVoltage,
             flywheelTorqueCurrent, flywheelTemperature, flywheelMotorVoltage,

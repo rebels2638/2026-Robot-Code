@@ -11,9 +11,15 @@ import frc.robot.configs.HopperConfig;
 import frc.robot.constants.Constants;
 import frc.robot.lib.util.ConfigLoader;
 import frc.robot.lib.util.DashboardMotorControlLoopConfigurator;
-import frc.robot.lib.util.LoopCycleProfiler;
 
 public class Hopper extends SubsystemBase {
+    private static final double HOPPER_VOLTAGE_SETPOINT_TOLERANCE_VOLTS = 0.25;
+
+    private enum HopperControlMode {
+        VELOCITY,
+        VOLTAGE
+    }
+
     private static Hopper instance = null;
 
     public static Hopper getInstance() {
@@ -24,18 +30,10 @@ public class Hopper extends SubsystemBase {
     }
 
     public enum HopperSetpoint {
-        OFF(0.0),
-        FEEDING(Double.NaN),
-        REVERSE(Double.NaN);
-
-        private final double rps;
-        HopperSetpoint(double rps) {
-            this.rps = rps;
-        }
-
-        public double getRps() {
-            return rps;
-        }
+        OFF,
+        FEEDING,
+        FEEDING_IDLE,
+        REVERSE
     }
 
     private final HopperIO hopperIO;
@@ -48,7 +46,9 @@ public class Hopper extends SubsystemBase {
     private final boolean enableConnectionAlerts;
     private final Alert hopperDisconnectedAlert;
 
+    private HopperControlMode hopperControlMode = HopperControlMode.VELOCITY;
     private double hopperSetpointRPS = 0.0;
+    private double hopperSetpointVolts = 0.0;
 
     private Hopper() {
         boolean useSimulation = Constants.shouldUseSimulation(Constants.SimOnlySubsystems.HOPPER);
@@ -75,40 +75,53 @@ public class Hopper extends SubsystemBase {
 
     @Override
     public void periodic() {
-        long periodicStartNanos = LoopCycleProfiler.markStart();
-
-        long updateInputsStartNanos = LoopCycleProfiler.markStart();
         hopperIO.updateInputs(hopperInputs);
-        LoopCycleProfiler.endSection("Hopper/UpdateInputs", updateInputsStartNanos);
-
-        long processInputsStartNanos = LoopCycleProfiler.markStart();
         Logger.processInputs("Hopper", hopperInputs);
-        LoopCycleProfiler.endSection("Hopper/ProcessInputs", processInputsStartNanos);
 
         hopperDisconnectedAlert.set(enableConnectionAlerts && !hopperInputs.hopperMotorConnected);
 
-        long configUpdatesStartNanos = LoopCycleProfiler.markStart();
         pendingHopperControlLoopConfigApply |= hopperControlLoopConfigurator.hasChanged();
         if (DriverStation.isDisabled() && pendingHopperControlLoopConfigApply) {
             hopperIO.configureControlLoop(hopperControlLoopConfigurator.getConfig());
             pendingHopperControlLoopConfigApply = false;
         }
-        LoopCycleProfiler.endSection("Hopper/ControlLoopConfigUpdates", configUpdatesStartNanos);
-
-        LoopCycleProfiler.endSection("Hopper/PeriodicTotal", periodicStartNanos);
     }
 
     public void setHopperVelocity(double velocityRotationsPerSec) {
+        hopperControlMode = HopperControlMode.VELOCITY;
         hopperSetpointRPS = velocityRotationsPerSec;
+        hopperSetpointVolts = Double.NaN;
+        Logger.recordOutput("Hopper/controlMode", hopperControlMode.name());
         Logger.recordOutput("Hopper/velocitySetpointRPS", velocityRotationsPerSec);
+        Logger.recordOutput("Hopper/voltageSetpointVolts", Double.NaN);
         hopperIO.setVelocity(velocityRotationsPerSec);
     }
 
+    public void setHopperVoltage(double voltage) {
+        hopperControlMode = HopperControlMode.VOLTAGE;
+        hopperSetpointRPS = Double.NaN;
+        hopperSetpointVolts = voltage;
+        Logger.recordOutput("Hopper/controlMode", hopperControlMode.name());
+        Logger.recordOutput("Hopper/velocitySetpointRPS", Double.NaN);
+        Logger.recordOutput("Hopper/voltageSetpointVolts", voltage);
+        hopperIO.setVoltage(voltage);
+    }
+
     public void setSetpoint(HopperSetpoint setpoint) {
-        double targetRps = setpoint == HopperSetpoint.FEEDING
-            ? config.feedingVelocityRPS
-            : setpoint == HopperSetpoint.REVERSE ? config.reverseVelocityRPS : setpoint.getRps();
-        setHopperVelocity(targetRps);
+        switch (setpoint) {
+            case OFF:
+                setHopperVelocity(0.0);
+                break;
+            case FEEDING:
+                setHopperVelocity(config.feedingVelocityRPS);
+                break;
+            case FEEDING_IDLE:
+                setHopperVoltage(config.feedingIdleVoltage);
+                break;
+            case REVERSE:
+                setHopperVelocity(config.reverseVelocityRPS);
+                break;
+        }
     }
 
     public double getHopperVelocityRotationsPerSec() {
@@ -125,8 +138,13 @@ public class Hopper extends SubsystemBase {
 
     @AutoLogOutput(key = "Hopper/isHopperAtSetpoint")
     public boolean isHopperAtSetpoint() {
-        return hopperInputs.hopperMotorConnected
-            && Math.abs(hopperInputs.velocityRotationsPerSec - hopperSetpointRPS) < config.hopperVelocityToleranceRPS;
+        if (!hopperInputs.hopperMotorConnected) {
+            return false;
+        }
+
+        return hopperControlMode == HopperControlMode.VELOCITY
+            ? Math.abs(hopperInputs.velocityRotationsPerSec - hopperSetpointRPS) < config.hopperVelocityToleranceRPS
+            : Math.abs(hopperInputs.appliedVolts - hopperSetpointVolts) < HOPPER_VOLTAGE_SETPOINT_TOLERANCE_VOLTS;
     }
 
     @AutoLogOutput(key = "Hopper/isHopperMotorConnected")

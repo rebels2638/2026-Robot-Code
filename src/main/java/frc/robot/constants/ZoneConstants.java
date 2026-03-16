@@ -41,23 +41,21 @@ public final class ZoneConstants {
 
     public static final class Tower {
         private Tower() {}
-
         public static final RectangleZone EXCLUSION = new RectangleZone(
             "tower",
-            new Translation2d(0.959, 4.324),
-            new Translation2d(1.077, 3.156)
+            new Translation2d(0.219, 4.282),
+            new Translation2d(0.679, 3.176)
+        );
+        public static final RectangleZone TOP = new RectangleZone(
+            "tower_top",
+            new Translation2d(0.234, 4.630),
+            new Translation2d(3.742, 7.774)
         );
 
-        public static final RectangleZone LEFT = new RectangleZone(
-            "tower_left",
-            new Translation2d(1.500, 7.640),
-            new Translation2d(3.456, 3.350)
-        );
-
-        public static final RectangleZone RIGHT = new RectangleZone(
-            "tower_right",
-            new Translation2d(1.500, 7.640),
-            new Translation2d(3.456, 0.418)
+        public static final RectangleZone BOTTOM = new RectangleZone(
+            "tower_bottom",
+            new Translation2d(0.207, 2.932),
+            new Translation2d(3.742, 0.325)
         );
     }
 
@@ -161,8 +159,8 @@ public final class ZoneConstants {
 
     public static final Map<String, RectangleZone> ZONES = Map.ofEntries(
         Map.entry(Tower.EXCLUSION.name(), Tower.EXCLUSION),
-        Map.entry(Tower.LEFT.name(), Tower.LEFT),
-        Map.entry(Tower.RIGHT.name(), Tower.RIGHT),
+        Map.entry(Tower.TOP.name(), Tower.TOP),
+        Map.entry(Tower.BOTTOM.name(), Tower.BOTTOM),
         Map.entry(Alliance.LOWER.name(), Alliance.LOWER),
         Map.entry(Alliance.LOWER_TRANSITION.name(), Alliance.LOWER_TRANSITION),
         Map.entry(Alliance.MIDDLE.name(), Alliance.MIDDLE),

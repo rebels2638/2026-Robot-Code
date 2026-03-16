@@ -1,8 +1,10 @@
 package frc.robot.configs;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.google.gson.Gson;
+import frc.robot.lib.util.ballistics.BallisticsModel;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -22,5 +24,16 @@ class ShooterConfigTest {
         assertTrue(config.turretMaxAccelerationDegPerSec2 > 0.0);
         assertTrue(config.turretMaxJerkDegPerSec3 > 0.0);
         assertTrue(config.turretAngleToleranceRotations > 0.0);
+        assertEquals(-12.0, config.flywheelMinOutputVoltage);
+        assertEquals(12.0, config.flywheelMaxOutputVoltage);
+    }
+
+    @Test
+    void simConfig_usesSimpleBallisticsAndFiniteFlywheelLimit() throws IOException {
+        ShooterConfig config = new Gson()
+            .fromJson(Files.readString(Path.of("src/main/deploy/configs/shooter/sim.json")), ShooterConfig.class);
+
+        assertEquals(BallisticsModel.SIMPLE, config.getBallisticsModel());
+        assertTrue(config.getMaxBallisticFlywheelVelocityRPS() > 0.0);
     }
 }

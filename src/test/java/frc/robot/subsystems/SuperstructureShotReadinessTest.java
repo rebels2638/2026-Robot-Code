@@ -10,9 +10,30 @@ import edu.wpi.first.math.geometry.Translation2d;
 import edu.wpi.first.math.geometry.Translation3d;
 import frc.robot.constants.ZoneConstants.RectangleZone;
 import frc.robot.lib.util.ShotCalculator.ShotData;
+import frc.robot.subsystems.hopper.Hopper.HopperSetpoint;
 import org.junit.jupiter.api.Test;
 
 class SuperstructureShotReadinessTest {
+    @Test
+    void getPreparingForShotHopperSetpoint_returnsFeedingIdleAfterShooting() {
+        assertEquals(
+            HopperSetpoint.FEEDING_IDLE,
+            Superstructure.getPreparingForShotHopperSetpoint(Superstructure.CurrentSystemState.SHOOTING)
+        );
+    }
+
+    @Test
+    void getPreparingForShotHopperSetpoint_returnsOffWhenPreparingDidNotFollowShooting() {
+        assertEquals(
+            HopperSetpoint.OFF,
+            Superstructure.getPreparingForShotHopperSetpoint(Superstructure.CurrentSystemState.TRACKING)
+        );
+        assertEquals(
+            HopperSetpoint.OFF,
+            Superstructure.getPreparingForShotHopperSetpoint(Superstructure.CurrentSystemState.READY_FOR_SHOT)
+        );
+    }
+
     @Test
     // Ready when both impact error and distance bounds are satisfied.
     void isShotReady_trueWhenImpactAndDistanceAreValid() {
@@ -372,10 +393,8 @@ class SuperstructureShotReadinessTest {
     void resolveTargetForZoneConstraints_allPassTargetsAreAllowedFromAnyZone() {
         Superstructure.TargetState[] passTargets = {
             Superstructure.TargetState.PASS_ALLIANCE_TOP,
-            Superstructure.TargetState.PASS_ALLIANCE_CENTER,
             Superstructure.TargetState.PASS_ALLIANCE_BOTTOM,
             Superstructure.TargetState.PASS_NEUTRAL_TOP,
-            Superstructure.TargetState.PASS_NEUTRAL_CENTER,
             Superstructure.TargetState.PASS_NEUTRAL_BOTTOM
         };
         Superstructure.RobotFieldZone[] zones = {
@@ -396,7 +415,71 @@ class SuperstructureShotReadinessTest {
     }
 
     @Test
-    void isPassLineOfSightClear_checksHubAndTowerBlockersWithMirroring() {
+    void selectClosestLineOfSightTarget_prefersNearestVisibleTarget() {
+        assertEquals(
+            Superstructure.TargetState.PASS_ALLIANCE_BOTTOM,
+            Superstructure.selectClosestLineOfSightTarget(
+                new Translation2d(0.0, 0.0),
+                new Superstructure.TargetCandidate(
+                    Superstructure.TargetState.PASS_ALLIANCE_TOP,
+                    new Translation2d(5.0, 0.0),
+                    true
+                ),
+                new Superstructure.TargetCandidate(
+                    Superstructure.TargetState.PASS_ALLIANCE_BOTTOM,
+                    new Translation2d(2.0, 0.0),
+                    true
+                ),
+                new Superstructure.TargetCandidate(
+                    Superstructure.TargetState.PASS_NEUTRAL_TOP,
+                    new Translation2d(3.0, 0.0),
+                    true
+                )
+            ).orElseThrow()
+        );
+    }
+
+    @Test
+    void selectClosestLineOfSightTarget_ignoresBlockedCloserTarget() {
+        assertEquals(
+            Superstructure.TargetState.PASS_ALLIANCE_BOTTOM,
+            Superstructure.selectClosestLineOfSightTarget(
+                new Translation2d(0.0, 0.0),
+                new Superstructure.TargetCandidate(
+                    Superstructure.TargetState.PASS_NEUTRAL_TOP,
+                    new Translation2d(1.0, 0.0),
+                    false
+                ),
+                new Superstructure.TargetCandidate(
+                    Superstructure.TargetState.PASS_ALLIANCE_BOTTOM,
+                    new Translation2d(3.0, 0.0),
+                    true
+                )
+            ).orElseThrow()
+        );
+    }
+
+    @Test
+    void selectClosestLineOfSightTarget_returnsEmptyWhenNoVisibleTargetExists() {
+        assertFalse(
+            Superstructure.selectClosestLineOfSightTarget(
+                new Translation2d(0.0, 0.0),
+                new Superstructure.TargetCandidate(
+                    Superstructure.TargetState.PASS_ALLIANCE_TOP,
+                    new Translation2d(1.0, 0.0),
+                    false
+                ),
+                new Superstructure.TargetCandidate(
+                    Superstructure.TargetState.PASS_ALLIANCE_BOTTOM,
+                    new Translation2d(2.0, 0.0),
+                    false
+                )
+            ).isPresent()
+        );
+    }
+
+    @Test
+    void hasClearLineOfSightWithRectangularBlockers_checksAllRequestedBlockers() {
         Translation2d shooter = new Translation2d(0.0, 0.0);
         Translation2d target = new Translation2d(10.0, 0.0);
         RectangleZone clearHub = new RectangleZone(
@@ -431,64 +514,64 @@ class SuperstructureShotReadinessTest {
         );
 
         assertTrue(
-            Superstructure.isPassLineOfSightClear(
+            Superstructure.hasClearLineOfSightWithRectangularBlockers(
                 shooter,
                 target,
+                0.12,
                 clearHub,
                 clearFlippedHub,
                 clearTower,
-                clearFlippedTower,
-                0.12
+                clearFlippedTower
             )
         );
         assertFalse(
-            Superstructure.isPassLineOfSightClear(
+            Superstructure.hasClearLineOfSightWithRectangularBlockers(
                 shooter,
                 target,
+                0.12,
                 blockingHub,
                 clearFlippedHub,
                 clearTower,
-                clearFlippedTower,
-                0.12
+                clearFlippedTower
             )
         );
         assertFalse(
-            Superstructure.isPassLineOfSightClear(
+            Superstructure.hasClearLineOfSightWithRectangularBlockers(
                 shooter,
                 target,
+                0.12,
                 clearHub,
                 blockingHub,
                 clearTower,
-                clearFlippedTower,
-                0.12
+                clearFlippedTower
             )
         );
         assertFalse(
-            Superstructure.isPassLineOfSightClear(
+            Superstructure.hasClearLineOfSightWithRectangularBlockers(
                 shooter,
                 target,
+                0.12,
                 clearHub,
                 clearFlippedHub,
                 blockingTower,
-                clearFlippedTower,
-                0.12
+                clearFlippedTower
             )
         );
         assertFalse(
-            Superstructure.isPassLineOfSightClear(
+            Superstructure.hasClearLineOfSightWithRectangularBlockers(
                 shooter,
                 target,
+                0.12,
                 clearHub,
                 clearFlippedHub,
                 clearTower,
-                blockingTower,
-                0.12
+                blockingTower
             )
         );
     }
 
     @Test
-    void isHubLineOfSightClear_checksMirroredTowerBlockers() {
+    void hasClearLineOfSightWithRectangularBlockers_checksSubsetOfBlockers() {
         Translation2d shooter = new Translation2d(0.0, 0.0);
         Translation2d target = new Translation2d(10.0, 0.0);
         RectangleZone clearTower = new RectangleZone(
@@ -508,30 +591,30 @@ class SuperstructureShotReadinessTest {
         );
 
         assertTrue(
-            Superstructure.isHubLineOfSightClear(
+            Superstructure.hasClearLineOfSightWithRectangularBlockers(
                 shooter,
                 target,
+                0.12,
                 clearTower,
-                clearFlippedTower,
-                0.12
+                clearFlippedTower
             )
         );
         assertFalse(
-            Superstructure.isHubLineOfSightClear(
+            Superstructure.hasClearLineOfSightWithRectangularBlockers(
                 shooter,
                 target,
+                0.12,
                 blockingTower,
-                clearFlippedTower,
-                0.12
+                clearFlippedTower
             )
         );
         assertFalse(
-            Superstructure.isHubLineOfSightClear(
+            Superstructure.hasClearLineOfSightWithRectangularBlockers(
                 shooter,
                 target,
+                0.12,
                 clearTower,
-                blockingTower,
-                0.12
+                blockingTower
             )
         );
     }

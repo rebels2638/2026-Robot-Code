@@ -18,6 +18,7 @@ class LerpTableGeneratorTest {
         config.flywheelRadiusMeters = 0.05;
         config.backRollerGearRatio = 0.65;
         config.backRollerRadiusMeters = 0.03;
+        config.maxBallisticFlywheelVelocityRPS = 80.0;
 
         List<ShooterConfig.LerpEntry> entries = LerpTableGenerator.generate(config);
 
@@ -29,8 +30,33 @@ class LerpTableGeneratorTest {
             assertTrue(entry.hoodAngleDegrees >= config.hoodMinAngleDegrees);
             assertTrue(entry.hoodAngleDegrees <= config.hoodMaxAngleDegrees);
             assertTrue(entry.flywheelVelocityRPS > 0.0);
+            assertTrue(entry.flywheelVelocityRPS <= config.getMaxBallisticFlywheelVelocityRPS());
             assertTrue(entry.flightTimeSeconds > 0.0);
             previousDistance = entry.distanceMeters;
         }
+    }
+
+    @Test
+    // Existing table distances should be preserved so per-config sampling can be regenerated.
+    void generate_reusesConfiguredDistancesWhenPresent() {
+        ShooterConfig config = new ShooterConfig();
+        config.shooterPoseZ = 0.95;
+        config.hoodMinAngleDegrees = 15.0;
+        config.hoodMaxAngleDegrees = 80.0;
+        config.flywheelRadiusMeters = 0.05;
+        config.backRollerGearRatio = 0.65;
+        config.backRollerRadiusMeters = 0.03;
+
+        ShooterConfig.LerpEntry first = new ShooterConfig.LerpEntry();
+        first.distanceMeters = 1.0;
+        ShooterConfig.LerpEntry second = new ShooterConfig.LerpEntry();
+        second.distanceMeters = 2.0;
+        config.shootingLerpTable = List.of(first, second);
+
+        List<ShooterConfig.LerpEntry> entries = LerpTableGenerator.generate(config);
+
+        assertEquals(2, entries.size());
+        assertEquals(1.0, entries.get(0).distanceMeters, 1e-9);
+        assertEquals(2.0, entries.get(1).distanceMeters, 1e-9);
     }
 }

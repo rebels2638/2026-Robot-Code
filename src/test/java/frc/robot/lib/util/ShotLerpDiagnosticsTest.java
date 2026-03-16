@@ -10,6 +10,7 @@ import edu.wpi.first.math.numbers.N3;
 import frc.robot.configs.ShooterConfig;
 import frc.robot.lib.util.ballistics.BallisticsConstants;
 import frc.robot.lib.util.ballistics.BallisticsPhysics;
+import frc.robot.lib.util.ballistics.BallisticsModel;
 import frc.robot.lib.util.ballistics.TrajectoryResult;
 import java.io.IOException;
 import java.nio.file.Files;
@@ -68,7 +69,8 @@ class ShotLerpDiagnosticsTest {
                 config.shooterPoseZ,
                 targetHeight,
                 spinRateRadPerSec,
-                0.002
+                0.002,
+                config.getBallisticsModel()
             );
 
             assertTrue(result.reachedTarget() || Math.abs(result.finalDistance() - entry.distanceMeters) < 0.02);
@@ -107,7 +109,8 @@ class ShotLerpDiagnosticsTest {
                 config.shooterPoseZ,
                 targetHeight,
                 directSpinRate,
-                0.002
+                0.002,
+                config.getBallisticsModel()
             );
 
             double runtimeExitVelocity = ShotCalculator.calculateExitVelocityMetersPerSec(
@@ -130,7 +133,8 @@ class ShotLerpDiagnosticsTest {
                 config.shooterPoseZ,
                 targetHeight,
                 runtimeSpinRate,
-                0.002
+                0.002,
+                config.getBallisticsModel()
             );
 
             double impactErrorMeters = Math.hypot(
@@ -205,7 +209,8 @@ class ShotLerpDiagnosticsTest {
                 config.shooterPoseZ,
                 targetHeight,
                 runtimeSpinRate,
-                0.002
+                0.002,
+                config.getBallisticsModel()
             );
 
             double impactErrorMeters = Math.hypot(
@@ -229,7 +234,8 @@ class ShotLerpDiagnosticsTest {
                 config.shooterPoseZ,
                 targetHeight,
                 directSpinRate,
-                0.002
+                0.002,
+                config.getBallisticsModel()
             );
             double directErrorMeters = Math.hypot(
                 directResult.finalDistance() - distance,
@@ -258,6 +264,68 @@ class ShotLerpDiagnosticsTest {
             worstMarginDirect
         );
         assertTrue(worstError < impactToleranceMeters);
+    }
+
+    @Test
+    // Sim shooting table should match the simple gravity-only model configured for simulation.
+    void simShootingLerpTable_matchesConfiguredBallisticsModel() throws IOException {
+        ShooterConfig config = loadShooterConfig("src/main/deploy/configs/shooter/sim.json");
+        assertEquals(BallisticsModel.SIMPLE, config.getBallisticsModel());
+        assertTrue(config.getShootingLerpEntries() != null && !config.getShootingLerpEntries().isEmpty());
+
+        for (ShooterConfig.LerpEntry entry : config.getShootingLerpEntries()) {
+            double exitVelocity = calculateShotExitVelocityMetersPerSec(entry.flywheelVelocityRPS, config);
+            double spinRateRadPerSec = calculateSpinRadPerSec(entry.flywheelVelocityRPS, config);
+
+            TrajectoryResult result = BallisticsPhysics.simulateToDistance(
+                entry.distanceMeters,
+                Math.toRadians(entry.hoodAngleDegrees),
+                exitVelocity,
+                config.shooterPoseZ,
+                1.8034,
+                spinRateRadPerSec,
+                0.002,
+                config.getBallisticsModel()
+            );
+
+            assertTrue(result.reachedTarget());
+            assertTrue(Math.abs(result.finalHeight() - 1.8034) < 0.01);
+            assertTrue(Math.abs(result.flightTime() - entry.flightTimeSeconds) < 0.01);
+            assertTrue(entry.hoodAngleDegrees >= config.hoodMinAngleDegrees);
+            assertTrue(entry.hoodAngleDegrees <= config.hoodMaxAngleDegrees);
+            assertTrue(entry.flywheelVelocityRPS <= config.getMaxBallisticFlywheelVelocityRPS());
+        }
+    }
+
+    @Test
+    // Sim pass table should also match the simple gravity-only model and stay within sim flywheel limits.
+    void simPassLerpTable_matchesConfiguredBallisticsModel() throws IOException {
+        ShooterConfig config = loadShooterConfig("src/main/deploy/configs/shooter/sim.json");
+        assertEquals(BallisticsModel.SIMPLE, config.getBallisticsModel());
+        assertTrue(config.passLerpTable != null && !config.passLerpTable.isEmpty());
+
+        for (ShooterConfig.LerpEntry entry : config.passLerpTable) {
+            double exitVelocity = calculateShotExitVelocityMetersPerSec(entry.flywheelVelocityRPS, config);
+            double spinRateRadPerSec = calculateSpinRadPerSec(entry.flywheelVelocityRPS, config);
+
+            TrajectoryResult result = BallisticsPhysics.simulateToDistance(
+                entry.distanceMeters,
+                Math.toRadians(entry.hoodAngleDegrees),
+                exitVelocity,
+                config.shooterPoseZ,
+                0.0,
+                spinRateRadPerSec,
+                0.002,
+                config.getBallisticsModel()
+            );
+
+            assertTrue(result.reachedTarget() || Math.abs(result.finalDistance() - entry.distanceMeters) < 0.02);
+            assertTrue(Math.abs(result.finalHeight() - 0.0) < 0.01);
+            assertTrue(Math.abs(result.flightTime() - entry.flightTimeSeconds) < 0.01);
+            assertTrue(entry.hoodAngleDegrees >= config.hoodMinAngleDegrees);
+            assertTrue(entry.hoodAngleDegrees <= config.hoodMaxAngleDegrees);
+            assertTrue(entry.flywheelVelocityRPS <= config.getMaxBallisticFlywheelVelocityRPS());
+        }
     }
 
     private static ShooterConfig loadShooterConfig(String path) throws IOException {

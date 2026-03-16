@@ -21,44 +21,44 @@ public final class AlignmentConstants {
         public static final double INTERMEDIARY_TRANSLATION_TOLERANCE_METERS = 0.08;
         public static final double INTERMEDIARY_ROTATION_TOLERANCE_DEG = 5;
 
-        public static final class Left {
-            private Left() {}
+        public static final class Top {
+            private Top() {}
 
             public static final Pair<Translation2d, Translation2d> BOUNDS = new Pair<>(
-                ZoneConstants.Tower.LEFT.cornerA(),
-                ZoneConstants.Tower.LEFT.cornerB()
+                ZoneConstants.Tower.TOP.cornerA(),
+                ZoneConstants.Tower.TOP.cornerB()
             );
 
             public static final Pose2d INTERMEDIATE_WAYPOINT = new Pose2d(
-                1.846, 
-                4.636, 
-                Rotation2d.fromDegrees(-90)
+                1.010, 
+                4.911, 
+                Rotation2d.fromDegrees(0)
             ); 
 
             public static final Pose2d FINAL_WAYPOINT = new Pose2d(
-                1.310, 
-                4.636, 
-                Rotation2d.fromDegrees(-90)
+                1.010, 
+                4.748, 
+                Rotation2d.fromDegrees(0)
             );
         }
-        public static final class Right {
-            private Right() {}
+        public static final class Bottom {
+            private Bottom() {}
 
             public static final Pair<Translation2d, Translation2d> BOUNDS = new Pair<>(
-                ZoneConstants.Tower.RIGHT.cornerA(),
-                ZoneConstants.Tower.RIGHT.cornerB()
+                ZoneConstants.Tower.BOTTOM.cornerA(),
+                ZoneConstants.Tower.BOTTOM.cornerB()
             );
 
             public static final Pose2d INTERMEDIATE_WAYPOINT = new Pose2d(
-                5, 
-                5, 
-                Rotation2d.fromDegrees(0)
+                1.010, 
+                2.434, 
+                Rotation2d.fromDegrees(180)
             );
 
             public static final Pose2d FINAL_WAYPOINT = new Pose2d(
-                5, 
-                5, 
-                Rotation2d.fromDegrees(0)
+                1.010, 
+                2.734, 
+                Rotation2d.fromDegrees(180)
             );
         }
 

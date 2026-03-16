@@ -13,6 +13,14 @@ public final class BallisticsPhysics {
     }
 
     public static Derivatives computeDerivatives3D(ProjectileState s, double spinRateRadPerSec) {
+        return computeDerivatives3D(s, spinRateRadPerSec, BallisticsModel.AERODYNAMIC);
+    }
+
+    public static Derivatives computeDerivatives3D(ProjectileState s, double spinRateRadPerSec, BallisticsModel model) {
+        if (model == BallisticsModel.SIMPLE) {
+            return new Derivatives(s.vx(), s.vy(), s.vz(), 0.0, 0.0, -BallisticsConstants.GRAVITY);
+        }
+
         double vHorizontal = Math.hypot(s.vx(), s.vy());
         double v = s.speed();
 
@@ -68,6 +76,14 @@ public final class BallisticsPhysics {
     }
 
     public static Derivatives2D computeDerivatives2D(State2D s, double spinRateRadPerSec) {
+        return computeDerivatives2D(s, spinRateRadPerSec, BallisticsModel.AERODYNAMIC);
+    }
+
+    public static Derivatives2D computeDerivatives2D(State2D s, double spinRateRadPerSec, BallisticsModel model) {
+        if (model == BallisticsModel.SIMPLE) {
+            return new Derivatives2D(s.vx(), s.vz(), 0.0, -BallisticsConstants.GRAVITY);
+        }
+
         double v = Math.hypot(s.vx(), s.vz());
         if (v < 1e-6) {
             return new Derivatives2D(s.vx(), s.vz(), 0.0, -BallisticsConstants.GRAVITY);
@@ -102,19 +118,52 @@ public final class BallisticsPhysics {
     }
 
     public static ProjectileState integrateStep3D(ProjectileState state, double spinRateRadPerSec, double dt) {
-        Derivatives k1 = computeDerivatives3D(state, spinRateRadPerSec);
-        Derivatives k2 = computeDerivatives3D(state.add(k1, dt * 0.5), spinRateRadPerSec);
-        Derivatives k3 = computeDerivatives3D(state.add(k2, dt * 0.5), spinRateRadPerSec);
-        Derivatives k4 = computeDerivatives3D(state.add(k3, dt), spinRateRadPerSec);
+        return integrateStep3D(state, spinRateRadPerSec, dt, BallisticsModel.AERODYNAMIC);
+    }
+
+    public static ProjectileState integrateStep3D(
+        ProjectileState state,
+        double spinRateRadPerSec,
+        double dt,
+        BallisticsModel model
+    ) {
+        if (model == BallisticsModel.SIMPLE) {
+            return new ProjectileState(
+                state.x() + state.vx() * dt,
+                state.y() + state.vy() * dt,
+                state.z() + state.vz() * dt - 0.5 * BallisticsConstants.GRAVITY * dt * dt,
+                state.vx(),
+                state.vy(),
+                state.vz() - BallisticsConstants.GRAVITY * dt
+            );
+        }
+
+        Derivatives k1 = computeDerivatives3D(state, spinRateRadPerSec, model);
+        Derivatives k2 = computeDerivatives3D(state.add(k1, dt * 0.5), spinRateRadPerSec, model);
+        Derivatives k3 = computeDerivatives3D(state.add(k2, dt * 0.5), spinRateRadPerSec, model);
+        Derivatives k4 = computeDerivatives3D(state.add(k3, dt), spinRateRadPerSec, model);
 
         return state.add(weighted(k1, k2, k3, k4), dt / 6.0);
     }
 
     public static State2D integrateStep2D(State2D state, double spinRateRadPerSec, double dt) {
-        Derivatives2D k1 = computeDerivatives2D(state, spinRateRadPerSec);
-        Derivatives2D k2 = computeDerivatives2D(state.add(k1, dt * 0.5), spinRateRadPerSec);
-        Derivatives2D k3 = computeDerivatives2D(state.add(k2, dt * 0.5), spinRateRadPerSec);
-        Derivatives2D k4 = computeDerivatives2D(state.add(k3, dt), spinRateRadPerSec);
+        return integrateStep2D(state, spinRateRadPerSec, dt, BallisticsModel.AERODYNAMIC);
+    }
+
+    public static State2D integrateStep2D(State2D state, double spinRateRadPerSec, double dt, BallisticsModel model) {
+        if (model == BallisticsModel.SIMPLE) {
+            return new State2D(
+                state.x() + state.vx() * dt,
+                state.z() + state.vz() * dt - 0.5 * BallisticsConstants.GRAVITY * dt * dt,
+                state.vx(),
+                state.vz() - BallisticsConstants.GRAVITY * dt
+            );
+        }
+
+        Derivatives2D k1 = computeDerivatives2D(state, spinRateRadPerSec, model);
+        Derivatives2D k2 = computeDerivatives2D(state.add(k1, dt * 0.5), spinRateRadPerSec, model);
+        Derivatives2D k3 = computeDerivatives2D(state.add(k2, dt * 0.5), spinRateRadPerSec, model);
+        Derivatives2D k4 = computeDerivatives2D(state.add(k3, dt), spinRateRadPerSec, model);
 
         return state.add(weighted(k1, k2, k3, k4), dt / 6.0);
     }
@@ -127,6 +176,26 @@ public final class BallisticsPhysics {
         double targetHeight,
         double spinRateRadPerSec
     ) {
+        return estimateFlightTime(
+            distance,
+            launchAngle,
+            exitVelocity,
+            shooterHeight,
+            targetHeight,
+            spinRateRadPerSec,
+            BallisticsModel.AERODYNAMIC
+        );
+    }
+
+    public static double estimateFlightTime(
+        double distance,
+        double launchAngle,
+        double exitVelocity,
+        double shooterHeight,
+        double targetHeight,
+        double spinRateRadPerSec,
+        BallisticsModel model
+    ) {
         TrajectoryResult result = simulateToDistance(
             distance,
             launchAngle,
@@ -134,7 +203,8 @@ public final class BallisticsPhysics {
             shooterHeight,
             targetHeight,
             spinRateRadPerSec,
-            DEFAULT_DT
+            DEFAULT_DT,
+            model
         );
 
         if (!result.reachedTarget()) {
@@ -154,8 +224,34 @@ public final class BallisticsPhysics {
         double spinRateRadPerSec,
         double dt
     ) {
+        return simulateToDistance(
+            distance,
+            launchAngle,
+            exitVelocity,
+            shooterHeight,
+            targetHeight,
+            spinRateRadPerSec,
+            dt,
+            BallisticsModel.AERODYNAMIC
+        );
+    }
+
+    public static TrajectoryResult simulateToDistance(
+        double distance,
+        double launchAngle,
+        double exitVelocity,
+        double shooterHeight,
+        double targetHeight,
+        double spinRateRadPerSec,
+        double dt,
+        BallisticsModel model
+    ) {
         double vx0 = exitVelocity * Math.cos(launchAngle);
         double vz0 = exitVelocity * Math.sin(launchAngle);
+
+        if (model == BallisticsModel.SIMPLE) {
+            return simulateToDistanceSimple(distance, shooterHeight, vx0, vz0);
+        }
 
         State2D state = new State2D(0.0, shooterHeight, vx0, vz0);
         State2D prev = state;
@@ -163,7 +259,7 @@ public final class BallisticsPhysics {
 
         while (state.z() >= 0.0 && state.x() <= distance + 0.1 && elapsed < MAX_SIM_TIME) {
             prev = state;
-            state = integrateStep2D(state, spinRateRadPerSec, dt);
+            state = integrateStep2D(state, spinRateRadPerSec, dt, model);
             elapsed += dt;
 
             if (state.x() >= distance) {
@@ -187,6 +283,32 @@ public final class BallisticsPhysics {
         double targetHeight,
         double dt
     ) {
+        return simulateToHeight3D(
+            startPosition,
+            vx,
+            vy,
+            vz,
+            spinRateRadPerSec,
+            targetHeight,
+            dt,
+            BallisticsModel.AERODYNAMIC
+        );
+    }
+
+    public static Translation3d simulateToHeight3D(
+        Translation3d startPosition,
+        double vx,
+        double vy,
+        double vz,
+        double spinRateRadPerSec,
+        double targetHeight,
+        double dt,
+        BallisticsModel model
+    ) {
+        if (model == BallisticsModel.SIMPLE) {
+            return simulateToHeight3DSimple(startPosition, vx, vy, vz, targetHeight);
+        }
+
         ProjectileState state = new ProjectileState(
             startPosition.getX(),
             startPosition.getY(),
@@ -201,7 +323,7 @@ public final class BallisticsPhysics {
 
         while (state.z() >= 0.0 && elapsed < MAX_SIM_TIME) {
             prev = state;
-            state = integrateStep3D(state, spinRateRadPerSec, step);
+            state = integrateStep3D(state, spinRateRadPerSec, step, model);
             elapsed += step;
 
             boolean crossedTarget =
@@ -215,6 +337,108 @@ public final class BallisticsPhysics {
         }
 
         return new Translation3d(state.x(), state.y(), state.z());
+    }
+
+    private static TrajectoryResult simulateToDistanceSimple(double distance, double shooterHeight, double vx0, double vz0) {
+        if (distance <= 0.0) {
+            return new TrajectoryResult(0.0, shooterHeight, 0.0, shooterHeight >= -TARGET_REACH_HEIGHT_EPSILON_METERS);
+        }
+        if (vx0 <= 1e-9) {
+            return new TrajectoryResult(0.0, shooterHeight, 0.0, false);
+        }
+
+        double timeToDistance = distance / vx0;
+        double timeToGround = solvePositiveQuadraticRoot(
+            -0.5 * BallisticsConstants.GRAVITY,
+            vz0,
+            shooterHeight
+        );
+
+        if (!Double.isFinite(timeToGround) || timeToGround >= timeToDistance) {
+            double zAtDistance = shooterHeight + vz0 * timeToDistance - 0.5 * BallisticsConstants.GRAVITY * timeToDistance * timeToDistance;
+            boolean reached = zAtDistance >= -TARGET_REACH_HEIGHT_EPSILON_METERS;
+            return new TrajectoryResult(timeToDistance, zAtDistance, distance, reached);
+        }
+
+        double finalDistance = vx0 * timeToGround;
+        return new TrajectoryResult(timeToGround, 0.0, finalDistance, false);
+    }
+
+    private static Translation3d simulateToHeight3DSimple(
+        Translation3d startPosition,
+        double vx,
+        double vy,
+        double vz,
+        double targetHeight
+    ) {
+        double crossingTime = solveCrossingTimeOnDescent(startPosition.getZ(), vz, targetHeight);
+        if (Double.isFinite(crossingTime) && crossingTime <= MAX_SIM_TIME) {
+            return new Translation3d(
+                startPosition.getX() + vx * crossingTime,
+                startPosition.getY() + vy * crossingTime,
+                targetHeight
+            );
+        }
+
+        double terminalTime = solvePositiveQuadraticRoot(
+            -0.5 * BallisticsConstants.GRAVITY,
+            vz,
+            startPosition.getZ()
+        );
+        if (!Double.isFinite(terminalTime)) {
+            terminalTime = MAX_SIM_TIME;
+        } else {
+            terminalTime = Math.min(terminalTime, MAX_SIM_TIME);
+        }
+
+        return new Translation3d(
+            startPosition.getX() + vx * terminalTime,
+            startPosition.getY() + vy * terminalTime,
+            startPosition.getZ() + vz * terminalTime - 0.5 * BallisticsConstants.GRAVITY * terminalTime * terminalTime
+        );
+    }
+
+    private static double solveCrossingTimeOnDescent(double startHeight, double vz0, double targetHeight) {
+        double a = -0.5 * BallisticsConstants.GRAVITY;
+        double b = vz0;
+        double c = startHeight - targetHeight;
+        double discriminant = b * b - 4.0 * a * c;
+        if (discriminant < 0.0) {
+            return Double.NaN;
+        }
+
+        double sqrtDiscriminant = Math.sqrt(discriminant);
+        double denominator = 2.0 * a;
+        double t1 = (-b + sqrtDiscriminant) / denominator;
+        double t2 = (-b - sqrtDiscriminant) / denominator;
+        double best = Double.NaN;
+        if (t1 >= 0.0 && vz0 - BallisticsConstants.GRAVITY * t1 <= 0.0) {
+            best = t1;
+        }
+        if (t2 >= 0.0 && vz0 - BallisticsConstants.GRAVITY * t2 <= 0.0 && (!Double.isFinite(best) || t2 < best)) {
+            best = t2;
+        }
+        return best;
+    }
+
+    private static double solvePositiveQuadraticRoot(double a, double b, double c) {
+        double discriminant = b * b - 4.0 * a * c;
+        if (discriminant < 0.0) {
+            return Double.NaN;
+        }
+
+        double sqrtDiscriminant = Math.sqrt(discriminant);
+        double denominator = 2.0 * a;
+        double t1 = (-b + sqrtDiscriminant) / denominator;
+        double t2 = (-b - sqrtDiscriminant) / denominator;
+        double best = Double.POSITIVE_INFINITY;
+        if (t1 >= 0.0) {
+            best = t1;
+        }
+        if (t2 >= 0.0) {
+            best = Math.min(best, t2);
+        }
+        return Double.isFinite(best) ? best : Double.NaN;
     }
 
     private static Derivatives weighted(Derivatives k1, Derivatives k2, Derivatives k3, Derivatives k4) {

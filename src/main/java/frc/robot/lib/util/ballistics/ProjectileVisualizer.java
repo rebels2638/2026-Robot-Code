@@ -12,14 +12,13 @@ import edu.wpi.first.wpilibj.RobotBase;
 import edu.wpi.first.wpilibj.Timer;
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
 import frc.robot.constants.Constants;
-import frc.robot.lib.util.LoopCycleProfiler;
 
 /**
- * Visualizes one or more projectiles using physics simulation with drag and Magnus effect.
- * Uses numerical integration to simulate the trajectory of the 2026 "Rebuilt" Fuel game piece.
+ * Visualizes one or more projectiles using simple gravity-only kinematics.
  */
 public class ProjectileVisualizer extends SubsystemBase {
-    private static final double SIMULATION_DT = 0.001;
+    private static final double SIMULATION_DT = 0.02;
+    private static final BallisticsModel VISUALIZATION_MODEL = BallisticsModel.SIMPLE;
 
     private static final ProjectileVisualizer INSTANCE = new ProjectileVisualizer();
 
@@ -28,7 +27,7 @@ public class ProjectileVisualizer extends SubsystemBase {
     }
 
     /**
-     * Add a projectile with constant parameters (no spin/Magnus effect).
+     * Add a projectile with constant parameters.
      */
     public static int addProjectile(
             double robotVx,
@@ -46,8 +45,7 @@ public class ProjectileVisualizer extends SubsystemBase {
     }
 
     /**
-     * Add a projectile with constant parameters including spin rate for Magnus effect.
-     * @param spinRateRPM Spin rate in RPM (positive = backspin for upward lift)
+     * Add a projectile with constant parameters plus an ignored legacy spin argument.
      */
     public static int addProjectile(
             double robotVx,
@@ -66,7 +64,7 @@ public class ProjectileVisualizer extends SubsystemBase {
     }
 
     /**
-     * Add a projectile with supplier parameters (no spin/Magnus effect).
+     * Add a projectile with supplier parameters.
      */
     public static int addProjectile(
             Supplier<Double> robotVxSupplier,
@@ -84,8 +82,7 @@ public class ProjectileVisualizer extends SubsystemBase {
     }
 
     /**
-     * Add a projectile with supplier parameters including spin rate for Magnus effect.
-     * @param spinRateRPMSupplier Spin rate in RPM (positive = backspin for upward lift)
+     * Add a projectile with supplier parameters plus an ignored legacy spin supplier.
      */
     public static int addProjectile(
             Supplier<Double> robotVxSupplier,
@@ -119,10 +116,6 @@ public class ProjectileVisualizer extends SubsystemBase {
         if (!RobotBase.isSimulation()) {
             return;
         }
-
-        long periodicStartNanos = LoopCycleProfiler.markStart();
-
-        long updateProjectilesStartNanos = LoopCycleProfiler.markStart();
         double now = timestampSupplier.get();
         Iterator<ProjectileInstance> iterator = projectiles.iterator();
 
@@ -139,34 +132,22 @@ public class ProjectileVisualizer extends SubsystemBase {
                 iterator.remove();
             }
         }
-        LoopCycleProfiler.endSection("ProjectileVisualizer/UpdateProjectiles", updateProjectilesStartNanos);
 
         // Reset nextId when no projectiles are active
-        long resetIdStartNanos = LoopCycleProfiler.markStart();
         if (projectiles.isEmpty()) {
             nextId = 0;
         }
-        LoopCycleProfiler.endSection("ProjectileVisualizer/ResetIdWhenEmpty", resetIdStartNanos);
 
         // Build translations array from only active projectiles
-        long buildTranslationsStartNanos = LoopCycleProfiler.markStart();
         Translation3d[] activeTranslations = null;
-        if (Constants.VERBOSE_LOGGING_ENABLED) {
-            activeTranslations = new Translation3d[projectiles.size()];
-            for (int i = 0; i < projectiles.size(); i++) {
-                activeTranslations[i] = projectiles.get(i).currentPosition;
-            }
+        activeTranslations = new Translation3d[projectiles.size()];
+        for (int i = 0; i < projectiles.size(); i++) {
+            activeTranslations[i] = projectiles.get(i).currentPosition;
         }
-        LoopCycleProfiler.endSection("ProjectileVisualizer/BuildTranslations", buildTranslationsStartNanos);
+        
 
-        long outputLogStartNanos = LoopCycleProfiler.markStart();
-        if (Constants.VERBOSE_LOGGING_ENABLED && activeTranslations != null) {
-            Logger.recordOutput("ProjectileVisualizer/Translations", activeTranslations);
-        }
+        Logger.recordOutput("ProjectileVisualizer/Translations", activeTranslations);
         Logger.recordOutput("ProjectileVisualizer/ActiveCount", projectiles.size());
-        LoopCycleProfiler.endSection("ProjectileVisualizer/OutputLogging", outputLogStartNanos);
-
-        LoopCycleProfiler.endSection("ProjectileVisualizer/PeriodicTotal", periodicStartNanos);
     }
 
     void setTimestampSupplierForTesting(Supplier<Double> timestampSupplier) {
@@ -205,9 +186,8 @@ public class ProjectileVisualizer extends SubsystemBase {
         }
         projectiles.clear();
         nextId = 0;
-        if (Constants.VERBOSE_LOGGING_ENABLED) {
-            Logger.recordOutput("ProjectileVisualizer/Translations", new Translation3d[0]);
-        }
+        Logger.recordOutput("ProjectileVisualizer/Translations", new Translation3d[0]);
+        
         Logger.recordOutput("ProjectileVisualizer/ActiveCount", 0);
     }
 
@@ -251,12 +231,11 @@ public class ProjectileVisualizer extends SubsystemBase {
             lastUpdateTime = now;
             initializeState();
             currentPosition = initialPose.getTranslation();
-            if (Constants.VERBOSE_LOGGING_ENABLED) {
-                Logger.recordOutput(logKey("InitialPose"), initialPose);
-                Logger.recordOutput(logKey("LaunchAngleDegrees"), Math.toDegrees(launchAngle));
-                Logger.recordOutput(logKey("LaunchVelocity"), launchVelocitySupplier.get());
-                Logger.recordOutput(logKey("SpinRateRPM"), spinRateRPMSupplier.get());
-            }
+            Logger.recordOutput(logKey("InitialPose"), initialPose);
+            Logger.recordOutput(logKey("LaunchAngleDegrees"), Math.toDegrees(launchAngle));
+            Logger.recordOutput(logKey("LaunchVelocity"), launchVelocitySupplier.get());
+            Logger.recordOutput(logKey("SpinRateRPM"), spinRateRPMSupplier.get());
+            
             initialized = true;
         }
 
@@ -307,7 +286,7 @@ public class ProjectileVisualizer extends SubsystemBase {
             double remainingTime = elapsedSinceLastUpdate;
             while (remainingTime > 0 && state.z() >= 0) {
                 double dt = Math.min(SIMULATION_DT, remainingTime);
-                state = BallisticsPhysics.integrateStep3D(state, spinRateRadPerSec, dt);
+                state = BallisticsPhysics.integrateStep3D(state, spinRateRadPerSec, dt, VISUALIZATION_MODEL);
                 remainingTime -= dt;
             }
 
@@ -318,23 +297,20 @@ public class ProjectileVisualizer extends SubsystemBase {
             Pose3d currentPose = new Pose3d(currentPosition, initialPose.getRotation());
 
             double elapsedTotal = now - startTime;
-            if (Constants.VERBOSE_LOGGING_ENABLED) {
-                Logger.recordOutput(logKey("CurrentPose"), currentPose);
-                Logger.recordOutput(logKey("CurrentPosition"), currentPosition);
-                Logger.recordOutput(logKey("ElapsedTime"), elapsedTotal);
-                Logger.recordOutput(logKey("Height"), state.z());
-                Logger.recordOutput(logKey("VelocityMagnitude"), state.speed());
-            }
+            Logger.recordOutput(logKey("CurrentPose"), currentPose);
+            Logger.recordOutput(logKey("CurrentPosition"), currentPosition);
+            Logger.recordOutput(logKey("ElapsedTime"), elapsedTotal);
+            Logger.recordOutput(logKey("Height"), state.z());
+            Logger.recordOutput(logKey("VelocityMagnitude"), state.speed());
+            
         }
 
         private void clearLogs() {
-            if (Constants.VERBOSE_LOGGING_ENABLED) {
-                Logger.recordOutput(logKey("CurrentPose"), new Pose3d());
-                Logger.recordOutput(logKey("CurrentPosition"), new Translation3d());
-                Logger.recordOutput(logKey("ElapsedTime"), 0.0);
-                Logger.recordOutput(logKey("Height"), 0.0);
-                Logger.recordOutput(logKey("VelocityMagnitude"), 0.0);
-            }
+            Logger.recordOutput(logKey("CurrentPose"), new Pose3d());
+            Logger.recordOutput(logKey("CurrentPosition"), new Translation3d());
+            Logger.recordOutput(logKey("ElapsedTime"), 0.0);
+            Logger.recordOutput(logKey("Height"), 0.0);
+            Logger.recordOutput(logKey("VelocityMagnitude"), 0.0);
         }
 
         private boolean isFinished() {

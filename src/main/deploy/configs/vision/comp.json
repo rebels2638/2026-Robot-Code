@@ -2,6 +2,7 @@
   "cameras": [
     {
       "name": "limelight-fl",
+      "observationMode": "MT1_ONLY",
       "x": 0.071188,
       "y": 0.36293,
       "z": 0.50849,
@@ -11,6 +12,7 @@
     },
     {
       "name": "limelight-fr",
+      "observationMode": "MT1_ONLY",
       "x": 0.13709,
       "y": -0.30978,
       "z": 0.507,
@@ -20,6 +22,7 @@
     },
     {
       "name": "limelight-bl",
+      "observationMode": "MT1_ONLY",
       "x": -0.15338,
       "y": 0.306,
       "z": 0.50849,
@@ -29,6 +32,7 @@
     },
     {
       "name": "limelight-br",
+      "observationMode": "MT1_ONLY",
       "x": -0.071188,
       "y": -0.36293,
       "z": 0.50849,
@@ -41,10 +45,10 @@
   "enabledImuMode": 4,
   "maxAmbiguity": 0.4,
   "maxZError": 0.5,
-  "linearStdDevBaseline": 0.02,
-  "angularStdDevBaseline": 0.5,
+  "linearStdDevBaseline": 0.01,
+  "angularStdDevBaseline": 0.35,
   "linearStdDevMegatag1Factor": 1.8,
-  "angularStdDevMegatag1Factor": 1.0,
+  "angularStdDevMegatag1Factor": 99999.0,
   "linearStdDevMegatag2Factor": 1.0,
   "angularStdDevMegatag2Factor": 999999.0,
   "maxRotationRateMegatag1DegreesPerSecond": 360.0,

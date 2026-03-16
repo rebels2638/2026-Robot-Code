@@ -5,6 +5,5 @@
   "visionTranslationDevBase": 0.02,
   "visionRotationDevBase": 0.02,
   "gyroResetTimeoutSeconds": 1.0,
-  "gyroResetMaxVisionRotationStdDev": 300.0,
-  "maxTiltAngleDegrees": 15.0
+  "gyroResetMaxVisionRotationStdDev": 300.0
 }

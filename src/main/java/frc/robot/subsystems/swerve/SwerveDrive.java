@@ -7,6 +7,7 @@ import static edu.wpi.first.units.Units.Volts;
 import java.util.ArrayList;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
+import java.util.function.BooleanSupplier;
 import java.util.function.DoubleSupplier;
 
 import org.littletonrobotics.junction.AutoLogOutput;
@@ -18,6 +19,7 @@ import edu.wpi.first.math.controller.PIDController;
 import edu.wpi.first.math.geometry.Pose2d;
 import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.math.geometry.Rotation3d;
+import edu.wpi.first.math.geometry.Translation2d;
 import edu.wpi.first.math.kinematics.ChassisSpeeds;
 import edu.wpi.first.math.kinematics.SwerveModulePosition;
 import edu.wpi.first.math.kinematics.SwerveModuleState;
@@ -28,7 +30,9 @@ import edu.wpi.first.wpilibj.DriverStation;
 import edu.wpi.first.wpilibj.Timer;
 import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.CommandScheduler;
+import edu.wpi.first.wpilibj2.command.InstantCommand;
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
+import edu.wpi.first.wpilibj2.command.WaitUntilCommand;
 import edu.wpi.first.wpilibj2.command.sysid.SysIdRoutine;
 import edu.wpi.first.wpilibj2.command.sysid.SysIdRoutine.Direction;
 import frc.robot.RobotState;
@@ -39,7 +43,6 @@ import frc.robot.configs.SwerveDrivetrainConfig;
 import frc.robot.configs.SwerveModuleGeneralConfig;
 import frc.robot.lib.util.ConfigLoader;
 import frc.robot.lib.util.DashboardMotorControlLoopConfigurator;
-import frc.robot.lib.util.LoopCycleProfiler;
 import frc.robot.lib.BLine.ChassisRateLimiter;
 import frc.robot.lib.BLine.FollowPath;
 import frc.robot.lib.BLine.Path;
@@ -65,7 +68,8 @@ public class SwerveDrive extends SubsystemBase {
     public enum DesiredSystemState {
         DISABLED,
         IDLE,
-        TELEOP,
+        TELOP_FIELD_RELATIVE,
+        TELOP_ROBOT_RELATIVE,
         FOLLOW_PATH,
         PREPARE_FOR_AUTO,
         SYSID
@@ -74,7 +78,8 @@ public class SwerveDrive extends SubsystemBase {
     public enum CurrentSystemState {
         DISABLED,
         IDLE,
-        TELEOP,
+        TELOP_FIELD_RELATIVE,
+        TELOP_ROBOT_RELATIVE,
         FOLLOW_PATH,
         PREPARE_FOR_AUTO,
         READY_FOR_AUTO,
@@ -127,13 +132,21 @@ public class SwerveDrive extends SubsystemBase {
     private CurrentTranslationOverrideState previousTranslationOverrideState = CurrentTranslationOverrideState.NONE;
 
     // Teleop input suppliers (normalized -1 to 1)
-    private DoubleSupplier vxNormalizedSupplier = () -> 0.0;
-    private DoubleSupplier vyNormalizedSupplier = () -> 0.0;
-    private DoubleSupplier omegaNormalizedSupplier = () -> 0.0;
+    private DoubleSupplier fieldRelativeVxNormalizedSupplier = () -> 0.0;
+    private DoubleSupplier fieldRelativeVyNormalizedSupplier = () -> 0.0;
+    private DoubleSupplier fieldRelativeOmegaNormalizedSupplier = () -> 0.0;
+    private DoubleSupplier robotRelativeVxNormalizedSupplier = () -> 0.0;
+    private DoubleSupplier robotRelativeVyNormalizedSupplier = () -> 0.0;
+    private DoubleSupplier robotRelativeOmegaNormalizedSupplier = () -> 0.0;
+    private Rotation2d robotRelativeTeleopHeadingOffset = new Rotation2d();
 
     // Path following
     private Path currentPath = null;
     private boolean shouldResetPose = false;
+    private boolean shouldUseDefaultPathFlipping = true;
+    private boolean shouldFlipCurrentPath = false;
+    private boolean shouldMirrorCurrentPath = false;
+    private BooleanSupplier pathMirroringHook = () -> false;
     private Command currentPathCommand = null;
     private FollowPath.Builder followPathBuilder;
 
@@ -210,13 +223,30 @@ public class SwerveDrive extends SubsystemBase {
         new SwerveModulePosition(),
         new SwerveModulePosition(),
         new SwerveModulePosition()
-    };  
+    };
+    private SwerveModulePosition[] filteredOdometryModulePositions = new SwerveModulePosition[] {
+        new SwerveModulePosition(),
+        new SwerveModulePosition(),
+        new SwerveModulePosition(),
+        new SwerveModulePosition()
+    };
     private SwerveModuleState[] moduleStates = new SwerveModuleState[] {
         new SwerveModuleState(),
         new SwerveModuleState(),
         new SwerveModuleState(),
         new SwerveModuleState()
     };
+    private SwerveModuleState[] filteredOdometryModuleStates = new SwerveModuleState[] {
+        new SwerveModuleState(),
+        new SwerveModuleState(),
+        new SwerveModuleState(),
+        new SwerveModuleState()
+    };
+    private final double[] lastRawOdometryDrivePositionsMeters = new double[4];
+    private final double[] rejectedOdometryDriveDistanceMeters = new double[4];
+    private boolean hasInitializedFilteredOdometry = false;
+    private boolean isRejectingTiltedOdometry = false;
+    private Pose2d currentPose = new Pose2d();
 
     private ChassisSpeeds desiredRobotRelativeSpeeds = new ChassisSpeeds();
     private ChassisSpeeds obtainableFieldRelativeSpeeds = new ChassisSpeeds();
@@ -373,7 +403,7 @@ public class SwerveDrive extends SubsystemBase {
                 drivetrainConfig.followPathCrossTrackKI,
                 drivetrainConfig.followPathCrossTrackKD
             )
-        ).withDefaultShouldFlip().withTRatioBasedTranslationHandoffs(true).withShouldMirror(() -> true);
+        ).withDefaultShouldFlip().withTRatioBasedTranslationHandoffs(true);
 
         // Configure omega override PID controllers with velocity limiting
         omegaOverridePIDController = new PIDController(
@@ -395,18 +425,14 @@ public class SwerveDrive extends SubsystemBase {
 
     @Override
     public void periodic() {
-        long periodicStartNanos = LoopCycleProfiler.markStart();
-
-        long loopDtStartNanos = LoopCycleProfiler.markStart();
-        double dt = Timer.getTimestamp() - prevLoopTime; 
-        prevLoopTime = Timer.getTimestamp();
+        double now = Timer.getTimestamp();
+        double dt = now - prevLoopTime;
+        prevLoopTime = now;
 
         Logger.recordOutput("SwerveDrive/dtPeriodic", dt);
-        LoopCycleProfiler.endSection("SwerveDrive/LoopDt", loopDtStartNanos);
 
         // Thread safe reading of the gyro and swerve inputs.
         // The read lock is released only after inputs are written via the write lock
-        long inputReadStartNanos = LoopCycleProfiler.markStart();
         odometryLock.lock();
         try {
             gyroIO.updateInputs(gyroInputs);
@@ -426,18 +452,14 @@ public class SwerveDrive extends SubsystemBase {
             steerMotorDisconnectedAlerts[i].set(enableConnectionAlerts && !moduleInputs[i].steerMotorConnected);
             steerEncoderDisconnectedAlerts[i].set(enableConnectionAlerts && !moduleInputs[i].steerEncoderConnected);
         }
-        LoopCycleProfiler.endSection("SwerveDrive/ReadInputs", inputReadStartNanos);
 
-        long buildModuleStatesStartNanos = LoopCycleProfiler.markStart();
         for (int i = 0; i < 4; i++) {
             moduleStates[i] = new SwerveModuleState(
                 moduleInputs[i].driveVelocityMetersPerSec,
                 moduleInputs[i].steerPosition
             );
         }
-        LoopCycleProfiler.endSection("SwerveDrive/BuildModuleStates", buildModuleStatesStartNanos);
 
-        long configUpdateStartNanos = LoopCycleProfiler.markStart();
         pendingDriveControlLoopConfigApply |= driveControlLoopConfigurator.hasChanged();
         pendingSteerControlLoopConfigApply |= steerControlLoopConfigurator.hasChanged();
         if (DriverStation.isDisabled()) {
@@ -454,32 +476,31 @@ public class SwerveDrive extends SubsystemBase {
                 pendingSteerControlLoopConfigApply = false;
             }
         }
-        LoopCycleProfiler.endSection("SwerveDrive/ControlLoopConfigUpdates", configUpdateStartNanos);
 
-        long odometryStartNanos = LoopCycleProfiler.markStart();
         ArrayList<Pose2d> updatedPoses = Constants.VERBOSE_LOGGING_ENABLED ? new ArrayList<Pose2d>() : null;
+
+        double angleToFloorDegrees = getAngleToFloorDegrees(gyroInputs.gyroOrientation);
+        boolean shouldRejectTiltedOdometry = gyroInputs.isConnected
+            && angleToFloorDegrees > drivetrainConfig.maxOdometryTiltAngleDegrees;
+        isRejectingTiltedOdometry = shouldRejectTiltedOdometry;
+        Logger.recordOutput("SwerveDrive/odometry/angleToFloorDegrees", angleToFloorDegrees);
+        Logger.recordOutput("SwerveDrive/odometry/isRejectingTiltedOdometry", isRejectingTiltedOdometry);
 
         double[] odometryTimestampsSeconds = moduleInputs[0].odometryTimestampsSeconds;
         for (int i = 0; i < odometryTimestampsSeconds.length; i++) {
-            for (int j = 0; j < 4; j++) {
-                modulePositions[j] = new SwerveModulePosition(
-                    moduleInputs[j].odometryDrivePositionsMeters[i],
-                    moduleInputs[j].odometrySteerPositions[i]
-                );
-            }
+            Rotation3d odometryGyroOrientation = getOdometryGyroOrientation(i);
+            boolean shouldRejectOdometrySample = gyroInputs.isConnected
+                && getAngleToFloorDegrees(odometryGyroOrientation) > drivetrainConfig.maxOdometryTiltAngleDegrees;
+            updateOdometryObservation(i, shouldRejectOdometrySample);
             
             RobotState.getInstance().addOdometryObservation(
                 new OdometryObservation(
                     odometryTimestampsSeconds[i],
                     gyroInputs.isConnected,
-                    modulePositions,
-                    moduleStates,
+                    filteredOdometryModulePositions,
+                    filteredOdometryModuleStates,
                     gyroInputs.isConnected ?
-                        new Rotation3d(
-                            gyroInputs.gyroOrientation.getX(),
-                            gyroInputs.gyroOrientation.getY(),
-                            gyroInputs.odometryYawPositions[i].getRadians()
-                        ) :
+                        odometryGyroOrientation :
                         new Rotation3d(),
                     gyroInputs.isConnected ? gyroInputs.yawVelocityRadPerSec : 0
                 )
@@ -492,25 +513,80 @@ public class SwerveDrive extends SubsystemBase {
 
         if (Constants.VERBOSE_LOGGING_ENABLED && updatedPoses != null) {
             Logger.recordOutput("SwerveDrive/updatedPoses", updatedPoses.toArray(new Pose2d[0]));
-            Logger.recordOutput("SwerveDrive/measuredModuleStates", moduleStates);
-            Logger.recordOutput("SwerveDrive/measuredModulePositions", modulePositions);
         }
-        LoopCycleProfiler.endSection("SwerveDrive/Odometry", odometryStartNanos);
+        Logger.recordOutput("SwerveDrive/measuredModuleStates", moduleStates);
+        Logger.recordOutput("SwerveDrive/measuredModulePositions", modulePositions);
+        Logger.recordOutput("SwerveDrive/filteredOdometryModuleStates", filteredOdometryModuleStates);
+        Logger.recordOutput("SwerveDrive/filteredOdometryModulePositions", filteredOdometryModulePositions);
+        Logger.recordOutput("SwerveDrive/rejectedOdometryDriveDistanceMeters", rejectedOdometryDriveDistanceMeters);
+
+        currentPose = RobotState.getInstance().getEstimatedPose();
 
         // FSM processing
-        long stateTransitionsStartNanos = LoopCycleProfiler.markStart();
         handleStateTransitions();
-        LoopCycleProfiler.endSection("SwerveDrive/StateTransitions", stateTransitionsStartNanos);
 
-        long currentStateStartNanos = LoopCycleProfiler.markStart();
         handleCurrentState();
-        LoopCycleProfiler.endSection("SwerveDrive/CurrentStateHandling", currentStateStartNanos);
 
-        long commandLogStartNanos = LoopCycleProfiler.markStart();
         Logger.recordOutput("SwerveDrive/CurrentCommand", this.getCurrentCommand() == null ? "" : this.getCurrentCommand().toString());
-        LoopCycleProfiler.endSection("SwerveDrive/CurrentCommandLog", commandLogStartNanos);
+    }
 
-        LoopCycleProfiler.endSection("SwerveDrive/PeriodicTotal", periodicStartNanos);
+    private void updateOdometryObservation(int odometrySampleIndex, boolean shouldRejectTiltedOdometry) {
+        for (int moduleIndex = 0; moduleIndex < moduleInputs.length; moduleIndex++) {
+            double rawDrivePositionMeters = moduleInputs[moduleIndex].odometryDrivePositionsMeters[odometrySampleIndex];
+            Rotation2d steerPosition = moduleInputs[moduleIndex].odometrySteerPositions[odometrySampleIndex];
+
+            modulePositions[moduleIndex] = new SwerveModulePosition(rawDrivePositionMeters, steerPosition);
+
+            if (!hasInitializedFilteredOdometry) {
+                lastRawOdometryDrivePositionsMeters[moduleIndex] = rawDrivePositionMeters;
+            } else if (shouldRejectTiltedOdometry) {
+                // Absorb unloaded-wheel travel into the offset so filtered distance stays continuous.
+                rejectedOdometryDriveDistanceMeters[moduleIndex] +=
+                    rawDrivePositionMeters - lastRawOdometryDrivePositionsMeters[moduleIndex];
+            }
+
+            filteredOdometryModulePositions[moduleIndex] = new SwerveModulePosition(
+                rawDrivePositionMeters - rejectedOdometryDriveDistanceMeters[moduleIndex],
+                steerPosition
+            );
+            filteredOdometryModuleStates[moduleIndex] = new SwerveModuleState(
+                shouldRejectTiltedOdometry ? 0.0 : moduleInputs[moduleIndex].driveVelocityMetersPerSec,
+                steerPosition
+            );
+            lastRawOdometryDrivePositionsMeters[moduleIndex] = rawDrivePositionMeters;
+        }
+
+        hasInitializedFilteredOdometry = true;
+    }
+
+    private Rotation3d getOdometryGyroOrientation(int odometrySampleIndex) {
+        if (!gyroInputs.isConnected) {
+            return new Rotation3d();
+        }
+
+        double rollRadians = gyroInputs.gyroOrientation.getX();
+        double pitchRadians = gyroInputs.gyroOrientation.getY();
+        double yawRadians = gyroInputs.gyroOrientation.getZ();
+        if (gyroInputs.odometryRollPositions.length > odometrySampleIndex) {
+            rollRadians = gyroInputs.odometryRollPositions[odometrySampleIndex].getRadians();
+        }
+        if (gyroInputs.odometryPitchPositions.length > odometrySampleIndex) {
+            pitchRadians = gyroInputs.odometryPitchPositions[odometrySampleIndex].getRadians();
+        }
+        if (gyroInputs.odometryYawPositions.length > odometrySampleIndex) {
+            yawRadians = gyroInputs.odometryYawPositions[odometrySampleIndex].getRadians();
+        }
+
+        return new Rotation3d(
+            rollRadians,
+            pitchRadians,
+            yawRadians
+        );
+    }
+
+    private double getAngleToFloorDegrees(Rotation3d orientation) {
+        double cosine = Math.cos(orientation.getX()) * Math.cos(orientation.getY());
+        return Math.toDegrees(Math.acos(MathUtil.clamp(cosine, -1.0, 1.0)));
     }
 
     /**
@@ -524,8 +600,11 @@ public class SwerveDrive extends SubsystemBase {
             case IDLE:
                 currentSystemState = CurrentSystemState.IDLE;
                 break;
-            case TELEOP:
-                currentSystemState = CurrentSystemState.TELEOP;
+            case TELOP_FIELD_RELATIVE:
+                currentSystemState = CurrentSystemState.TELOP_FIELD_RELATIVE;
+                break;
+            case TELOP_ROBOT_RELATIVE:
+                currentSystemState = CurrentSystemState.TELOP_ROBOT_RELATIVE;
                 break;
 
             case FOLLOW_PATH:
@@ -538,8 +617,9 @@ public class SwerveDrive extends SubsystemBase {
                 break;
                 
             case PREPARE_FOR_AUTO:
-                if (currentPath != null) {
-                    modulesAlignmentTargetRotation = currentPath.getInitialModuleDirection();
+                Path resolvedCurrentPath = resolveConfiguredCurrentPath();
+                if (resolvedCurrentPath != null) {
+                    modulesAlignmentTargetRotation = resolvedCurrentPath.getInitialModuleDirection();
                     modulesAlignmentToleranceDeg = 15;
                 }
                 if (areModulesAligned()) {
@@ -600,8 +680,11 @@ public class SwerveDrive extends SubsystemBase {
             case IDLE:
                 handleIdleSystemState();
                 break;
-            case TELEOP:
-                handleTeleopSystemState();
+            case TELOP_FIELD_RELATIVE:
+                handleFieldRelativeTeleopSystemState();
+                break;
+            case TELOP_ROBOT_RELATIVE:
+                handleRobotRelativeTeleopSystemState();
                 break;
             case FOLLOW_PATH:
                 handleFollowPathSystemState();
@@ -686,19 +769,36 @@ public class SwerveDrive extends SubsystemBase {
         previousSystemState = CurrentSystemState.IDLE;
     }
 
-    private void handleTeleopSystemState() {
+    private void handleFieldRelativeTeleopSystemState() {
         cancelPathCommand();
 
         invert = Constants.shouldFlipPath() ? -1 : 1;
 
         ChassisSpeeds desiredFieldRelativeSpeeds = new ChassisSpeeds(
-            vxNormalizedSupplier.getAsDouble() * drivetrainConfig.maxTranslationalVelocityMetersPerSec * invert,
-            vyNormalizedSupplier.getAsDouble() * drivetrainConfig.maxTranslationalVelocityMetersPerSec * invert,
-            omegaNormalizedSupplier.getAsDouble() * drivetrainConfig.maxAngularVelocityRadiansPerSec
+            fieldRelativeVxNormalizedSupplier.getAsDouble() * drivetrainConfig.maxTranslationalVelocityMetersPerSec * invert,
+            fieldRelativeVyNormalizedSupplier.getAsDouble() * drivetrainConfig.maxTranslationalVelocityMetersPerSec * invert,
+            fieldRelativeOmegaNormalizedSupplier.getAsDouble() * drivetrainConfig.maxAngularVelocityRadiansPerSec
         );
         driveFieldRelative(desiredFieldRelativeSpeeds);
 
-        previousSystemState = CurrentSystemState.TELEOP;
+        previousSystemState = CurrentSystemState.TELOP_FIELD_RELATIVE;
+    }
+
+    private void handleRobotRelativeTeleopSystemState() {
+        cancelPathCommand();
+
+        ChassisSpeeds desiredRobotRelativeSpeeds = new ChassisSpeeds(
+            robotRelativeVxNormalizedSupplier.getAsDouble() * drivetrainConfig.maxTranslationalVelocityMetersPerSec,
+            robotRelativeVyNormalizedSupplier.getAsDouble() * drivetrainConfig.maxTranslationalVelocityMetersPerSec,
+            robotRelativeOmegaNormalizedSupplier.getAsDouble() * drivetrainConfig.maxAngularVelocityRadiansPerSec
+        );
+        desiredRobotRelativeSpeeds = applyRobotRelativeTeleopHeadingOffset(
+            desiredRobotRelativeSpeeds,
+            robotRelativeTeleopHeadingOffset
+        );
+        driveRobotRelative(desiredRobotRelativeSpeeds);
+
+        previousSystemState = CurrentSystemState.TELOP_ROBOT_RELATIVE;
     }
 
     private void handleFollowPathSystemState() {
@@ -715,9 +815,29 @@ public class SwerveDrive extends SubsystemBase {
     private void prepareForAuto() {
         cancelPathCommand();
 
-        if (currentPath != null) {
-            alignModules(currentPath.getInitialModuleDirection(), 15);
+        Path resolvedCurrentPath = resolveConfiguredCurrentPath();
+        if (resolvedCurrentPath != null) {
+            alignModules(resolvedCurrentPath.getInitialModuleDirection(), 15);
         }
+    }
+
+    private boolean shouldFlipPathForCurrentSettings() {
+        return shouldUseDefaultPathFlipping ? Constants.shouldFlipPath() : shouldFlipCurrentPath;
+    }
+
+    private Path resolveConfiguredCurrentPath() {
+        if (currentPath == null) {
+            return null;
+        }
+
+        Path resolvedPath = currentPath.copy();
+        if (shouldFlipPathForCurrentSettings()) {
+            resolvedPath.flip();
+        }
+        if (shouldMirrorCurrentPath) {
+            resolvedPath.mirror();
+        }
+        return resolvedPath;
     }
 
     private void handlePrepareForAutoSystemState() {
@@ -832,10 +952,20 @@ public class SwerveDrive extends SubsystemBase {
      * Builds a path command using the followPathBuilder, applying pose reset if configured.
      */
     private Command buildPathCommand(Path path) {
+        FollowPath.Builder configuredBuilder = shouldUseDefaultPathFlipping
+            ? followPathBuilder.withDefaultShouldFlip()
+            : followPathBuilder.withShouldFlip(() -> shouldFlipCurrentPath);
+
         if (shouldResetPose) {
-            return followPathBuilder.withPoseReset(RobotState.getInstance()::resetPose).build(path);
+            return configuredBuilder
+                .withShouldMirror(() -> shouldMirrorCurrentPath)
+                .withPoseReset(RobotState.getInstance()::resetPose)
+                .build(path);
         }
-        return followPathBuilder.withPoseReset((Pose2d pose) -> {}).build(path);
+        return configuredBuilder
+            .withShouldMirror(() -> shouldMirrorCurrentPath)
+            .withPoseReset((Pose2d pose) -> {})
+            .build(path);
     }
 
     /**
@@ -846,8 +976,7 @@ public class SwerveDrive extends SubsystemBase {
     }
 
     private boolean isAtSnapTarget() {
-        Rotation2d currentRotation = RobotState.getInstance().getEstimatedPose().getRotation();
-        double errorRad = MathUtil.angleModulus(snapTargetAngle.getRadians() - currentRotation.getRadians());
+        double errorRad = MathUtil.angleModulus(snapTargetAngle.getRadians() - currentPose.getRotation().getRadians());
         return Math.abs(errorRad) <= Math.toRadians(drivetrainConfig.snappedToleranceDeg);
     }
 
@@ -1174,8 +1303,7 @@ public class SwerveDrive extends SubsystemBase {
     }
 
     private double calculateSnapOmega() {
-        Rotation2d currentRotation = RobotState.getInstance().getEstimatedPose().getRotation();
-        double current = currentRotation.getRadians();
+        double current = currentPose.getRotation().getRadians();
         double target = snapTargetAngle.getRadians();
 
         snappedOmegaOverridePIDController.setSetpoint(target);
@@ -1186,28 +1314,124 @@ public class SwerveDrive extends SubsystemBase {
     }
 
     // Supplier setters
-    public void setTeleopInputSuppliers(
+    public void setFieldRelativeTeleopInputSuppliers(
         DoubleSupplier vxNormalized,
         DoubleSupplier vyNormalized,
         DoubleSupplier omegaNormalized
     ) {
-        this.vxNormalizedSupplier = vxNormalized;
-        this.vyNormalizedSupplier = vyNormalized;
-        this.omegaNormalizedSupplier = omegaNormalized;
+        this.fieldRelativeVxNormalizedSupplier = vxNormalized;
+        this.fieldRelativeVyNormalizedSupplier = vyNormalized;
+        this.fieldRelativeOmegaNormalizedSupplier = omegaNormalized;
+    }
+
+    public void setRobotRelativeTeleopInputSuppliers(
+        DoubleSupplier vxNormalized,
+        DoubleSupplier vyNormalized,
+        DoubleSupplier omegaNormalized
+    ) {
+        this.robotRelativeVxNormalizedSupplier = vxNormalized;
+        this.robotRelativeVyNormalizedSupplier = vyNormalized;
+        this.robotRelativeOmegaNormalizedSupplier = omegaNormalized;
+    }
+
+    public void setRobotRelativeTeleopHeadingOffset(Rotation2d headingOffset) {
+        this.robotRelativeTeleopHeadingOffset = headingOffset != null ? headingOffset : new Rotation2d();
     }
 
     public void setCurrentPath(Path path) {
+        setCurrentPath(path, false, false);
+    }
+
+    public void setCurrentPath(Path path, boolean shouldResetPose) {
+        setCurrentPath(path, shouldResetPose, false);
+    }
+
+    public void setCurrentPath(Path path, boolean shouldResetPose, boolean shouldMirrorPath) {
         this.currentPath = path;
-        this.shouldResetPose = false;
+        this.shouldResetPose = shouldResetPose;
+        this.shouldUseDefaultPathFlipping = true;
+        this.shouldFlipCurrentPath = false;
+        this.shouldMirrorCurrentPath = shouldMirrorPath;
         // Clear existing command to allow fresh path to be scheduled
         cancelPathCommand();
     }
 
-    public void setCurrentPath(Path path, boolean shouldResetPose) {
+    public void setCurrentPath(Path path, boolean shouldResetPose, boolean shouldMirrorPath, boolean shouldFlipPath) {
         this.currentPath = path;
         this.shouldResetPose = shouldResetPose;
+        this.shouldUseDefaultPathFlipping = false;
+        this.shouldFlipCurrentPath = shouldFlipPath;
+        this.shouldMirrorCurrentPath = shouldMirrorPath;
         // Clear existing command to allow fresh path to be scheduled
         cancelPathCommand();
+    }
+
+    public void setPathMirroringHook(BooleanSupplier pathMirroringHook) {
+        this.pathMirroringHook = pathMirroringHook != null ? pathMirroringHook : () -> false;
+    }
+
+    public Command followPathCommand(Path path) {
+        return followPathCommand(path, () -> false, pathMirroringHook);
+    }
+
+    public Command followPathCommand(Path path, boolean shouldResetPose) {
+        return followPathCommand(path, () -> shouldResetPose, pathMirroringHook);
+    }
+
+    public Command followPathCommand(Path path, boolean shouldResetPose, boolean shouldMirrorPath) {
+        return followPathCommand(path, () -> shouldResetPose, () -> shouldMirrorPath);
+    }
+
+    public Command prepareForPathCommand(Path path, boolean shouldMirrorPath) {
+        return new InstantCommand(() -> setCurrentPath(path, false, shouldMirrorPath)).andThen(
+            new InstantCommand(() -> setDesiredSystemState(DesiredSystemState.PREPARE_FOR_AUTO))
+        ).andThen(
+            new WaitUntilCommand(() -> getCurrentSystemState() == CurrentSystemState.READY_FOR_AUTO)
+        );
+    }
+
+    public Command prepareForPathCommand(Path path, boolean shouldMirrorPath, boolean shouldFlipPath) {
+        return new InstantCommand(() -> setCurrentPath(path, false, shouldMirrorPath, shouldFlipPath)).andThen(
+            new InstantCommand(() -> setDesiredSystemState(DesiredSystemState.PREPARE_FOR_AUTO))
+        ).andThen(
+            new WaitUntilCommand(() -> getCurrentSystemState() == CurrentSystemState.READY_FOR_AUTO)
+        );
+    }
+
+    public Command followPathCommand(Path path, boolean shouldResetPose, boolean shouldMirrorPath, boolean shouldFlipPath) {
+        return new InstantCommand(() -> setCurrentPath(
+            path,
+            shouldResetPose,
+            shouldMirrorPath,
+            shouldFlipPath
+        )).andThen(
+            new InstantCommand(() -> setDesiredSystemState(DesiredSystemState.FOLLOW_PATH))
+        ).andThen(
+            new WaitUntilCommand(() -> currentPathCommand != null)
+        ).andThen(
+            new WaitUntilCommand(() -> getCurrentSystemState() == CurrentSystemState.IDLE)
+        );
+    }
+
+    public Command followPathCommand(
+        Path path,
+        BooleanSupplier shouldResetPoseHook,
+        BooleanSupplier shouldMirrorPathHook
+    ) {
+        BooleanSupplier resolvedResetPoseHook = shouldResetPoseHook != null ? shouldResetPoseHook : () -> false;
+        BooleanSupplier resolvedMirrorPathHook = shouldMirrorPathHook != null ? shouldMirrorPathHook : () -> false;
+
+        return new InstantCommand(() -> setCurrentPath(
+            path,
+            resolvedResetPoseHook.getAsBoolean(),
+            resolvedMirrorPathHook.getAsBoolean()
+        )).andThen(
+            new InstantCommand(() -> setDesiredSystemState(DesiredSystemState.FOLLOW_PATH))
+        ).andThen(
+            new WaitUntilCommand(() -> currentPathCommand != null)
+        ).andThen(
+            new WaitUntilCommand(() -> getCurrentSystemState() == CurrentSystemState.IDLE)
+        );
     }
 
     public void setRotationRangeAccumulatedDegrees(double minAbsDeg, double maxAbsDeg) {
@@ -1245,7 +1469,7 @@ public class SwerveDrive extends SubsystemBase {
 
     public void setRotationRangeWrappedDegrees(double minWrappedDeg, double maxWrappedDeg) {
         double wrappedReferenceDeg = normalizeWrappedDegrees(
-            RobotState.getInstance().getEstimatedPose().getRotation().getDegrees()
+            currentPose.getRotation().getDegrees()
         );
         WrappedRotationRangeResolution resolution = resolveWrappedRotationRangeDegrees(
             minWrappedDeg,
@@ -1488,8 +1712,58 @@ public class SwerveDrive extends SubsystemBase {
         return currentSystemState;
     }
 
+    @AutoLogOutput(key = "SwerveDrive/hasCurrentPathCommand")
+    public boolean hasCurrentPathCommand() {
+        return currentPathCommand != null;
+    }
+
+    @AutoLogOutput(key = "SwerveDrive/currentPathCommandScheduled")
+    public boolean isCurrentPathCommandScheduled() {
+        return currentPathCommand != null && currentPathCommand.isScheduled();
+    }
+
+    @AutoLogOutput(key = "SwerveDrive/currentPathCommandFinished")
+    public boolean isCurrentPathCommandFinished() {
+        return currentPathCommand != null && currentPathCommand.isFinished();
+    }
+
     public void setDesiredSystemState(DesiredSystemState desiredState) {
         this.desiredSystemState = desiredState;
+    }
+
+    public void toggleTeleopDriveMode() {
+        desiredSystemState = toggleTeleopDriveMode(desiredSystemState);
+    }
+
+    @AutoLogOutput(key = "SwerveDrive/robotRelativeTeleopHeadingOffsetDeg")
+    public double getRobotRelativeTeleopHeadingOffsetDegrees() {
+        return robotRelativeTeleopHeadingOffset.getDegrees();
+    }
+
+    static DesiredSystemState toggleTeleopDriveMode(DesiredSystemState desiredState) {
+        switch (desiredState) {
+            case TELOP_FIELD_RELATIVE:
+                return DesiredSystemState.TELOP_ROBOT_RELATIVE;
+            case TELOP_ROBOT_RELATIVE:
+                return DesiredSystemState.TELOP_FIELD_RELATIVE;
+            default:
+                return desiredState;
+        }
+    }
+
+    static ChassisSpeeds applyRobotRelativeTeleopHeadingOffset(
+        ChassisSpeeds speeds,
+        Rotation2d headingOffset
+    ) {
+        Translation2d rotatedTranslation = new Translation2d(
+            speeds.vxMetersPerSecond,
+            speeds.vyMetersPerSecond
+        ).rotateBy(headingOffset);
+        return new ChassisSpeeds(
+            rotatedTranslation.getX(),
+            rotatedTranslation.getY(),
+            speeds.omegaRadiansPerSecond
+        );
     }
 
     // Omega Override State getters/setters
@@ -1591,14 +1865,15 @@ public class SwerveDrive extends SubsystemBase {
     private ChassisSpeeds compensateRobotRelativeSpeeds(ChassisSpeeds speeds) {
         Rotation2d angularVelocity = new Rotation2d(speeds.omegaRadiansPerSecond * drivetrainConfig.rotationCompensationCoefficient);
         if (angularVelocity.getRadians() != 0.0) {
+            Rotation2d heading = currentPose.getRotation();
             speeds = ChassisSpeeds.fromFieldRelativeSpeeds(
                 ChassisSpeeds.fromRobotRelativeSpeeds( // why should this be split into two?
                     speeds.vxMetersPerSecond,
                     speeds.vyMetersPerSecond,
                     speeds.omegaRadiansPerSecond,
-                    RobotState.getInstance().getEstimatedPose().getRotation().plus(angularVelocity)
+                    heading.plus(angularVelocity)
                 ),
-                RobotState.getInstance().getEstimatedPose().getRotation()
+                heading
             );
         }
 
@@ -1627,8 +1902,10 @@ public class SwerveDrive extends SubsystemBase {
     }
 
     private void driveRobotRelative(ChassisSpeeds speeds) {
-        double dt = Timer.getTimestamp() - prevDriveTime; 
-        prevDriveTime = Timer.getTimestamp();
+        double now = Timer.getTimestamp();
+        double dt = now - prevDriveTime;
+        prevDriveTime = now;
+        Rotation2d heading = currentPose.getRotation();
 
         lastUnoverriddenOmega = speeds.omegaRadiansPerSecond;
         desiredRobotRelativeSpeeds = speeds;
@@ -1673,10 +1950,10 @@ public class SwerveDrive extends SubsystemBase {
                 desiredRobotRelativeSpeeds.omegaRadiansPerSecond
             );
 
-            desiredRobotRelativeSpeeds = ChassisSpeeds.fromFieldRelativeSpeeds(frozenFieldRelativeSpeeds, RobotState.getInstance().getEstimatedPose().getRotation());
+            desiredRobotRelativeSpeeds = ChassisSpeeds.fromFieldRelativeSpeeds(frozenFieldRelativeSpeeds, heading);
         }
 
-        ChassisSpeeds desiredFieldRelativeSpeeds = ChassisSpeeds.fromRobotRelativeSpeeds(desiredRobotRelativeSpeeds, RobotState.getInstance().getEstimatedPose().getRotation());
+        ChassisSpeeds desiredFieldRelativeSpeeds = ChassisSpeeds.fromRobotRelativeSpeeds(desiredRobotRelativeSpeeds, heading);
         Logger.recordOutput("SwerveDrive/desiredFieldRelativeSpeeds", desiredFieldRelativeSpeeds);
         Logger.recordOutput("SwerveDrive/desiredRobotRelativeSpeeds", desiredRobotRelativeSpeeds);
         
@@ -1693,7 +1970,7 @@ public class SwerveDrive extends SubsystemBase {
         
         Logger.recordOutput("SwerveDrive/obtainableFieldRelativeSpeeds", obtainableFieldRelativeSpeeds);
 
-        ChassisSpeeds obtainableRobotRelativeSpeeds = ChassisSpeeds.fromFieldRelativeSpeeds(obtainableFieldRelativeSpeeds, RobotState.getInstance().getEstimatedPose().getRotation());
+        ChassisSpeeds obtainableRobotRelativeSpeeds = ChassisSpeeds.fromFieldRelativeSpeeds(obtainableFieldRelativeSpeeds, heading);
         Logger.recordOutput("SwerveDrive/obtainableRobotRelativeSpeeds", obtainableRobotRelativeSpeeds);
 
         SwerveModuleState[] moduleSetpoints = kinematics.toSwerveModuleStates(obtainableRobotRelativeSpeeds);
@@ -1712,7 +1989,7 @@ public class SwerveDrive extends SubsystemBase {
     }
 
     private void driveFieldRelative(ChassisSpeeds speeds) {
-        speeds = ChassisSpeeds.fromFieldRelativeSpeeds(speeds, RobotState.getInstance().getEstimatedPose().getRotation());
+        speeds = ChassisSpeeds.fromFieldRelativeSpeeds(speeds, currentPose.getRotation());
         driveRobotRelative(speeds);
     }
 
