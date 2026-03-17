@@ -27,14 +27,14 @@
   "pivotKP": 120.0,
   "pivotKI": 0.0,
   "pivotKD": 0.0,
-  "pivotMotorToOutputShaftRatio": 33.57,
+  "pivotMotorToOutputShaftRatio": 31.4285714286,
   "pivotMaxVelocityRotationsPerSec": 0.8,
   "pivotMaxAccelerationRotationsPerSec2": 3.0,
   "pivotMaxJerkRotationsPerSec3": 40.0,
   "pivotStartingAngleRotations": 0.2777,
-  "pivotMinAngleRotations": 0.01944444444,
+  "pivotMinAngleRotations": 0.0,
   "pivotMaxAngleRotations": 0.25,
-  "pivotAngleToleranceRotations": 0.01,
+  "pivotAngleToleranceRotations": 0.001,
   "pivotUpAngleRotations": 0.25,
-  "pivotDownAngleRotations": 0.01944444444
+  "pivotDownAngleRotations": 0.00
 }
