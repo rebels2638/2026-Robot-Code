@@ -27,6 +27,7 @@ import edu.wpi.first.wpilibj2.command.CommandScheduler;
 import frc.robot.constants.Constants;
 import frc.robot.constants.FieldConstants;
 import frc.robot.lib.BLine.FollowPath;
+import frc.robot.lib.util.Elastic;
 import frc.robot.lib.util.PhoenixUtil;
 
 /**
@@ -106,6 +107,7 @@ public class Robot extends LoggedRobot {
         // for elastic dashboard
         WebServer.start(5800, Filesystem.getDeployDirectory().getPath());
         startElasticCameraPublishers();
+        Elastic.selectTab("Autonomous"); // this call speeds up load time keep. 
 
         m_robotContainer = RobotContainer.getInstance();
 
