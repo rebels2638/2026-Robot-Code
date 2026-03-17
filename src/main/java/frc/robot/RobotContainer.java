@@ -19,10 +19,8 @@ import edu.wpi.first.wpilibj2.command.SequentialCommandGroup;
 import edu.wpi.first.wpilibj2.command.WaitCommand;
 import edu.wpi.first.wpilibj2.command.WaitUntilCommand;
 import edu.wpi.first.wpilibj2.command.button.Trigger;
-import frc.robot.commands.AutoClimbCommand;
 import frc.robot.commands.autos.Autos;
 import frc.robot.constants.AlignmentConstants;
-import frc.robot.constants.ClimbingConstants;
 // import frc.robot.commands.autos.tower.ScoreL1;
 import frc.robot.constants.Constants;
 import frc.robot.lib.BLine.FollowPath;
@@ -209,17 +207,16 @@ public class RobotContainer {
     }
 
     private void bindCompetitionDriveHelpers() {
-        Trigger leftBumperOnlyTrigger = xboxDriver.getLeftBumper().and(xboxDriver.getRightBumper().negate());
-        Trigger rightBumperOnlyTrigger = xboxDriver.getRightBumper().and(xboxDriver.getLeftBumper().negate());
-        Trigger autoClimbTrigger = xboxDriver.getRightBumper().and(xboxDriver.getLeftBumper());
+        Trigger leftBumperTrigger = xboxDriver.getLeftBumper();
+        Trigger rightBumperTrigger = xboxDriver.getRightBumper();
 
-        leftBumperOnlyTrigger.onTrue(
+        leftBumperTrigger.onTrue(
             new InstantCommand(() -> superstructure.setDesiredIntakeState(Superstructure.DesiredIntakeState.ALTERNATING))
         ).onFalse(
             new InstantCommand(() -> superstructure.setDesiredIntakeState(Superstructure.DesiredIntakeState.DEPLOYED))
         );
 
-        rightBumperOnlyTrigger.onTrue(
+        rightBumperTrigger.onTrue(
             new InstantCommand(() -> superstructure.setDesiredIntakeState(Superstructure.DesiredIntakeState.STOWED))
         );
 
@@ -235,7 +232,11 @@ public class RobotContainer {
             new InstantCommand(this::runHubTrackingHelper)
         );
 
-        autoClimbTrigger.whileTrue(new AutoClimbCommand(ClimbingConstants.TOWER));
+        xboxDriver.getYButton().onTrue(
+            new InstantCommand(() -> superstructure.setDesiredIntakeState(Superstructure.DesiredIntakeState.REVERSING))
+        ).onFalse(
+            new InstantCommand(() -> superstructure.setDesiredIntakeState(Superstructure.DesiredIntakeState.DEPLOYED))
+        );
 
         xboxDriver.getXButton().onTrue(
             new InstantCommand(() -> swerveDrive.setDesiredSystemState(
@@ -251,14 +252,6 @@ public class RobotContainer {
             new RunCommand(this::runAlliancePassHelper)
         ).onFalse(
             new InstantCommand(() -> superstructure.setDesiredSystemState(Superstructure.DesiredSystemState.TRACKING))
-        );
-
-        xboxDriver.getYButton().onTrue(
-            new InstantCommand(() -> superstructure.setDesiredClimbState(Superstructure.DesiredClimbState.EXTENDED))
-        );
-
-        xboxDriver.getAButton().onTrue(
-            new InstantCommand(() -> superstructure.setDesiredClimbState(Superstructure.DesiredClimbState.CLIMBED))
         );
     }
 
