@@ -66,9 +66,7 @@ public final class Autos {
             ),
             setTarget(TargetState.HUB),
             setSystem(DesiredSystemState.SHOOTING),
-            firstFollowPath("outpost"),
-            waitSeconds(10),
-            climb()
+            firstFollowPath("outpost")
         ),
         auto(
             "overcharge",
@@ -81,8 +79,7 @@ public final class Autos {
             firstFollowPath("bottom_jab_sharp"),
             waitSeconds(5),
             followPath("outpost"),
-            waitSeconds(10),
-            climb()
+            waitSeconds(10)
         ),
         auto(
             "double_swipe_bottom",
