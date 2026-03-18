@@ -32,7 +32,7 @@ public final class Autos {
         SendableChooser<Command> chooser = new SendableChooser<>();
         chooser.setDefaultOption("Do Nothing", Commands.none());
 
-        for (AutoDefinition autoDefinition : AUTOS) {
+        for (AutoDefinition autoDefinition :  AUTOS) {
             chooser.addOption(autoDefinition.name(), autoDefinition.command());
         }
 
@@ -58,6 +58,23 @@ public final class Autos {
         //     waitSeconds(0.25),
         //     setIntake(DesiredIntakeState.STOWED)
         // )
+        auto(
+            "top_sweep_short_depo",
+            new Pose2d(
+                new Translation2d(3.511, 2.160),
+                Rotation2d.fromRadians(Math.PI)
+            ),
+            setSystem(DesiredSystemState.TRACKING),
+            firstFollowPath("top_sweep_short_depo", false, false)
+        ),        auto(
+            "straight",
+            new Pose2d(
+                new Translation2d(3.511, 2.160),
+                Rotation2d.fromRadians(Math.PI)
+            ),
+            setSystem(DesiredSystemState.HOME),
+            firstFollowPath("straight")
+        ),
         auto(
             "outpost",
             new Pose2d(

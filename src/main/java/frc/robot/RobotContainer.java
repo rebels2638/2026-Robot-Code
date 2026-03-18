@@ -14,6 +14,7 @@ import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.Commands;
 import edu.wpi.first.wpilibj2.command.ConditionalCommand;
 import edu.wpi.first.wpilibj2.command.InstantCommand;
+import edu.wpi.first.wpilibj2.command.ParallelDeadlineGroup;
 import edu.wpi.first.wpilibj2.command.RunCommand;
 import edu.wpi.first.wpilibj2.command.SequentialCommandGroup;
 import edu.wpi.first.wpilibj2.command.WaitCommand;
@@ -116,7 +117,7 @@ public class RobotContainer {
     }
 
     private void registerEventTriggers() {
-        FollowPath.registerEventTrigger("prepare_for_shot", new InstantCommand(() -> {
+        FollowPath.registerEventTrigger("ready", new InstantCommand(() -> {
             superstructure.setDesiredSystemState(Superstructure.DesiredSystemState.READY_FOR_SHOT);
         }));
         FollowPath.registerEventTrigger("shoot", () -> {
@@ -206,15 +207,21 @@ public class RobotContainer {
         // xboxDriver.getAButton().onFalse(new InstantCommand(() -> superstructure.setDesiredSystemState(Superstructure.DesiredSystemState.HOME)));
     }
 
+    public Command buildIntakeBumpCommand() {
+        return new SequentialCommandGroup(
+            new InstantCommand(() -> superstructure.setDesiredIntakeState(Superstructure.DesiredIntakeState.INTAKING)),
+            new ParallelDeadlineGroup(
+                new WaitUntilCommand(() -> intake.getPivotAngleRotations()/360 > 10),
+                new InstantCommand(() -> superstructure.setDesiredIntakeState(Superstructure.DesiredIntakeState.STOWED))
+            ),
+            new InstantCommand(() -> superstructure.setDesiredIntakeState(Superstructure.DesiredIntakeState.INTAKING))
+        );
+    }
     private void bindCompetitionDriveHelpers() {
         Trigger leftBumperTrigger = xboxDriver.getLeftBumper();
         Trigger rightBumperTrigger = xboxDriver.getRightBumper();
 
-        leftBumperTrigger.onTrue(
-            new InstantCommand(() -> superstructure.setDesiredIntakeState(Superstructure.DesiredIntakeState.ALTERNATING))
-        ).onFalse(
-            new InstantCommand(() -> superstructure.setDesiredIntakeState(Superstructure.DesiredIntakeState.DEPLOYED))
-        );
+        leftBumperTrigger.onTrue(buildIntakeBumpCommand());
 
         rightBumperTrigger.onTrue(
             new InstantCommand(() -> superstructure.setDesiredIntakeState(Superstructure.DesiredIntakeState.STOWED))
