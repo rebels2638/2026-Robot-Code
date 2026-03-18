@@ -332,8 +332,17 @@ public class Superstructure extends SubsystemBase {
                 break;
 
             case SHOOTING:
+                // Force at least one PREPARING_FOR_SHOT cycle before SHOOTING when coming from non-shot states.
+                // This ensures dynamic shooter setpoints are applied before readiness is evaluated for feed.
+                if (currentSystemState != CurrentSystemState.SHOOTING
+                    && currentSystemState != CurrentSystemState.PREPARING_FOR_SHOT
+                    && currentSystemState != CurrentSystemState.READY_FOR_SHOT) {
+                    nextSystemState = CurrentSystemState.PREPARING_FOR_SHOT;
+                    break;
+                }
+
                 boolean shouldStartShooting = currentSystemState == CurrentSystemState.READY_FOR_SHOT
-                    || (currentSystemState != CurrentSystemState.SHOOTING && isReadyForShot());
+                    || (currentSystemState == CurrentSystemState.PREPARING_FOR_SHOT && isReadyForShot());
                 if (shouldStartShooting) {
                     nextSystemState = CurrentSystemState.SHOOTING;
                     shotStartTime = Timer.getTimestamp();
