@@ -4,6 +4,7 @@ import java.util.function.Supplier;
 
 import org.littletonrobotics.junction.AutoLogOutput;
 import org.littletonrobotics.junction.Logger;
+import org.littletonrobotics.junction.networktables.LoggedNetworkNumber;
 
 import edu.wpi.first.math.InterpolatingMatrixTreeMap;
 import edu.wpi.first.math.MathUtil;
@@ -94,6 +95,10 @@ public class Shooter extends SubsystemBase {
     private final DashboardMotorControlLoopConfigurator hoodControlLoopConfigurator;
     private final DashboardMotorControlLoopConfigurator turretControlLoopConfigurator;
     private final DashboardMotorControlLoopConfigurator flywheelControlLoopConfigurator;
+    private final LoggedNetworkNumber turretOffsetDegreesCCW =
+        new LoggedNetworkNumber("Shooter/turretOffsetDegreesCCW", 0.0);
+    private final LoggedNetworkNumber flywheelOffsetRPS =
+        new LoggedNetworkNumber("Shooter/flywheelOffsetRPS", 0.0);
     private boolean pendingHoodControlLoopConfigApply = false;
     private boolean pendingTurretControlLoopConfigApply = false;
     private boolean pendingFlywheelControlLoopConfigApply = false;
@@ -228,7 +233,7 @@ public class Shooter extends SubsystemBase {
     public void setTurretSetpoint(TurretSetpoint setpoint) {
         if (setpoint == TurretSetpoint.DYNAMIC) {
             setTurretAngle(
-                turretAngleSupplier.get(),
+                getDynamicTurretFieldRelativeTarget(turretAngleSupplier.get()),
                 turretVelocitySupplier.get(),
                 TurretReferenceFrame.FIELD_RELATIVE
             );
@@ -238,7 +243,9 @@ public class Shooter extends SubsystemBase {
     }
 
     public void setFlywheelSetpoint(FlywheelSetpoint setpoint) {
-        double target = setpoint == FlywheelSetpoint.DYNAMIC ? flywheelRPSSupplier.get() : setpoint.getRps();
+        double target = setpoint == FlywheelSetpoint.DYNAMIC
+            ? applyFlywheelDynamicOffset(flywheelRPSSupplier.get(), flywheelOffsetRPS.get())
+            : setpoint.getRps();
         setShotVelocity(target);
     }
 
@@ -493,6 +500,14 @@ public class Shooter extends SubsystemBase {
         FIELD_RELATIVE
     }
 
+    static Rotation2d applyTurretDynamicOffset(Rotation2d targetAngle, double offsetDegreesCCW) {
+        return targetAngle.plus(Rotation2d.fromDegrees(offsetDegreesCCW));
+    }
+
+    static double applyFlywheelDynamicOffset(double targetVelocityRotationsPerSec, double offsetRPS) {
+        return targetVelocityRotationsPerSec + offsetRPS;
+    }
+
     public void setShotVelocity(double velocityRotationsPerSec) {
         flywheelSetpointRPS = velocityRotationsPerSec;
         Logger.recordOutput("Shooter/shotVelocitySetpointRotationsPerSec", velocityRotationsPerSec);
@@ -538,6 +553,10 @@ public class Shooter extends SubsystemBase {
 
     public double getFlywheelSetpointRPS() {
         return flywheelSetpointRPS;
+    }
+
+    public Rotation2d getDynamicTurretFieldRelativeTarget(Rotation2d rawFieldRelativeTarget) {
+        return applyTurretDynamicOffset(rawFieldRelativeTarget, turretOffsetDegreesCCW.get());
     }
 
     public void enableHoodEStop() {

@@ -612,10 +612,12 @@ public class Superstructure extends SubsystemBase {
         double hoodErrorDegrees = Math.abs((actualHood - setpointHood) * 360.0);
         double turretErrorRotations = MathUtil.inputModulus(actualTurret - setpointTurret, -0.5, 0.5);
         double turretErrorDegrees = Math.abs(turretErrorRotations * 360.0);
+        Rotation2d turretFieldRelativeTarget =
+            shooter.getDynamicTurretFieldRelativeTarget(cachedShotData.targetFieldYaw());
         double turretFieldRelativeErrorDegrees = calculateTurretFieldRelativeErrorDegrees(
             actualTurret,
             robotState.getEstimatedPose().getRotation(),
-            cachedShotData.targetFieldYaw()
+            turretFieldRelativeTarget
         );
         double flywheelErrorRps = Math.abs(actualFlywheel - setpointFlywheel);
         boolean hoodAtSetpoint = shooter.isHoodAtSetpoint();

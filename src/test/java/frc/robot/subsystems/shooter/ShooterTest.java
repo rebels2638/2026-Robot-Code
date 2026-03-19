@@ -4,10 +4,23 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import edu.wpi.first.math.geometry.Rotation2d;
 import org.junit.jupiter.api.Test;
 
 class ShooterTest {
     private static final double EPS = 1e-9;
+
+    @Test
+    void applyTurretDynamicOffset_addsCounterclockwiseDegrees() {
+        Rotation2d adjusted = Shooter.applyTurretDynamicOffset(Rotation2d.fromDegrees(30.0), 12.5);
+
+        assertEquals(42.5, adjusted.getDegrees(), EPS);
+    }
+
+    @Test
+    void applyFlywheelDynamicOffset_addsRpsOffset() {
+        assertEquals(84.0, Shooter.applyFlywheelDynamicOffset(80.5, 3.5), EPS);
+    }
 
     @Test
     void selectConnectedFlywheelVelocity_prefersLeaderWhenConnected() {
