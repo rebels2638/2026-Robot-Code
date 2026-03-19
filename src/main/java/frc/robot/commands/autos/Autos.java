@@ -101,13 +101,14 @@ public final class Autos {
         auto(
             "double_swipe_bottom",
             new Pose2d(
-                new Translation2d(3.569, 2.320),
-                Rotation2d.fromRadians(0)
+                new Translation2d(3.41, 2.27),
+                Rotation2d.fromDegrees(118)
             ),
             setTarget(TargetState.HUB),
             setSystem(DesiredSystemState.HOME),
             firstFollowPath("bottom_jab_sharp"),
-            waitSeconds(6),
+            waitSeconds(3.4),
+            setSystem(DesiredSystemState.HOME),
             followPath("bottom_sweep_short"),
             waitSeconds(6)
         ),
