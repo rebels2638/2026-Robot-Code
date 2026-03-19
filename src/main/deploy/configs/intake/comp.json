@@ -35,7 +35,7 @@
   "pivotMinAngleRotations": -0.025,
   "pivotMaxAngleRotations": 0.25,
   "pivotAngleToleranceRotations": 0.001,
-  "pivotUpAngleRotations": 0.235,
+  "pivotUpAngleRotations": 0.2083333333,
   "pivotDownAngleRotations": -0.02222222222,
   "pivotAlternatingFirstAngleRotations": 0.235,
   "pivotAlternatingSecondAngleRotations": 0.00
