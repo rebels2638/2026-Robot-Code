@@ -86,7 +86,7 @@ public class FieldConstants {
         // Pass targets are defined in blue-origin field coordinates and mirrored for red alliance at runtime.
         public static final double passTargetHeightMeters = 0.0;
 
-        public static final Translation3d allianceTop = new Translation3d(0.245, 7.782, passTargetHeightMeters);
+        public static final Translation3d allianceTop = new Translation3d(0.53, 6, passTargetHeightMeters);
         public static final Translation3d allianceBottom = new Translation3d(0.288, 0.269, passTargetHeightMeters);
 
         public static final Translation3d neutralTop = new Translation3d(6.108, 5.632, passTargetHeightMeters);

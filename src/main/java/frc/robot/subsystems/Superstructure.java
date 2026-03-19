@@ -88,6 +88,11 @@ public class Superstructure extends SubsystemBase {
         ALTERNATING
     }
 
+    enum AlternatingIntakeTarget {
+        FIRST,
+        SECOND
+    }
+
     public enum DesiredClimbState {
         DISABLED,
         RETRACTED,
@@ -151,7 +156,7 @@ public class Superstructure extends SubsystemBase {
     private double shotStartTime = 0;
     private double lastBallVisualizedTime = 0;
     private boolean hasStartedShooting = false;
-    private double lastAlternatingIntakeToggleTime = 0;
+    private AlternatingIntakeTarget alternatingIntakeTarget = null;
     private boolean hasWarnedInvalidTurretRotationMargins = false;
     
     // Cached shot data for mechanism control after applying guards.
@@ -537,7 +542,7 @@ public class Superstructure extends SubsystemBase {
 
     private void applyIntakeState(CurrentIntakeState intakeState) {
         if (intakeState != CurrentIntakeState.ALTERNATING) {
-            lastAlternatingIntakeToggleTime = 0;
+            alternatingIntakeTarget = null;
         }
 
         switch (intakeState) {
@@ -563,20 +568,11 @@ public class Superstructure extends SubsystemBase {
     }
 
     private void applyAlternatingIntake() {
-        double now = Timer.getTimestamp();
-        if (lastAlternatingIntakeToggleTime == 0) {
-            lastAlternatingIntakeToggleTime = now;
-        }
-
-        boolean timerElapsed = now - lastAlternatingIntakeToggleTime >= config.alternatingIntakeToggleSeconds;
-        boolean pivotSettled = intake.isPivotAtSetpoint();
-        if (timerElapsed && pivotSettled) {
-            lastAlternatingIntakeToggleTime = now;
-            intake.setSetpoint(intake.isStowed() ? IntakeSetpoint.DEPLOYED : IntakeSetpoint.STOWED);
-            return;
-        }
-
-        intake.setSetpoint(intake.isStowed() ? IntakeSetpoint.STOWED : IntakeSetpoint.DEPLOYED);
+        alternatingIntakeTarget = resolveNextAlternatingIntakeTarget(
+            alternatingIntakeTarget,
+            intake.isPivotAtSetpoint()
+        );
+        intake.setSetpoint(getAlternatingIntakeSetpoint(alternatingIntakeTarget));
     }
 
     private void applyClimbState(DesiredClimbState climbState) {
@@ -1104,6 +1100,27 @@ public class Superstructure extends SubsystemBase {
             : HopperSetpoint.OFF;
     }
 
+    static AlternatingIntakeTarget resolveNextAlternatingIntakeTarget(
+        AlternatingIntakeTarget currentTarget,
+        boolean pivotAtSetpoint
+    ) {
+        if (currentTarget == null) {
+            return AlternatingIntakeTarget.FIRST;
+        }
+        if (!pivotAtSetpoint) {
+            return currentTarget;
+        }
+        return currentTarget == AlternatingIntakeTarget.FIRST
+            ? AlternatingIntakeTarget.SECOND
+            : AlternatingIntakeTarget.FIRST;
+    }
+
+    private static IntakeSetpoint getAlternatingIntakeSetpoint(AlternatingIntakeTarget target) {
+        return target == AlternatingIntakeTarget.FIRST
+            ? IntakeSetpoint.ALTERNATING_FIRST
+            : IntakeSetpoint.ALTERNATING_SECOND;
+    }
+
     // Public interface
     public void setDesiredSystemState(DesiredSystemState desiredSystemState) {
         this.desiredSystemState = desiredSystemState;
@@ -1144,6 +1161,11 @@ public class Superstructure extends SubsystemBase {
     @AutoLogOutput(key = "Superstructure/desiredIntakeState")
     public DesiredIntakeState getDesiredIntakeState() {
         return desiredIntakeState;
+    }
+
+    @AutoLogOutput(key = "Superstructure/alternatingIntakeTarget")
+    public String getAlternatingIntakeTarget() {
+        return alternatingIntakeTarget == null ? "NONE" : alternatingIntakeTarget.name();
     }
 
     @AutoLogOutput(key = "Superstructure/currentClimbState")

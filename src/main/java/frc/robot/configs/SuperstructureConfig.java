@@ -2,7 +2,6 @@ package frc.robot.configs;
 
 public class SuperstructureConfig {
     public double shotDurationSeconds = 0.3;
-    public double alternatingIntakeToggleSeconds = 1.0;
     public double ballsPerSecond = 9.5;
 
     public double turretRotationBufferDeg = 20.0;
