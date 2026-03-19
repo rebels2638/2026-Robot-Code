@@ -275,7 +275,7 @@
   "turretKD": 0.3,
   "turretMotorToOutputShaftRatio": 20.0,
   "turretStartingAngleDeg": 180.0,
-  "turretMinAngleDeg": 100.0,
+  "turretMinAngleDeg": 0.0,
   "turretMaxAngleDeg": 275.0,
   "turretMaxVelocityDegPerSec": 3000.0,
   "turretMaxAccelerationDegPerSec2": 9000.0,
