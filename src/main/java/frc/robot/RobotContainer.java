@@ -111,8 +111,6 @@ public class RobotContainer {
 
         // superstructure.setDesiredTargetState(Superstructure.TargetState.PASS_ALLIANCE_TOP);
 
-        this.xboxDriver.getXButton().onTrue(new InstantCommand( ()->robotState.resetPose(new Pose2d())));
-
         configureBindings();
     }
 
@@ -120,15 +118,16 @@ public class RobotContainer {
         FollowPath.registerEventTrigger("ready", new InstantCommand(() -> {
             superstructure.setDesiredSystemState(Superstructure.DesiredSystemState.READY_FOR_SHOT);
         }));
-        FollowPath.registerEventTrigger("shoot", () -> {
-            superstructure.setDesiredSystemState(Superstructure.DesiredSystemState.SHOOTING);
-        });
+        FollowPath.registerEventTrigger("shoot", this::runHubShootingHelper);
+        
         FollowPath.registerEventTrigger("intake", () -> {
             superstructure.setDesiredIntakeState(Superstructure.DesiredIntakeState.INTAKING);
         });
         FollowPath.registerEventTrigger("deploy", () -> {
             superstructure.setDesiredIntakeState(Superstructure.DesiredIntakeState.DEPLOYED);
         });
+
+        FollowPath.registerEventTrigger("lob", this::runAlliancePassHelper);
     }
 
     private void configureBindings() {

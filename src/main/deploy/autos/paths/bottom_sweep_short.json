@@ -140,7 +140,7 @@
       },
       {
         "value": 2.0,
-        "start_ordinal": 5,
+        "start_ordinal": 6,
         "end_ordinal": 7
       },
       {
@@ -154,14 +154,14 @@
         "end_ordinal": 9
       },
       {
-        "value": 0.5,
+        "value": 1.7,
         "start_ordinal": 3,
-        "end_ordinal": 3
+        "end_ordinal": 4
       },
       {
         "value": 1.0,
-        "start_ordinal": 4,
-        "end_ordinal": 4
+        "start_ordinal": 5,
+        "end_ordinal": 5
       }
     ]
   }

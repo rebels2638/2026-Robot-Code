@@ -59,14 +59,24 @@ public final class Autos {
         //     setIntake(DesiredIntakeState.STOWED)
         // )
         auto(
+            "bottom_sweep_over",
+            new Pose2d(
+                new Translation2d(3.511, 2.160),
+                Rotation2d.fromRadians(Math.PI)
+            ),
+            setSystem(DesiredSystemState.HOME),
+            firstFollowPath("bottom_sweep_over", false, false)
+        ), 
+        auto(
             "top_sweep_short_depo",
             new Pose2d(
                 new Translation2d(3.511, 2.160),
                 Rotation2d.fromRadians(Math.PI)
             ),
-            setSystem(DesiredSystemState.TRACKING),
+            setSystem(DesiredSystemState.HOME),
             firstFollowPath("top_sweep_short_depo", false, false)
-        ),        auto(
+        ),        
+        auto(
             "straight",
             new Pose2d(
                 new Translation2d(3.511, 2.160),
