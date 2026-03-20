@@ -136,7 +136,10 @@ public class RobotContainer {
         //     new InstantCommand(() -> robotState.resetPose(new Pose2d(robotState.getEstimatedPose().getTranslation(), new Rotation2d(0))))
         // );
         // xboxDriver.getAButton().onTrue(
-        //     new InstantCommand(() -> Shooter.getInstance().setHoodAngle(Rotation2d.fromDegrees(hood.getAsDouble())))
+        //     new InstantCommand(this::runHubShootingHelper)
+        // );
+        // xboxDriver.getBButton().onTrue(
+        //     new InstantCommand(this::runAlliancePassHelper)
         // );
         // xboxDriver.getBButton().onTrue(
         //     new InstantCommand(() -> Shooter.getInstance().setShotVelocity(shooterFlywheelSet.getAsDouble()))
