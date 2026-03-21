@@ -7,6 +7,7 @@ import edu.wpi.first.wpilibj.smartdashboard.SendableChooser;
 import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.Commands;
 import edu.wpi.first.wpilibj2.command.InstantCommand;
+import edu.wpi.first.wpilibj2.command.ParallelCommandGroup;
 import edu.wpi.first.wpilibj2.command.SequentialCommandGroup;
 import edu.wpi.first.wpilibj2.command.WaitCommand;
 import frc.robot.RobotState;
@@ -73,8 +74,18 @@ public final class Autos {
                 new Translation2d(3.511, 2.160),
                 Rotation2d.fromRadians(Math.PI)
             ),
-            setSystem(DesiredSystemState.HOME),
-            firstFollowPath("top_sweep_short_depo", false, false)
+            new ParallelCommandGroup(
+                new SequentialCommandGroup(
+                    setSystem(DesiredSystemState.HOME),
+                    firstFollowPath("top_sweep_short_depo", false, false)
+                ),
+                new SequentialCommandGroup(
+                    new WaitCommand(15.5),
+                    setTarget(TargetState.HUB),
+                    setSystem(DesiredSystemState.SHOOTING)
+                )
+            )
+            
         ),        
         auto(
             "straight",
