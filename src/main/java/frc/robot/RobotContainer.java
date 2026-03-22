@@ -14,15 +14,14 @@ import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.Commands;
 import edu.wpi.first.wpilibj2.command.ConditionalCommand;
 import edu.wpi.first.wpilibj2.command.InstantCommand;
+import edu.wpi.first.wpilibj2.command.ParallelDeadlineGroup;
 import edu.wpi.first.wpilibj2.command.RunCommand;
 import edu.wpi.first.wpilibj2.command.SequentialCommandGroup;
 import edu.wpi.first.wpilibj2.command.WaitCommand;
 import edu.wpi.first.wpilibj2.command.WaitUntilCommand;
 import edu.wpi.first.wpilibj2.command.button.Trigger;
-import frc.robot.commands.AutoClimbCommand;
 import frc.robot.commands.autos.Autos;
 import frc.robot.constants.AlignmentConstants;
-import frc.robot.constants.ClimbingConstants;
 // import frc.robot.commands.autos.tower.ScoreL1;
 import frc.robot.constants.Constants;
 import frc.robot.lib.BLine.FollowPath;
@@ -112,24 +111,23 @@ public class RobotContainer {
 
         // superstructure.setDesiredTargetState(Superstructure.TargetState.PASS_ALLIANCE_TOP);
 
-        this.xboxDriver.getXButton().onTrue(new InstantCommand( ()->robotState.resetPose(new Pose2d())));
-
         configureBindings();
     }
 
     private void registerEventTriggers() {
-        FollowPath.registerEventTrigger("prepare_for_shot", new InstantCommand(() -> {
+        FollowPath.registerEventTrigger("ready", new InstantCommand(() -> {
             superstructure.setDesiredSystemState(Superstructure.DesiredSystemState.READY_FOR_SHOT);
         }));
-        FollowPath.registerEventTrigger("shoot", () -> {
-            superstructure.setDesiredSystemState(Superstructure.DesiredSystemState.SHOOTING);
-        });
+        FollowPath.registerEventTrigger("shoot", this::runHubShootingHelper);
+        
         FollowPath.registerEventTrigger("intake", () -> {
             superstructure.setDesiredIntakeState(Superstructure.DesiredIntakeState.INTAKING);
         });
         FollowPath.registerEventTrigger("deploy", () -> {
             superstructure.setDesiredIntakeState(Superstructure.DesiredIntakeState.DEPLOYED);
         });
+
+        FollowPath.registerEventTrigger("lob", this::runAlliancePassHelper);
     }
 
     private void configureBindings() {
@@ -138,7 +136,10 @@ public class RobotContainer {
         //     new InstantCommand(() -> robotState.resetPose(new Pose2d(robotState.getEstimatedPose().getTranslation(), new Rotation2d(0))))
         // );
         // xboxDriver.getAButton().onTrue(
-        //     new InstantCommand(() -> Shooter.getInstance().setHoodAngle(Rotation2d.fromDegrees(hood.getAsDouble())))
+        //     new InstantCommand(this::runHubShootingHelper)
+        // );
+        // xboxDriver.getBButton().onTrue(
+        //     new InstantCommand(this::runAlliancePassHelper)
         // );
         // xboxDriver.getBButton().onTrue(
         //     new InstantCommand(() -> Shooter.getInstance().setShotVelocity(shooterFlywheelSet.getAsDouble()))
@@ -208,18 +209,23 @@ public class RobotContainer {
         // xboxDriver.getAButton().onFalse(new InstantCommand(() -> superstructure.setDesiredSystemState(Superstructure.DesiredSystemState.HOME)));
     }
 
-    private void bindCompetitionDriveHelpers() {
-        Trigger leftBumperOnlyTrigger = xboxDriver.getLeftBumper().and(xboxDriver.getRightBumper().negate());
-        Trigger rightBumperOnlyTrigger = xboxDriver.getRightBumper().and(xboxDriver.getLeftBumper().negate());
-        Trigger autoClimbTrigger = xboxDriver.getRightBumper().and(xboxDriver.getLeftBumper());
-
-        leftBumperOnlyTrigger.onTrue(
-            new InstantCommand(() -> superstructure.setDesiredIntakeState(Superstructure.DesiredIntakeState.ALTERNATING))
-        ).onFalse(
-            new InstantCommand(() -> superstructure.setDesiredIntakeState(Superstructure.DesiredIntakeState.DEPLOYED))
+    public Command buildIntakeBumpCommand() {
+        return new SequentialCommandGroup(
+            new InstantCommand(() -> superstructure.setDesiredIntakeState(Superstructure.DesiredIntakeState.INTAKING)),
+            new ParallelDeadlineGroup(
+                new WaitUntilCommand(() -> intake.getPivotAngleRotations()/360 > 10),
+                new InstantCommand(() -> superstructure.setDesiredIntakeState(Superstructure.DesiredIntakeState.STOWED))
+            ),
+            new InstantCommand(() -> superstructure.setDesiredIntakeState(Superstructure.DesiredIntakeState.INTAKING))
         );
+    }
+    private void bindCompetitionDriveHelpers() {
+        Trigger leftBumperTrigger = xboxDriver.getLeftBumper();
+        Trigger rightBumperTrigger = xboxDriver.getRightBumper();
 
-        rightBumperOnlyTrigger.onTrue(
+        leftBumperTrigger.onTrue(buildIntakeBumpCommand());
+
+        rightBumperTrigger.onTrue(
             new InstantCommand(() -> superstructure.setDesiredIntakeState(Superstructure.DesiredIntakeState.STOWED))
         );
 
@@ -235,7 +241,11 @@ public class RobotContainer {
             new InstantCommand(this::runHubTrackingHelper)
         );
 
-        autoClimbTrigger.whileTrue(new AutoClimbCommand(ClimbingConstants.TOWER));
+        xboxDriver.getYButton().onTrue(
+            new InstantCommand(() -> superstructure.setDesiredIntakeState(Superstructure.DesiredIntakeState.REVERSING))
+        ).onFalse(
+            new InstantCommand(() -> superstructure.setDesiredIntakeState(Superstructure.DesiredIntakeState.DEPLOYED))
+        );
 
         xboxDriver.getXButton().onTrue(
             new InstantCommand(() -> swerveDrive.setDesiredSystemState(
@@ -251,14 +261,6 @@ public class RobotContainer {
             new RunCommand(this::runAlliancePassHelper)
         ).onFalse(
             new InstantCommand(() -> superstructure.setDesiredSystemState(Superstructure.DesiredSystemState.TRACKING))
-        );
-
-        xboxDriver.getYButton().onTrue(
-            new InstantCommand(() -> superstructure.setDesiredClimbState(Superstructure.DesiredClimbState.EXTENDED))
-        );
-
-        xboxDriver.getAButton().onTrue(
-            new InstantCommand(() -> superstructure.setDesiredClimbState(Superstructure.DesiredClimbState.CLIMBED))
         );
     }
 

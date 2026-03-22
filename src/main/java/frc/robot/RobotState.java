@@ -21,6 +21,7 @@ import frc.robot.subsystems.swerve.SwerveDrive;
 import java.util.NoSuchElementException;
 import org.littletonrobotics.junction.AutoLogOutput;
 import org.littletonrobotics.junction.Logger;
+import org.littletonrobotics.junction.networktables.LoggedNetworkBoolean;
 
 public class RobotState {
     private static final double OBSERVATION_LOG_PERIOD_SECONDS = 0.1;
@@ -81,6 +82,8 @@ public class RobotState {
 
     private final SwerveDrivetrainConfig drivetrainConfig;
     private final RobotStateConfig robotStateConfig;
+    private final LoggedNetworkBoolean zeroGyroButtonHeld =
+        new LoggedNetworkBoolean("RobotState/zeroGyroButtonHeld", false);
 
     private RobotState() {
         SwerveConfig swerveConfig = ConfigLoader.load("swerve", SwerveConfig.class);
@@ -194,13 +197,18 @@ public class RobotState {
             logVisionObservationMetrics(observation, observation.timestampSeconds(), true);
         }
 
+        double currentTime = Timer.getTimestamp();
         boolean didResetGyro = false;
-        if (DriverStation.isDisabled()
-            && Timer.getTimestamp() - lastGyroResetTime > robotStateConfig.gyroResetTimeoutSeconds
+        if (shouldApplyVisionGyroReset(
+            shouldAllowVisionGyroReset(DriverStation.isDisabled(), zeroGyroButtonHeld.get()),
+            currentTime,
+            lastGyroResetTime,
+            robotStateConfig.gyroResetTimeoutSeconds
+        )
             // && observation.visionMeasurementStdDevs().get(2,0) < robotStateConfig.gyroResetMaxVisionRotationStdDev
             ) {
                 resetPose(new Pose2d(getEstimatedPose().getTranslation(), observation.visionRobotPoseMeters().getRotation()));
-                lastGyroResetTime = Timer.getTimestamp();
+                lastGyroResetTime = currentTime;
                 didResetGyro = true;
         }
         if (shouldLogObservation || didResetGyro) {
@@ -232,9 +240,28 @@ public class RobotState {
         resetPose(new Pose2d(getEstimatedPose().getTranslation(), new Rotation2d()));
     }
 
+    static boolean shouldAllowVisionGyroReset(boolean isDisabled, boolean zeroGyroButtonHeld) {
+        return isDisabled || zeroGyroButtonHeld;
+    }
+
+    static boolean shouldApplyVisionGyroReset(
+        boolean allowVisionGyroReset,
+        double currentTimeSeconds,
+        double lastGyroResetTimeSeconds,
+        double gyroResetTimeoutSeconds
+    ) {
+        return allowVisionGyroReset
+            && currentTimeSeconds - lastGyroResetTimeSeconds > gyroResetTimeoutSeconds;
+    }
+
     @AutoLogOutput(key = "RobotState/estimatedPose")
     public Pose2d getEstimatedPose() {
         return swerveDrivePoseEstimator.getEstimatedPosition();
+    }
+
+    @AutoLogOutput(key = "RobotState/vision/allowVisionGyroReset")
+    public boolean getAllowVisionGyroReset() {
+        return shouldAllowVisionGyroReset(DriverStation.isDisabled(), zeroGyroButtonHeld.get());
     }
 
     public double getYawVelocityRadPerSec() {

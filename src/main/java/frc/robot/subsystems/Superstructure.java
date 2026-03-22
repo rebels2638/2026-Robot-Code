@@ -88,6 +88,11 @@ public class Superstructure extends SubsystemBase {
         ALTERNATING
     }
 
+    enum AlternatingIntakeTarget {
+        FIRST,
+        SECOND
+    }
+
     public enum DesiredClimbState {
         DISABLED,
         RETRACTED,
@@ -151,7 +156,7 @@ public class Superstructure extends SubsystemBase {
     private double shotStartTime = 0;
     private double lastBallVisualizedTime = 0;
     private boolean hasStartedShooting = false;
-    private double lastAlternatingIntakeToggleTime = 0;
+    private AlternatingIntakeTarget alternatingIntakeTarget = null;
     private boolean hasWarnedInvalidTurretRotationMargins = false;
     
     // Cached shot data for mechanism control after applying guards.
@@ -332,8 +337,17 @@ public class Superstructure extends SubsystemBase {
                 break;
 
             case SHOOTING:
+                // Force at least one PREPARING_FOR_SHOT cycle before SHOOTING when coming from non-shot states.
+                // This ensures dynamic shooter setpoints are applied before readiness is evaluated for feed.
+                if (currentSystemState != CurrentSystemState.SHOOTING
+                    && currentSystemState != CurrentSystemState.PREPARING_FOR_SHOT
+                    && currentSystemState != CurrentSystemState.READY_FOR_SHOT) {
+                    nextSystemState = CurrentSystemState.PREPARING_FOR_SHOT;
+                    break;
+                }
+
                 boolean shouldStartShooting = currentSystemState == CurrentSystemState.READY_FOR_SHOT
-                    || (currentSystemState != CurrentSystemState.SHOOTING && isReadyForShot());
+                    || (currentSystemState == CurrentSystemState.PREPARING_FOR_SHOT && isReadyForShot());
                 if (shouldStartShooting) {
                     nextSystemState = CurrentSystemState.SHOOTING;
                     shotStartTime = Timer.getTimestamp();
@@ -528,7 +542,7 @@ public class Superstructure extends SubsystemBase {
 
     private void applyIntakeState(CurrentIntakeState intakeState) {
         if (intakeState != CurrentIntakeState.ALTERNATING) {
-            lastAlternatingIntakeToggleTime = 0;
+            alternatingIntakeTarget = null;
         }
 
         switch (intakeState) {
@@ -554,20 +568,11 @@ public class Superstructure extends SubsystemBase {
     }
 
     private void applyAlternatingIntake() {
-        double now = Timer.getTimestamp();
-        if (lastAlternatingIntakeToggleTime == 0) {
-            lastAlternatingIntakeToggleTime = now;
-        }
-
-        boolean timerElapsed = now - lastAlternatingIntakeToggleTime >= config.alternatingIntakeToggleSeconds;
-        boolean pivotSettled = intake.isPivotAtSetpoint();
-        if (timerElapsed && pivotSettled) {
-            lastAlternatingIntakeToggleTime = now;
-            intake.setSetpoint(intake.isStowed() ? IntakeSetpoint.DEPLOYED : IntakeSetpoint.STOWED);
-            return;
-        }
-
-        intake.setSetpoint(intake.isStowed() ? IntakeSetpoint.STOWED : IntakeSetpoint.DEPLOYED);
+        alternatingIntakeTarget = resolveNextAlternatingIntakeTarget(
+            alternatingIntakeTarget,
+            intake.isPivotAtSetpoint()
+        );
+        intake.setSetpoint(getAlternatingIntakeSetpoint(alternatingIntakeTarget));
     }
 
     private void applyClimbState(DesiredClimbState climbState) {
@@ -597,7 +602,7 @@ public class Superstructure extends SubsystemBase {
     private ShotReadinessData calculateShotReadinessData(ShotComputationContext context) {
         double actualHood = shooter.getHoodAngleRotations();
         double actualTurret = shooter.getTurretAngleRotations();
-        double actualFlywheel = shooter.getFlywheelVelocityRotationsPerSec();
+        double actualFlywheel = shooter.getFlywheelVelocityForSetpointCheck();
 
         // Use the commanded (clamped/resolved) shooter setpoints so impact math matches what hardware is tracking.
         double setpointHood = shooter.getHoodSetpointRotations();
@@ -607,10 +612,12 @@ public class Superstructure extends SubsystemBase {
         double hoodErrorDegrees = Math.abs((actualHood - setpointHood) * 360.0);
         double turretErrorRotations = MathUtil.inputModulus(actualTurret - setpointTurret, -0.5, 0.5);
         double turretErrorDegrees = Math.abs(turretErrorRotations * 360.0);
+        Rotation2d turretFieldRelativeTarget =
+            shooter.getDynamicTurretFieldRelativeTarget(cachedShotData.targetFieldYaw());
         double turretFieldRelativeErrorDegrees = calculateTurretFieldRelativeErrorDegrees(
             actualTurret,
             robotState.getEstimatedPose().getRotation(),
-            cachedShotData.targetFieldYaw()
+            turretFieldRelativeTarget
         );
         double flywheelErrorRps = Math.abs(actualFlywheel - setpointFlywheel);
         boolean hoodAtSetpoint = shooter.isHoodAtSetpoint();
@@ -1095,6 +1102,27 @@ public class Superstructure extends SubsystemBase {
             : HopperSetpoint.OFF;
     }
 
+    static AlternatingIntakeTarget resolveNextAlternatingIntakeTarget(
+        AlternatingIntakeTarget currentTarget,
+        boolean pivotAtSetpoint
+    ) {
+        if (currentTarget == null) {
+            return AlternatingIntakeTarget.FIRST;
+        }
+        if (!pivotAtSetpoint) {
+            return currentTarget;
+        }
+        return currentTarget == AlternatingIntakeTarget.FIRST
+            ? AlternatingIntakeTarget.SECOND
+            : AlternatingIntakeTarget.FIRST;
+    }
+
+    private static IntakeSetpoint getAlternatingIntakeSetpoint(AlternatingIntakeTarget target) {
+        return target == AlternatingIntakeTarget.FIRST
+            ? IntakeSetpoint.ALTERNATING_FIRST
+            : IntakeSetpoint.ALTERNATING_SECOND;
+    }
+
     // Public interface
     public void setDesiredSystemState(DesiredSystemState desiredSystemState) {
         this.desiredSystemState = desiredSystemState;
@@ -1135,6 +1163,11 @@ public class Superstructure extends SubsystemBase {
     @AutoLogOutput(key = "Superstructure/desiredIntakeState")
     public DesiredIntakeState getDesiredIntakeState() {
         return desiredIntakeState;
+    }
+
+    @AutoLogOutput(key = "Superstructure/alternatingIntakeTarget")
+    public String getAlternatingIntakeTarget() {
+        return alternatingIntakeTarget == null ? "NONE" : alternatingIntakeTarget.name();
     }
 
     @AutoLogOutput(key = "Superstructure/currentClimbState")

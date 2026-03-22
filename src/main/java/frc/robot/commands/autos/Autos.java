@@ -7,6 +7,7 @@ import edu.wpi.first.wpilibj.smartdashboard.SendableChooser;
 import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.Commands;
 import edu.wpi.first.wpilibj2.command.InstantCommand;
+import edu.wpi.first.wpilibj2.command.ParallelCommandGroup;
 import edu.wpi.first.wpilibj2.command.SequentialCommandGroup;
 import edu.wpi.first.wpilibj2.command.WaitCommand;
 import frc.robot.RobotState;
@@ -32,7 +33,7 @@ public final class Autos {
         SendableChooser<Command> chooser = new SendableChooser<>();
         chooser.setDefaultOption("Do Nothing", Commands.none());
 
-        for (AutoDefinition autoDefinition : AUTOS) {
+        for (AutoDefinition autoDefinition :  AUTOS) {
             chooser.addOption(autoDefinition.name(), autoDefinition.command());
         }
 
@@ -59,6 +60,43 @@ public final class Autos {
         //     setIntake(DesiredIntakeState.STOWED)
         // )
         auto(
+            "bottom_sweep_over",
+            new Pose2d(
+                new Translation2d(3.511, 2.160),
+                Rotation2d.fromRadians(Math.PI)
+            ),
+            setSystem(DesiredSystemState.HOME),
+            firstFollowPath("bottom_sweep_over", false, false)
+        ), 
+        auto(
+            "top_sweep_short_depo",
+            new Pose2d(
+                new Translation2d(3.511, 2.160),
+                Rotation2d.fromRadians(Math.PI)
+            ),
+            new ParallelCommandGroup(
+                new SequentialCommandGroup(
+                    setSystem(DesiredSystemState.HOME),
+                    firstFollowPath("top_sweep_short_depo", false, false)
+                ),
+                new SequentialCommandGroup(
+                    new WaitCommand(15.5),
+                    setTarget(TargetState.HUB),
+                    setSystem(DesiredSystemState.SHOOTING)
+                )
+            )
+            
+        ),        
+        auto(
+            "straight",
+            new Pose2d(
+                new Translation2d(3.511, 2.160),
+                Rotation2d.fromRadians(Math.PI)
+            ),
+            setSystem(DesiredSystemState.HOME),
+            firstFollowPath("straight")
+        ),
+        auto(
             "outpost",
             new Pose2d(
                 new Translation2d(3.511, 2.160),
@@ -66,9 +104,7 @@ public final class Autos {
             ),
             setTarget(TargetState.HUB),
             setSystem(DesiredSystemState.SHOOTING),
-            firstFollowPath("outpost"),
-            waitSeconds(10),
-            climb()
+            firstFollowPath("outpost")
         ),
         auto(
             "overcharge",
@@ -81,19 +117,19 @@ public final class Autos {
             firstFollowPath("bottom_jab_sharp"),
             waitSeconds(5),
             followPath("outpost"),
-            waitSeconds(10),
-            climb()
+            waitSeconds(10)
         ),
         auto(
             "double_swipe_bottom",
             new Pose2d(
-                new Translation2d(3.569, 2.320),
-                Rotation2d.fromRadians(0)
+                new Translation2d(3.41, 2.27),
+                Rotation2d.fromDegrees(118)
             ),
             setTarget(TargetState.HUB),
             setSystem(DesiredSystemState.HOME),
             firstFollowPath("bottom_jab_sharp"),
-            waitSeconds(6),
+            waitSeconds(3.4),
+            setSystem(DesiredSystemState.HOME),
             followPath("bottom_sweep_short"),
             waitSeconds(6)
         ),
