@@ -51,4 +51,6 @@ public class IntakeConfig {
     public double pivotAngleToleranceRotations;
     public double pivotUpAngleRotations;
     public double pivotDownAngleRotations;
+    public double pivotAlternatingFirstAngleRotations;
+    public double pivotAlternatingSecondAngleRotations;
 }

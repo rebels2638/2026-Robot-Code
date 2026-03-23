@@ -1,7 +1,9 @@
 package frc.robot.subsystems.shooter;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertSame;
 
+import com.ctre.phoenix6.signals.InvertedValue;
 import org.junit.jupiter.api.Test;
 
 class ShooterIOTalonFXTest {
@@ -44,5 +46,57 @@ class ShooterIOTalonFXTest {
 
         assertEquals(0.4, command.positionRotations(), EPS);
         assertEquals(0.0, command.velocityRotPerSec(), EPS);
+    }
+
+    @Test
+    void calculateFlywheelControlTarget_prefersLeaderWhenAvailable() {
+        assertSame(
+            ShooterIOTalonFX.FlywheelControlTarget.LEADER,
+            ShooterIOTalonFX.calculateFlywheelControlTarget(true, true)
+        );
+        assertSame(
+            ShooterIOTalonFX.FlywheelControlTarget.LEADER,
+            ShooterIOTalonFX.calculateFlywheelControlTarget(true, false)
+        );
+    }
+
+    @Test
+    void calculateFlywheelControlTarget_fallsBackToFollowerWhenLeaderIsDisconnected() {
+        assertSame(
+            ShooterIOTalonFX.FlywheelControlTarget.FOLLOWER,
+            ShooterIOTalonFX.calculateFlywheelControlTarget(false, true)
+        );
+    }
+
+    @Test
+    void calculateFlywheelControlTarget_returnsNoneWhenBothFlywheelMotorsAreDisconnected() {
+        assertSame(
+            ShooterIOTalonFX.FlywheelControlTarget.NONE,
+            ShooterIOTalonFX.calculateFlywheelControlTarget(false, false)
+        );
+    }
+
+    @Test
+    void getFlywheelFollowerInvertedValue_opposesLeaderWhenConfigured() {
+        assertSame(
+            InvertedValue.CounterClockwise_Positive,
+            ShooterIOTalonFX.getFlywheelFollowerInvertedValue(true, true)
+        );
+        assertSame(
+            InvertedValue.Clockwise_Positive,
+            ShooterIOTalonFX.getFlywheelFollowerInvertedValue(false, true)
+        );
+    }
+
+    @Test
+    void getFlywheelFollowerInvertedValue_matchesLeaderWhenConfiguredAligned() {
+        assertSame(
+            InvertedValue.Clockwise_Positive,
+            ShooterIOTalonFX.getFlywheelFollowerInvertedValue(true, false)
+        );
+        assertSame(
+            InvertedValue.CounterClockwise_Positive,
+            ShooterIOTalonFX.getFlywheelFollowerInvertedValue(false, false)
+        );
     }
 }

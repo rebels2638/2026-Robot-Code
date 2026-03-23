@@ -27,7 +27,9 @@ public class Intake extends SubsystemBase {
         STOWED,
         DEPLOYED,
         INTAKING,
-        OUTTAKING
+        OUTTAKING,
+        ALTERNATING_FIRST,
+        ALTERNATING_SECOND
     }
 
     private final IntakeIO intakeIO;
@@ -136,6 +138,14 @@ public class Intake extends SubsystemBase {
             case OUTTAKING:
                 setPivotAngle(config.pivotDownAngleRotations);
                 setRollerVelocity(config.outtakingVelocityRPS);
+                break;
+            case ALTERNATING_FIRST:
+                setPivotAngle(config.pivotAlternatingFirstAngleRotations);
+                setRollerVelocity(config.intakingVelocityRPS);
+                break;
+            case ALTERNATING_SECOND:
+                setPivotAngle(config.pivotAlternatingSecondAngleRotations);
+                setRollerVelocity(config.intakingVelocityRPS);
                 break;
         }
     }

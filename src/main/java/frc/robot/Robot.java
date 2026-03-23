@@ -27,6 +27,7 @@ import edu.wpi.first.wpilibj2.command.CommandScheduler;
 import frc.robot.constants.Constants;
 import frc.robot.constants.FieldConstants;
 import frc.robot.lib.BLine.FollowPath;
+import frc.robot.lib.util.Elastic;
 import frc.robot.lib.util.PhoenixUtil;
 
 /**
@@ -78,7 +79,7 @@ public class Robot extends LoggedRobot {
         switch (Constants.currentMode) {
             case COMP:
                 // Running on a real robot, log to a USB stick ("/U/logs")
-                Logger.addDataReceiver(new WPILOGWriter());
+                // Logger.addDataReceiver(new WPILOGWriter());
                 Logger.addDataReceiver(new NT4Publisher());
 
                 break;
@@ -105,7 +106,8 @@ public class Robot extends LoggedRobot {
         Logger.start();
         // for elastic dashboard
         WebServer.start(5800, Filesystem.getDeployDirectory().getPath());
-        startElasticCameraPublishers();
+        // startElasticCameraPublishers();
+        Elastic.selectTab("Autonomous"); // this call speeds up load time keep. 
 
         m_robotContainer = RobotContainer.getInstance();
 

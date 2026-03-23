@@ -4,6 +4,7 @@ import java.util.function.Supplier;
 
 import org.littletonrobotics.junction.AutoLogOutput;
 import org.littletonrobotics.junction.Logger;
+import org.littletonrobotics.junction.networktables.LoggedNetworkNumber;
 
 import edu.wpi.first.math.InterpolatingMatrixTreeMap;
 import edu.wpi.first.math.MathUtil;
@@ -25,6 +26,8 @@ import frc.robot.lib.util.ConfigLoader;
 import frc.robot.lib.util.DashboardMotorControlLoopConfigurator;
 
 public class Shooter extends SubsystemBase {
+    private static final double DISCONNECTED_FLYWHEEL_MARGIN_RPS = 0.01;
+
     private static Shooter instance = null;
 
     public static Shooter getInstance() {
@@ -64,7 +67,7 @@ public class Shooter extends SubsystemBase {
     }
 
     public enum FlywheelSetpoint {
-        OFF(-1.0), // prevent bang bang jitter
+        OFF(0.0), // prevent bang bang jitter
         DYNAMIC(Double.NaN);
 
         private final double rps;
@@ -92,6 +95,10 @@ public class Shooter extends SubsystemBase {
     private final DashboardMotorControlLoopConfigurator hoodControlLoopConfigurator;
     private final DashboardMotorControlLoopConfigurator turretControlLoopConfigurator;
     private final DashboardMotorControlLoopConfigurator flywheelControlLoopConfigurator;
+    private final LoggedNetworkNumber turretOffsetDegreesCCW =
+        new LoggedNetworkNumber("Shooter/turretOffsetDegreesCCW", 0.0);
+    private final LoggedNetworkNumber flywheelOffsetRPS =
+        new LoggedNetworkNumber("Shooter/flywheelOffsetRPS", 0.0);
     private boolean pendingHoodControlLoopConfigApply = false;
     private boolean pendingTurretControlLoopConfigApply = false;
     private boolean pendingFlywheelControlLoopConfigApply = false;
@@ -226,7 +233,7 @@ public class Shooter extends SubsystemBase {
     public void setTurretSetpoint(TurretSetpoint setpoint) {
         if (setpoint == TurretSetpoint.DYNAMIC) {
             setTurretAngle(
-                turretAngleSupplier.get(),
+                getDynamicTurretFieldRelativeTarget(turretAngleSupplier.get()),
                 turretVelocitySupplier.get(),
                 TurretReferenceFrame.FIELD_RELATIVE
             );
@@ -236,7 +243,9 @@ public class Shooter extends SubsystemBase {
     }
 
     public void setFlywheelSetpoint(FlywheelSetpoint setpoint) {
-        double target = setpoint == FlywheelSetpoint.DYNAMIC ? flywheelRPSSupplier.get() : setpoint.getRps();
+        double target = setpoint == FlywheelSetpoint.DYNAMIC
+            ? applyFlywheelDynamicOffset(flywheelRPSSupplier.get(), flywheelOffsetRPS.get())
+            : setpoint.getRps();
         setShotVelocity(target);
     }
 
@@ -491,6 +500,14 @@ public class Shooter extends SubsystemBase {
         FIELD_RELATIVE
     }
 
+    static Rotation2d applyTurretDynamicOffset(Rotation2d targetAngle, double offsetDegreesCCW) {
+        return targetAngle.plus(Rotation2d.fromDegrees(offsetDegreesCCW));
+    }
+
+    static double applyFlywheelDynamicOffset(double targetVelocityRotationsPerSec, double offsetRPS) {
+        return targetVelocityRotationsPerSec + offsetRPS;
+    }
+
     public void setShotVelocity(double velocityRotationsPerSec) {
         flywheelSetpointRPS = velocityRotationsPerSec;
         Logger.recordOutput("Shooter/shotVelocitySetpointRotationsPerSec", velocityRotationsPerSec);
@@ -507,7 +524,23 @@ public class Shooter extends SubsystemBase {
     }
 
     public double getFlywheelVelocityRotationsPerSec() {
-        return shooterInputs.flywheelVelocityRotationsPerSec;
+        return selectConnectedFlywheelVelocityOrDefault(
+            shooterInputs.flywheelMotorConnected,
+            shooterInputs.flywheelVelocityRotationsPerSec,
+            shooterInputs.flywheelFollowerMotorConnected,
+            shooterInputs.flywheelFollowerVelocityRotationsPerSec,
+            0.0
+        );
+    }
+
+    public double getFlywheelVelocityForSetpointCheck() {
+        return selectConnectedFlywheelVelocityOrDefault(
+            shooterInputs.flywheelMotorConnected,
+            shooterInputs.flywheelVelocityRotationsPerSec,
+            shooterInputs.flywheelFollowerMotorConnected,
+            shooterInputs.flywheelFollowerVelocityRotationsPerSec,
+            flywheelSetpointRPS + Math.abs(config.flywheelVelocityToleranceRPS) + DISCONNECTED_FLYWHEEL_MARGIN_RPS
+        );
     }
 
     public double getHoodSetpointRotations() {
@@ -520,6 +553,10 @@ public class Shooter extends SubsystemBase {
 
     public double getFlywheelSetpointRPS() {
         return flywheelSetpointRPS;
+    }
+
+    public Rotation2d getDynamicTurretFieldRelativeTarget(Rotation2d rawFieldRelativeTarget) {
+        return applyTurretDynamicOffset(rawFieldRelativeTarget, turretOffsetDegreesCCW.get());
     }
 
     public void enableHoodEStop() {
@@ -599,7 +636,7 @@ public class Shooter extends SubsystemBase {
     }
 
     public double getShotExitVelocityMetersPerSec() {
-        return calculateShotExitVelocityMetersPerSec(shooterInputs.flywheelVelocityRotationsPerSec);
+        return calculateShotExitVelocityMetersPerSec(getFlywheelVelocityRotationsPerSec());
     }
 
     // Setpoint check methods
@@ -630,8 +667,14 @@ public class Shooter extends SubsystemBase {
 
     @AutoLogOutput(key = "Shooter/isFlywheelAtSetpoint")
     public boolean isFlywheelAtSetpoint() {
-        return shooterInputs.flywheelMotorConnected
-            && Math.abs(shooterInputs.flywheelVelocityRotationsPerSec - flywheelSetpointRPS) < config.flywheelVelocityToleranceRPS;
+        return isFlywheelAtSetpoint(
+            shooterInputs.flywheelMotorConnected,
+            shooterInputs.flywheelVelocityRotationsPerSec,
+            shooterInputs.flywheelFollowerMotorConnected,
+            shooterInputs.flywheelFollowerVelocityRotationsPerSec,
+            flywheelSetpointRPS,
+            config.flywheelVelocityToleranceRPS
+        );
     }
 
     @AutoLogOutput(key = "Shooter/isHoodMotorConnected")
@@ -652,6 +695,57 @@ public class Shooter extends SubsystemBase {
     @AutoLogOutput(key = "Shooter/isFlywheelFollowerMotorConnected")
     public boolean isFlywheelFollowerMotorConnected() {
         return shooterInputs.flywheelFollowerMotorConnected;
+    }
+
+    static double selectConnectedFlywheelVelocity(
+        boolean leaderConnected,
+        double leaderVelocityRotPerSec,
+        boolean followerConnected,
+        double followerVelocityRotPerSec
+    ) {
+        if (leaderConnected) {
+            return leaderVelocityRotPerSec;
+        }
+        if (followerConnected) {
+            return followerVelocityRotPerSec;
+        }
+        return Double.NaN;
+    }
+
+    static double selectConnectedFlywheelVelocityOrDefault(
+        boolean leaderConnected,
+        double leaderVelocityRotPerSec,
+        boolean followerConnected,
+        double followerVelocityRotPerSec,
+        double defaultVelocityRotPerSec
+    ) {
+        double connectedVelocity = selectConnectedFlywheelVelocity(
+            leaderConnected,
+            leaderVelocityRotPerSec,
+            followerConnected,
+            followerVelocityRotPerSec
+        );
+        return Double.isFinite(connectedVelocity) ? connectedVelocity : defaultVelocityRotPerSec;
+    }
+
+    static boolean isFlywheelAtSetpoint(
+        boolean leaderConnected,
+        double leaderVelocityRotPerSec,
+        boolean followerConnected,
+        double followerVelocityRotPerSec,
+        double setpointRotPerSec,
+        double toleranceRotPerSec
+    ) {
+        double measuredFlywheelVelocity = selectConnectedFlywheelVelocity(
+            leaderConnected,
+            leaderVelocityRotPerSec,
+            followerConnected,
+            followerVelocityRotPerSec
+        );
+        if (!Double.isFinite(measuredFlywheelVelocity)) {
+            return false;
+        }
+        return Math.abs(measuredFlywheelVelocity - setpointRotPerSec) < Math.abs(toleranceRotPerSec);
     }
 
     // Config getters
