@@ -85,32 +85,36 @@ public class VisionIOLimelight implements VisionIO {
                 Rotation2d.fromDegrees(txSubscriber.get()), Rotation2d.fromDegrees(tySubscriber.get()));
 
         // Read new pose observations from NetworkTables
+        TimestampedDoubleArray[] megatag1Samples = megatag1Subscriber.readQueue();
+        TimestampedDoubleArray[] megatag2Samples = megatag2Subscriber.readQueue();
         Set<Integer> tagIds = new HashSet<>();
-        List<PoseObservation> poseObservations = new ArrayList<>();
-        int rawMegatag1ObservationCount = 0;
-        int rawMegatag2ObservationCount = 0;
-        for (TimestampedDoubleArray rawSample : megatag1Subscriber.readQueue()) {
+        List<PoseObservation> poseObservations = new ArrayList<>(
+            Math.min(megatag1Samples.length + megatag2Samples.length, MAX_OBSERVATION_SAMPLES_PER_UPDATE * 2));
+        int megatag1StartIndex = VisionIO.getLatestSampleStartIndex(megatag1Samples.length);
+        int megatag2StartIndex = VisionIO.getLatestSampleStartIndex(megatag2Samples.length);
+        inputs.rawMegatag1ObservationCount = megatag1Samples.length;
+        inputs.rawMegatag2ObservationCount = megatag2Samples.length;
+        inputs.rawObservationCount = megatag1Samples.length + megatag2Samples.length;
+        inputs.droppedObservationCount = megatag1StartIndex + megatag2StartIndex;
+        for (int sampleIndex = megatag1StartIndex; sampleIndex < megatag1Samples.length; sampleIndex++) {
+            TimestampedDoubleArray rawSample = megatag1Samples[sampleIndex];
             collectTagIds(tagIds, rawSample.value);
             Optional<PoseObservation> poseObservation =
                 parsePoseObservation(rawSample, PoseObservationType.MEGATAG_1);
             if (poseObservation.isPresent()) {
                 poseObservations.add(poseObservation.get());
-                rawMegatag1ObservationCount++;
             }
         }
-        for (TimestampedDoubleArray rawSample : megatag2Subscriber.readQueue()) {
+        for (int sampleIndex = megatag2StartIndex; sampleIndex < megatag2Samples.length; sampleIndex++) {
+            TimestampedDoubleArray rawSample = megatag2Samples[sampleIndex];
             collectTagIds(tagIds, rawSample.value);
             Optional<PoseObservation> poseObservation =
                 parsePoseObservation(rawSample, PoseObservationType.MEGATAG_2);
             if (poseObservation.isPresent()) {
                 poseObservations.add(poseObservation.get());
-                rawMegatag2ObservationCount++;
             }
         }
         inputs.robotPoseObservations = poseObservations.toArray(new PoseObservation[0]);
-        inputs.rawMegatag1ObservationCount = rawMegatag1ObservationCount;
-        inputs.rawMegatag2ObservationCount = rawMegatag2ObservationCount;
-        inputs.rawObservationCount = poseObservations.size();
 
         inputs.tagIds = new int[tagIds.size()];
         int i = 0;

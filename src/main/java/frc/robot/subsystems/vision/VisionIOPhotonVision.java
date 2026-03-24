@@ -6,7 +6,6 @@ import edu.wpi.first.math.geometry.Transform3d;
 
 import java.util.ArrayList;
 import java.util.HashSet;
-import java.util.LinkedList;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -34,11 +33,19 @@ public class VisionIOPhotonVision implements VisionIO {
     inputs.connected = camera.isConnected();
     Optional<edu.wpi.first.apriltag.AprilTagFieldLayout> aprilTagLayout =
         VisionConstants.getAprilTagLayout();
+    var unreadResults = camera.getAllUnreadResults();
+    int resultStartIndex = VisionIO.getLatestSampleStartIndex(unreadResults.size());
+    inputs.rawMegatag1ObservationCount = 0;
+    inputs.rawMegatag2ObservationCount = 0;
+    inputs.rawObservationCount = unreadResults.size();
+    inputs.droppedObservationCount = resultStartIndex;
 
     // Read new camera observations
     Set<Short> tagIds = new HashSet<>();
-    List<PoseObservation> poseObservations = new LinkedList<>();
-    for (var result : camera.getAllUnreadResults()) {
+    List<PoseObservation> poseObservations =
+        new ArrayList<>(Math.min(unreadResults.size(), MAX_OBSERVATION_SAMPLES_PER_UPDATE));
+    for (int resultIndex = resultStartIndex; resultIndex < unreadResults.size(); resultIndex++) {
+      var result = unreadResults.get(resultIndex);
       // Update latest target observation
       if (result.hasTargets()) {
         inputs.latestTargetObservation =
@@ -113,7 +120,6 @@ public class VisionIOPhotonVision implements VisionIO {
     for (int i = 0; i < poseObservations.size(); i++) {
       inputs.robotPoseObservations[i] = poseObservations.get(i);
     }
-    inputs.rawObservationCount = poseObservations.size();
 
     // Save tag IDs to inputs objects
     inputs.tagIds = new int[tagIds.size()];
