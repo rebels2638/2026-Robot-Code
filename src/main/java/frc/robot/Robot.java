@@ -79,7 +79,7 @@ public class Robot extends LoggedRobot {
         switch (Constants.currentMode) {
             case COMP:
                 // Running on a real robot, log to a USB stick ("/U/logs")
-                // Logger.addDataReceiver(new WPILOGWriter());
+                Logger.addDataReceiver(new WPILOGWriter());
                 Logger.addDataReceiver(new NT4Publisher());
 
                 break;
