@@ -477,6 +477,7 @@ public class Superstructure extends SubsystemBase {
     }
 
     private void handleBumpState() {
+        applyDefaultMotionCaps();
         swerveDrive.setSnapTargetAngle(bumpSnapAngle);
         swerveDrive.setTranslationVelocityCapMaxVelocityMetersPerSec(config.bumpMaxVelocityMetersPerSec);
         swerveDrive.setDesiredOmegaOverrideState(SwerveDrive.DesiredOmegaOverrideState.SNAPPED);
@@ -490,6 +491,7 @@ public class Superstructure extends SubsystemBase {
     }
 
     private void applyHomeOutputs() {
+        applyDefaultMotionCaps();
         applyShooterAndHopperSetpoints(
             HoodSetpoint.HOME,
             TurretSetpoint.HOME,
@@ -501,6 +503,7 @@ public class Superstructure extends SubsystemBase {
     }
 
     private void applyTrackingOutputs() {
+        applyDefaultMotionCaps();
         applyShooterAndHopperSetpoints(
             HoodSetpoint.DYNAMIC,
             TurretSetpoint.DYNAMIC,
@@ -525,7 +528,16 @@ public class Superstructure extends SubsystemBase {
 
     private void applyShotMotionCaps() {
         swerveDrive.setTranslationVelocityCapMaxVelocityMetersPerSec(config.maxTranslationalVelocityDuringShotMetersPerSec);
+        swerveDrive.setTranslationAccelerationCapMaxMetersPerSecSec(
+            config.maxTranslationalAccelerationDuringShotMetersPerSecSec
+        );
         swerveDrive.setOmegaVelocityCapMaxRadiansPerSec(config.maxAngularVelocityDuringShotRadPerSec);
+        swerveDrive.setOmegaAccelerationCapMaxRadiansPerSecSec(config.maxAngularAccelerationDuringShotRadPerSecSec);
+    }
+
+    private void applyDefaultMotionCaps() {
+        swerveDrive.clearTranslationAccelerationCap();
+        swerveDrive.clearOmegaAccelerationCap();
     }
 
     private void applyShooterAndHopperSetpoints(

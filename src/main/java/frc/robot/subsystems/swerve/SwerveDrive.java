@@ -181,6 +181,7 @@ public class SwerveDrive extends SubsystemBase {
     // Rotational velocity cap (limits max angular velocity)
     private boolean shouldOverrideOmegaVelocityCap = false;
     private double omegaVelocityCapMaxRadiansPerSec = Double.MAX_VALUE;
+    private double omegaAccelerationCapMaxRadiansPerSecSec = Double.NaN;
 
     // Translational speed freezing (used during shooting) - only vx/vy are frozen, omega remains controlled
     private boolean shouldOverrideTranslationalSpeedsFrozen = false;
@@ -190,6 +191,7 @@ public class SwerveDrive extends SubsystemBase {
     // Shooting velocity cap (limits max translational velocity during shooting)
     private boolean shouldOverrideTranslationVelocityCap = false;
     private double translationVelocityCapMaxVelocityMetersPerSec = Double.MAX_VALUE;
+    private double translationAccelerationCapMaxMetersPerSecSec = Double.NaN;
 
     // Alliance-based inversion
     private int invert = 1;
@@ -1688,6 +1690,12 @@ public class SwerveDrive extends SubsystemBase {
         return Math.abs(normalized - 180.0) < 1e-9 ? -180.0 : normalized;
     }
 
+    static double resolveActiveLimit(boolean shouldApplyOverride, double overrideLimit, double defaultLimit) {
+        return shouldApplyOverride && Double.isFinite(overrideLimit) && overrideLimit > 0.0
+            ? overrideLimit
+            : defaultLimit;
+    }
+
     public void setSnapTargetAngle(Rotation2d angle) {
         this.snapTargetAngle = angle;
         Logger.recordOutput("SwerveDrive/snapTargetAngle", angle);
@@ -1697,8 +1705,24 @@ public class SwerveDrive extends SubsystemBase {
         this.translationVelocityCapMaxVelocityMetersPerSec = maxVelocity;
     }
 
+    public void setTranslationAccelerationCapMaxMetersPerSecSec(double maxAcceleration) {
+        this.translationAccelerationCapMaxMetersPerSecSec = maxAcceleration;
+    }
+
+    public void clearTranslationAccelerationCap() {
+        translationAccelerationCapMaxMetersPerSecSec = Double.NaN;
+    }
+
     public void setOmegaVelocityCapMaxRadiansPerSec(double maxOmegaVelocity) {
         this.omegaVelocityCapMaxRadiansPerSec = maxOmegaVelocity;
+    }
+
+    public void setOmegaAccelerationCapMaxRadiansPerSecSec(double maxOmegaAcceleration) {
+        this.omegaAccelerationCapMaxRadiansPerSecSec = maxOmegaAcceleration;
+    }
+
+    public void clearOmegaAccelerationCap() {
+        omegaAccelerationCapMaxRadiansPerSecSec = Double.NaN;
     }
 
     // System State getters/setters
@@ -1956,14 +1980,33 @@ public class SwerveDrive extends SubsystemBase {
         ChassisSpeeds desiredFieldRelativeSpeeds = ChassisSpeeds.fromRobotRelativeSpeeds(desiredRobotRelativeSpeeds, heading);
         Logger.recordOutput("SwerveDrive/desiredFieldRelativeSpeeds", desiredFieldRelativeSpeeds);
         Logger.recordOutput("SwerveDrive/desiredRobotRelativeSpeeds", desiredRobotRelativeSpeeds);
+
+        double activeTranslationAccelerationLimit = resolveActiveLimit(
+            shouldOverrideTranslationVelocityCap,
+            translationAccelerationCapMaxMetersPerSecSec,
+            drivetrainConfig.maxTranslationalAccelerationMetersPerSecSec
+        );
+        double activeOmegaAccelerationLimit = resolveActiveLimit(
+            shouldOverrideOmegaVelocityCap,
+            omegaAccelerationCapMaxRadiansPerSecSec,
+            drivetrainConfig.maxAngularAccelerationRadiansPerSecSec
+        );
+        Logger.recordOutput(
+            "SwerveDrive/activeTranslationAccelerationLimitMetersPerSecSec",
+            activeTranslationAccelerationLimit
+        );
+        Logger.recordOutput(
+            "SwerveDrive/activeOmegaAccelerationLimitRadPerSecSec",
+            activeOmegaAccelerationLimit
+        );
         
         // Limit acceleration to prevent sudden changes in speed
         obtainableFieldRelativeSpeeds = ChassisRateLimiter.limit(
             desiredFieldRelativeSpeeds, 
             obtainableFieldRelativeSpeeds, 
             dt, 
-            drivetrainConfig.maxTranslationalAccelerationMetersPerSecSec, 
-            drivetrainConfig.maxAngularAccelerationRadiansPerSecSec,
+            activeTranslationAccelerationLimit,
+            activeOmegaAccelerationLimit,
             drivetrainConfig.maxTranslationalVelocityMetersPerSec,
             drivetrainConfig.maxAngularVelocityRadiansPerSec
         );
