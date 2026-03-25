@@ -72,8 +72,8 @@ public class FieldConstants {
 
     public static class Hub {
         public static final Translation3d hubCenter = new Translation3d(
-                Units.inchesToMeters(182.105),
-                Units.inchesToMeters(158.845),
+                Units.inchesToMeters(182.105), // 4.63 m
+                Units.inchesToMeters(158.845), // 4.035 m
                 Units.inchesToMeters(72.0));
 
         public static final double sideLength = Units.inchesToMeters(47.5);
