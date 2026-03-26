@@ -15,7 +15,9 @@ import edu.wpi.first.wpilibj.Timer;
 import frc.robot.configs.RobotStateConfig;
 import frc.robot.configs.SwerveConfig;
 import frc.robot.configs.SwerveDrivetrainConfig;
+import frc.robot.constants.Constants;
 import frc.robot.lib.util.ConfigLoader;
+import frc.robot.sim.MapleSimManager;
 import frc.robot.subsystems.swerve.SwerveDrive;
 
 import java.util.NoSuchElementException;
@@ -239,6 +241,10 @@ public class RobotState {
      */
     public void resetPose(Pose2d initialPose) {
         SwerveDrive.getInstance().resetGyro(initialPose.getRotation());
+        if (Constants.shouldUseSimulation(Constants.SimOnlySubsystems.SWERVE)
+            && Constants.currentMode != Constants.Mode.REPLAY) {
+            MapleSimManager.getInstance().resetRobotPose(initialPose);
+        }
         swerveDrivePoseEstimator.resetPosition(initialPose.getRotation(), lastWheelPositions, initialPose);
         accumulatedYawRad = initialPose.getRotation().getRadians();
         lastWrappedYawRad = initialPose.getRotation().getRadians();

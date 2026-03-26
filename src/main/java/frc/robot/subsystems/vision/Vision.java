@@ -16,6 +16,7 @@ import frc.robot.configs.VisionConfig.ObservationMode;
 import frc.robot.constants.Constants;
 import frc.robot.lib.util.ConfigLoader;
 import frc.robot.lib.util.LimelightHelpers;
+import frc.robot.sim.MapleSimManager;
 import frc.robot.subsystems.vision.VisionIO.PoseObservationType;
 
 import java.util.ArrayList;
@@ -45,7 +46,13 @@ public class Vision extends SubsystemBase {
                 config.cameras != null ? config.cameras : List.of();
             if (useSimulation) {
                 for (VisionConfig.CameraConfig camera : cameraConfigs) {
-                    ioList.add(new VisionIO() {});
+                    ioList.add(
+                        new VisionIOPhotonVisionSim(
+                            camera.name,
+                            camera.getRobotToCamera(),
+                            MapleSimManager.getInstance()::getActualPose
+                        )
+                    );
                 }
             } else {
                 for (VisionConfig.CameraConfig camera : cameraConfigs) {

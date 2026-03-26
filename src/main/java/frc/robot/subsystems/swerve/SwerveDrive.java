@@ -47,6 +47,7 @@ import frc.robot.lib.BLine.ChassisRateLimiter;
 import frc.robot.lib.BLine.FollowPath;
 import frc.robot.lib.BLine.Path;
 import frc.robot.subsystems.swerve.gyro.GyroIO;
+import frc.robot.subsystems.swerve.gyro.GyroIOSim;
 import frc.robot.subsystems.swerve.gyro.GyroIOInputsAutoLogged;
 import frc.robot.subsystems.swerve.gyro.GyroIOPigeon2;
 import frc.robot.subsystems.swerve.module.ModuleIO;
@@ -272,7 +273,7 @@ public class SwerveDrive extends SubsystemBase {
                 new ModuleIOSim(moduleGeneralConfig, 2),
                 new ModuleIOSim(moduleGeneralConfig, 3)
             };
-            gyroIO = new GyroIO() {};
+            gyroIO = new GyroIOSim();
         } else if (Constants.currentMode == Constants.Mode.REPLAY) {
             modules = new ModuleIO[] {
                 new ModuleIO() {},

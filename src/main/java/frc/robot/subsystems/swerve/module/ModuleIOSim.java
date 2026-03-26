@@ -1,163 +1,160 @@
 package frc.robot.subsystems.swerve.module;
 
+import static edu.wpi.first.units.Units.Amps;
+import static edu.wpi.first.units.Units.Radians;
+import static edu.wpi.first.units.Units.RadiansPerSecond;
+import static edu.wpi.first.units.Units.Volts;
+
+import org.ironmaple.simulation.drivesims.SwerveModuleSimulation;
+import org.ironmaple.simulation.motorsims.SimulatedMotorController;
+
 import edu.wpi.first.math.MathUtil;
 import edu.wpi.first.math.controller.PIDController;
 import edu.wpi.first.math.controller.SimpleMotorFeedforward;
 import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.math.kinematics.SwerveModuleState;
-import edu.wpi.first.math.system.plant.DCMotor;
-import edu.wpi.first.math.system.plant.LinearSystemId;
-import edu.wpi.first.wpilibj.Timer;
-import edu.wpi.first.wpilibj.simulation.DCMotorSim;
 import frc.robot.configs.SwerveModuleGeneralConfig;
 import frc.robot.lib.util.DashboardMotorControlLoopConfigurator.MotorControlLoopConfig;
+import frc.robot.sim.MapleSimManager;
 
 public class ModuleIOSim implements ModuleIO {
-    private final DCMotor driveMotorModel = DCMotor.getKrakenX60Foc(1);
-    private final DCMotor turnMotorModel = DCMotor.getKrakenX60Foc(1);
+    private final MapleSimManager mapleSim = MapleSimManager.getInstance();
+    private final SwerveModuleGeneralConfig config;
+    private final SwerveModuleSimulation moduleSimulation;
+    private final SimulatedMotorController.GenericMotorController driveMotorController;
+    private final SimulatedMotorController.GenericMotorController steerMotorController;
 
-    private final DCMotorSim driveSim =
-        new DCMotorSim( 
-            LinearSystemId.createDCMotorSystem(driveMotorModel, (2.8087 * 0.0194 * 0.0485614385) / 6.12, 6.12), // J = (kA_linear * Kt * r) / G
-            driveMotorModel
-        );
-    private final DCMotorSim steerSim =
-        new DCMotorSim(
-            LinearSystemId.createDCMotorSystem(turnMotorModel,  0.00015, 21.428), // magic number because steer is not important
-            turnMotorModel
-        );
+    private PIDController driveFeedback;
+    private PIDController steerFeedback;
+    private SimpleMotorFeedforward driveFeedforward;
 
-
-    private PIDController driveFeedback = new PIDController(0, 0.0, 0.0);
-    private PIDController steerFeedback = new PIDController(25, 0.0, 0.0);
-
-    private SimpleMotorFeedforward driveFeedforward = new SimpleMotorFeedforward(0.0, 2.44, 0.1);
-
-    private boolean isSteerClosedLoop = true;
-    private boolean isDriveClosedLoop = true;
     private boolean isDriveEStopped = false;
     private boolean isSteerEStopped = false;
 
-    private SwerveModuleState lastDesiredState = new SwerveModuleState();
-
-    private double lastTimeInputs = Timer.getTimestamp();
-    
-    private final int moduleID;
     public ModuleIOSim(SwerveModuleGeneralConfig config, int moduleID) {
-        this.moduleID = moduleID;
+        this.config = config;
+        this.moduleSimulation = mapleSim.getModuleSimulation(moduleID);
+        this.driveMotorController = moduleSimulation.useGenericMotorControllerForDrive()
+            .withCurrentLimit(Amps.of(config.driveStatorCurrentLimit));
+        this.steerMotorController = moduleSimulation.useGenericControllerForSteer()
+            .withCurrentLimit(Amps.of(config.steerStatorCurrentLimit));
+
+        driveFeedback = new PIDController(config.driveKP, config.driveKI, config.driveKD);
+        steerFeedback = new PIDController(config.steerKP, config.steerKI, config.steerKD);
         steerFeedback.enableContinuousInput(-Math.PI, Math.PI);
+        driveFeedforward = new SimpleMotorFeedforward(config.driveKS, config.driveKV, config.driveKA);
     }
 
     @Override
     public void updateInputs(ModuleIOInputs inputs) {
-        double dt = Timer.getTimestamp() - lastTimeInputs;
-        lastTimeInputs = Timer.getTimestamp();
-
-        if (isDriveEStopped) {
-            driveSim.setInputVoltage(0);
-        } else if (isDriveClosedLoop) {
-            driveSim.setInputVoltage(
-                MathUtil.clamp(
-                    driveFeedforward.calculate(lastDesiredState.speedMetersPerSecond) +
-                    driveFeedback.calculate(driveSim.getAngularVelocityRadPerSec() * 0.0485614385), // wheel radius in meters
-                    -12,
-                    12
-                )
-            );
-        }
-
-        if (isSteerEStopped) {
-            steerSim.setInputVoltage(0);
-        } else if (isSteerClosedLoop) {
-            steerSim.setInputVoltage(
-                MathUtil.clamp(
-                    steerFeedback.calculate(steerSim.getAngularPositionRad()),
-                    -12,
-                    12
-                )
-            );
-        }
-
-        steerSim.update(dt);
-        driveSim.update(dt);
+        double wheelPositionRadians = moduleSimulation.getDriveWheelFinalPosition().in(Radians);
+        double wheelVelocityRadiansPerSecond = moduleSimulation.getDriveWheelFinalSpeed().in(RadiansPerSecond);
+        Rotation2d steerPosition = moduleSimulation.getSteerAbsoluteFacing();
 
         inputs.driveMotorConnected = true;
         inputs.steerMotorConnected = true;
         inputs.steerEncoderConnected = true;
-        
-        inputs.drivePositionMeters = driveSim.getAngularPositionRad() * 0.0485614385; // wheel radius in meters
-        inputs.driveVelocityMetersPerSec = driveSim.getAngularVelocityRadPerSec() * 0.0485614385;
-        inputs.driveAppliedVolts = driveSim.getInputVoltage();
 
-        inputs.steerPosition = new Rotation2d(steerSim.getAngularPosition());
-        inputs.steerVelocityRadPerSec = steerSim.getAngularVelocityRadPerSec();
-        inputs.steerAppliedVolts = steerSim.getInputVoltage();
+        inputs.drivePositionMeters = wheelPositionRadians * config.driveWheelRadiusMeters;
+        inputs.driveVelocityMetersPerSec = wheelVelocityRadiansPerSecond * config.driveWheelRadiusMeters;
+        inputs.driveAppliedVolts = moduleSimulation.getDriveMotorAppliedVoltage().in(Volts);
 
-        inputs.steerEncoderAbsolutePosition = inputs.steerPosition;
-        inputs.steerEncoderPosition = inputs.steerPosition;
+        inputs.steerPosition = steerPosition;
+        inputs.steerVelocityRadPerSec = moduleSimulation.getSteerAbsoluteEncoderSpeed().in(RadiansPerSecond);
+        inputs.steerAppliedVolts = moduleSimulation.getSteerMotorAppliedVoltage().in(Volts);
 
-        inputs.driveTorqueCurrent = driveSim.getCurrentDrawAmps();
-        inputs.steerTorqueCurrent = steerSim.getCurrentDrawAmps();
+        inputs.steerEncoderAbsolutePosition = steerPosition;
+        inputs.steerEncoderPosition = steerPosition;
 
-        inputs.odometryTimestampsSeconds = new double[] {Timer.getTimestamp()};
-        inputs.odometryDrivePositionsMeters = new double[] {inputs.drivePositionMeters};
-        inputs.odometrySteerPositions = new Rotation2d[] {inputs.steerPosition};
+        inputs.driveTorqueCurrent = moduleSimulation.getDriveMotorStatorCurrent().in(Amps);
+        inputs.driveTemperatureFahrenheit = 0.0;
+        inputs.steerTorqueCurrent = moduleSimulation.getSteerMotorStatorCurrent().in(Amps);
+        inputs.steerTemperatureFahrenheit = 0.0;
+
+        inputs.odometryTimestampsSeconds = mapleSim.getOdometryTimestampsSeconds();
+        inputs.odometryDrivePositionsMeters = convertWheelPositionCacheToMeters();
+        inputs.odometrySteerPositions = moduleSimulation.getCachedSteerAbsolutePositions().clone();
+    }
+
+    private double[] convertWheelPositionCacheToMeters() {
+        var cachedWheelPositions = moduleSimulation.getCachedDriveWheelFinalPositions();
+        double[] drivePositionsMeters = new double[cachedWheelPositions.length];
+        for (int i = 0; i < cachedWheelPositions.length; i++) {
+            drivePositionsMeters[i] = cachedWheelPositions[i].in(Radians) * config.driveWheelRadiusMeters;
+        }
+        return drivePositionsMeters;
     }
 
     @Override
     public void setState(SwerveModuleState state) {
-        if (isDriveEStopped) {
-            driveSim.setInputVoltage(0);
-            isDriveClosedLoop = false;
-        } else {
-            driveFeedback.setSetpoint(state.speedMetersPerSecond);
-            isDriveClosedLoop = true;
-        }
-
-        if (isSteerEStopped) {
-            steerSim.setInputVoltage(0);
-            isSteerClosedLoop = false;
-        } else {
-            steerFeedback.setSetpoint(state.angle.getRadians());
-            isSteerClosedLoop = true;
-        }
-
-        lastDesiredState = state;
+        double compensatedVelocityMetersPerSecond =
+            state.speedMetersPerSecond * state.angle.minus(moduleSimulation.getSteerAbsoluteFacing()).getCos();
+        requestDriveVelocity(compensatedVelocityMetersPerSecond);
+        requestSteerPosition(state.angle);
     }
 
     @Override
     public void setSteerTorqueCurrentFOC(double torqueCurrentFOC, double driveVelocityMetersPerSec) {
-        // In sim, treat torqueCurrentFOC as voltage for simplicity
-        steerSim.setInputVoltage(isSteerEStopped ? 0 : torqueCurrentFOC);
-
-        isDriveClosedLoop = false;
-        isSteerClosedLoop = !isSteerEStopped;
+        requestDriveVelocity(driveVelocityMetersPerSec);
+        requestSteerVoltage(torqueCurrentFOC);
     }
 
     @Override
     public void setDriveTorqueCurrentFOC(double torqueCurrentFOC, Rotation2d steerAngle) {
-        // In sim, treat torqueCurrentFOC as voltage for simplicity
-        driveSim.setInputVoltage(isDriveEStopped ? 0 : torqueCurrentFOC);
+        requestDriveVoltage(torqueCurrentFOC);
+        requestSteerPosition(steerAngle);
+    }
 
-        isDriveClosedLoop = !isDriveEStopped;
-        isSteerClosedLoop = true;
+    private void requestDriveVelocity(double setpointMetersPerSecond) {
+        if (isDriveEStopped) {
+            requestDriveVoltage(0.0);
+            return;
+        }
+
+        double measuredMetersPerSecond =
+            moduleSimulation.getDriveWheelFinalSpeed().in(RadiansPerSecond) * config.driveWheelRadiusMeters;
+        double driveVolts = driveFeedforward.calculate(setpointMetersPerSecond)
+            + driveFeedback.calculate(measuredMetersPerSecond, setpointMetersPerSecond);
+        requestDriveVoltage(driveVolts);
+    }
+
+    private void requestSteerPosition(Rotation2d setpoint) {
+        if (isSteerEStopped) {
+            requestSteerVoltage(0.0);
+            return;
+        }
+
+        double steerVolts = steerFeedback.calculate(
+            moduleSimulation.getSteerAbsoluteFacing().getRadians(),
+            setpoint.getRadians()
+        );
+        requestSteerVoltage(steerVolts);
+    }
+
+    private void requestDriveVoltage(double volts) {
+        driveMotorController.requestVoltage(Volts.of(MathUtil.clamp(volts, -12.0, 12.0)));
+    }
+
+    private void requestSteerVoltage(double volts) {
+        steerMotorController.requestVoltage(Volts.of(MathUtil.clamp(volts, -12.0, 12.0)));
     }
 
     @Override
     public void configureDriveControlLoop(MotorControlLoopConfig config) {
-        // No-op in sim
+        driveFeedback = new PIDController(config.kP(), config.kI(), config.kD());
+        driveFeedforward = new SimpleMotorFeedforward(config.kS(), config.kV(), config.kA());
     }
 
     @Override
     public void configureSteerControlLoop(MotorControlLoopConfig config) {
-        // No-op in sim
+        steerFeedback = new PIDController(config.kP(), config.kI(), config.kD());
+        steerFeedback.enableContinuousInput(-Math.PI, Math.PI);
     }
 
     @Override
     public void enableDriveEStop() {
         isDriveEStopped = true;
-        driveSim.setInputVoltage(0);
-        isDriveClosedLoop = false;
+        requestDriveVoltage(0.0);
     }
 
     @Override
@@ -168,8 +165,7 @@ public class ModuleIOSim implements ModuleIO {
     @Override
     public void enableSteerEStop() {
         isSteerEStopped = true;
-        steerSim.setInputVoltage(0);
-        isSteerClosedLoop = false;
+        requestSteerVoltage(0.0);
     }
 
     @Override

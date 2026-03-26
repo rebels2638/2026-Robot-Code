@@ -2,6 +2,7 @@ package frc.robot.subsystems.vision;
 
 import edu.wpi.first.math.geometry.Pose2d;
 import edu.wpi.first.math.geometry.Transform3d;
+import edu.wpi.first.wpilibj.Timer;
 
 import java.util.function.Supplier;
 import org.photonvision.simulation.PhotonCameraSim;
@@ -11,7 +12,9 @@ import frc.robot.constants.vision.VisionConstants;
 
 /** IO implementation for physics sim using PhotonVision simulator. */
 public class VisionIOPhotonVisionSim extends VisionIOPhotonVision {
+  private static final double SIM_UPDATE_GUARD_SECONDS = 0.01;
   private static VisionSystemSim visionSim;
+  private static double lastVisionSimUpdateTimestampSeconds = Double.NEGATIVE_INFINITY;
 
   private final Supplier<Pose2d> poseSupplier;
   private final PhotonCameraSim cameraSim;
@@ -44,7 +47,11 @@ public class VisionIOPhotonVisionSim extends VisionIOPhotonVision {
 
   @Override
   public void updateInputs(VisionIOInputs inputs) {
-    visionSim.update(poseSupplier.get());
+    double timestampSeconds = Timer.getTimestamp();
+    if (timestampSeconds - lastVisionSimUpdateTimestampSeconds > SIM_UPDATE_GUARD_SECONDS) {
+      visionSim.update(poseSupplier.get());
+      lastVisionSimUpdateTimestampSeconds = timestampSeconds;
+    }
     super.updateInputs(inputs);
   }
 }

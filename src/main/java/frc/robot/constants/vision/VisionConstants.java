@@ -9,7 +9,6 @@ import java.util.logging.Logger;
 import edu.wpi.first.apriltag.AprilTagFieldLayout;
 import edu.wpi.first.apriltag.AprilTagFields;
 import edu.wpi.first.wpilibj.Filesystem;
-import frc.robot.constants.Constants;
 
 public class VisionConstants {
   // AprilTag layout
@@ -70,10 +69,6 @@ public class VisionConstants {
   }
 
   public static synchronized Optional<AprilTagFieldLayout> getAprilTagLayout() {
-    if (!Constants.VERBOSE_LOGGING_ENABLED) {
-      return Optional.empty();
-    }
-
     if (aprilTagLayout == null) {
       aprilTagLayout = loadAprilTagLayout();
     }
