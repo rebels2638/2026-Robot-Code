@@ -3,241 +3,241 @@
     {
       "distanceMeters": 0.5,
       "hoodAngleDegrees": 68.6,
-      "flywheelVelocityRPS": 8.181,
+      "flywheelVelocityRPS": 9.681,
       "flightTimeSeconds": 0.635977
     },
     {
       "distanceMeters": 1.0,
       "hoodAngleDegrees": 69.2,
-      "flywheelVelocityRPS": 13.065,
+      "flywheelVelocityRPS": 14.565,
       "flightTimeSeconds": 0.83207
     },
     {
       "distanceMeters": 1.5,
       "hoodAngleDegrees": 69.8,
-      "flywheelVelocityRPS": 17.01,
+      "flywheelVelocityRPS": 18.51,
       "flightTimeSeconds": 1.004172
     },
     {
       "distanceMeters": 2.0,
       "hoodAngleDegrees": 69.9,
-      "flywheelVelocityRPS": 20.269,
+      "flywheelVelocityRPS": 21.769,
       "flightTimeSeconds": 1.149825
     },
     {
       "distanceMeters": 2.5,
       "hoodAngleDegrees": 67.7,
-      "flywheelVelocityRPS": 21.945,
+      "flywheelVelocityRPS": 23.445,
       "flightTimeSeconds": 1.212128
     },
     {
       "distanceMeters": 3.0,
       "hoodAngleDegrees": 65.1,
-      "flywheelVelocityRPS": 23.169,
+      "flywheelVelocityRPS": 24.669,
       "flightTimeSeconds": 1.24831
     },
     {
       "distanceMeters": 3.5,
       "hoodAngleDegrees": 62.4,
-      "flywheelVelocityRPS": 24.212,
+      "flywheelVelocityRPS": 25.712,
       "flightTimeSeconds": 1.271985
     },
     {
       "distanceMeters": 4.0,
       "hoodAngleDegrees": 59.6,
-      "flywheelVelocityRPS": 25.15,
+      "flywheelVelocityRPS": 26.65,
       "flightTimeSeconds": 1.286084
     },
     {
       "distanceMeters": 4.5,
       "hoodAngleDegrees": 59.1,
-      "flywheelVelocityRPS": 26.803,
+      "flywheelVelocityRPS": 28.303,
       "flightTimeSeconds": 1.351384
     },
     {
       "distanceMeters": 5.0,
       "hoodAngleDegrees": 58.8,
-      "flywheelVelocityRPS": 28.438,
+      "flywheelVelocityRPS": 29.938,
       "flightTimeSeconds": 1.417892
     },
     {
       "distanceMeters": 5.5,
       "hoodAngleDegrees": 57.9,
-      "flywheelVelocityRPS": 29.777,
+      "flywheelVelocityRPS": 31.277,
       "flightTimeSeconds": 1.464223
     },
     {
       "distanceMeters": 6.0,
       "hoodAngleDegrees": 56.6,
-      "flywheelVelocityRPS": 30.906,
+      "flywheelVelocityRPS": 32.406,
       "flightTimeSeconds": 1.495419
     },
     {
       "distanceMeters": 6.5,
       "hoodAngleDegrees": 57.6,
-      "flywheelVelocityRPS": 32.834,
+      "flywheelVelocityRPS": 34.334,
       "flightTimeSeconds": 1.590503
     },
     {
       "distanceMeters": 7.0,
       "hoodAngleDegrees": 57.1,
-      "flywheelVelocityRPS": 34.152,
+      "flywheelVelocityRPS": 35.652,
       "flightTimeSeconds": 1.639638
     },
     {
       "distanceMeters": 7.5,
       "hoodAngleDegrees": 57.6,
-      "flywheelVelocityRPS": 35.866,
+      "flywheelVelocityRPS": 37.366,
       "flightTimeSeconds": 1.719705
     },
     {
       "distanceMeters": 8.0,
       "hoodAngleDegrees": 57.3,
-      "flywheelVelocityRPS": 37.201,
+      "flywheelVelocityRPS": 38.701,
       "flightTimeSeconds": 1.77211
     },
     {
       "distanceMeters": 8.5,
       "hoodAngleDegrees": 57.9,
-      "flywheelVelocityRPS": 38.964,
+      "flywheelVelocityRPS": 40.464,
       "flightTimeSeconds": 1.856193
     },
     {
       "distanceMeters": 9.0,
       "hoodAngleDegrees": 57.7,
-      "flywheelVelocityRPS": 40.308,
+      "flywheelVelocityRPS": 41.808,
       "flightTimeSeconds": 1.910292
     },
     {
       "distanceMeters": 9.5,
       "hoodAngleDegrees": 56.1,
-      "flywheelVelocityRPS": 40.876,
+      "flywheelVelocityRPS": 42.376,
       "flightTimeSeconds": 1.956434
     },
     {
       "distanceMeters": 10.0,
       "hoodAngleDegrees": 57.0,
-      "flywheelVelocityRPS": 42.755,
+      "flywheelVelocityRPS": 44.255,
       "flightTimeSeconds": 2.002575
     },
     {
       "distanceMeters": 10.5,
       "hoodAngleDegrees": 57.2,
-      "flywheelVelocityRPS": 44.278,
+      "flywheelVelocityRPS": 45.778,
       "flightTimeSeconds": 2.070029
     },
     {
       "distanceMeters": 11.0,
       "hoodAngleDegrees": 57.4,
-      "flywheelVelocityRPS": 45.812,
+      "flywheelVelocityRPS": 47.312,
       "flightTimeSeconds": 2.13787
     },
     {
       "distanceMeters": 11.5,
       "hoodAngleDegrees": 57.0,
-      "flywheelVelocityRPS": 46.941,
+      "flywheelVelocityRPS": 48.441,
       "flightTimeSeconds": 2.178205
     },
     {
       "distanceMeters": 12.0,
       "hoodAngleDegrees": 56.7,
-      "flywheelVelocityRPS": 48.12,
+      "flywheelVelocityRPS": 49.62,
       "flightTimeSeconds": 2.222009
     },
     {
       "distanceMeters": 12.5,
       "hoodAngleDegrees": 57.4,
-      "flywheelVelocityRPS": 50.036,
+      "flywheelVelocityRPS": 51.536,
       "flightTimeSeconds": 2.313976
     },
     {
       "distanceMeters": 13.0,
       "hoodAngleDegrees": 56.9,
-      "flywheelVelocityRPS": 51.044,
+      "flywheelVelocityRPS": 52.544,
       "flightTimeSeconds": 2.346598
     },
     {
       "distanceMeters": 13.5,
       "hoodAngleDegrees": 56.9,
-      "flywheelVelocityRPS": 52.442,
+      "flywheelVelocityRPS": 53.942,
       "flightTimeSeconds": 2.404065
     },
     {
       "distanceMeters": 14.0,
       "hoodAngleDegrees": 57.1,
-      "flywheelVelocityRPS": 54.027,
+      "flywheelVelocityRPS": 55.527,
       "flightTimeSeconds": 2.472492
     },
     {
       "distanceMeters": 14.5,
       "hoodAngleDegrees": 57.2,
-      "flywheelVelocityRPS": 55.547,
+      "flywheelVelocityRPS": 57.047,
       "flightTimeSeconds": 2.536118
     },
     {
       "distanceMeters": 15.0,
       "hoodAngleDegrees": 59.0,
-      "flywheelVelocityRPS": 59.02,
+      "flywheelVelocityRPS": 60.52,
       "flightTimeSeconds": 2.708205
     },
     {
       "distanceMeters": 15.5,
       "hoodAngleDegrees": 57.7,
-      "flywheelVelocityRPS": 60.058,
+      "flywheelVelocityRPS": 61.558,
       "flightTimeSeconds": 2.74192
     },
     {
       "distanceMeters": 16.0,
       "hoodAngleDegrees": 56.8,
-      "flywheelVelocityRPS": 61.097,
+      "flywheelVelocityRPS": 62.597,
       "flightTimeSeconds": 2.775635
     },
     {
       "distanceMeters": 16.5,
       "hoodAngleDegrees": 55.9,
-      "flywheelVelocityRPS": 62.135,
+      "flywheelVelocityRPS": 63.635,
       "flightTimeSeconds": 2.809349
     },
     {
       "distanceMeters": 17.0,
       "hoodAngleDegrees": 57.4,
-      "flywheelVelocityRPS": 63.173,
+      "flywheelVelocityRPS": 64.673,
       "flightTimeSeconds": 2.843064
     },
     {
       "distanceMeters": 17.5,
       "hoodAngleDegrees": 57.4,
-      "flywheelVelocityRPS": 64.722,
+      "flywheelVelocityRPS": 66.222,
       "flightTimeSeconds": 2.903094
     },
     {
       "distanceMeters": 18.0,
       "hoodAngleDegrees": 54.7,
-      "flywheelVelocityRPS": 66.01,
+      "flywheelVelocityRPS": 67.51,
       "flightTimeSeconds": 2.94859
     },
     {
       "distanceMeters": 18.5,
       "hoodAngleDegrees": 57.0,
-      "flywheelVelocityRPS": 67.297,
+      "flywheelVelocityRPS": 68.797,
       "flightTimeSeconds": 2.994085
     },
     {
       "distanceMeters": 19.0,
       "hoodAngleDegrees": 57.5,
-      "flywheelVelocityRPS": 69.707,
+      "flywheelVelocityRPS": 71.207,
       "flightTimeSeconds": 3.094271
     },
     {
       "distanceMeters": 19.5,
       "hoodAngleDegrees": 57.4,
-      "flywheelVelocityRPS": 71.215,
+      "flywheelVelocityRPS": 72.715,
       "flightTimeSeconds": 3.148462
     },
     {
       "distanceMeters": 20.0,
       "hoodAngleDegrees": 59.1,
-      "flywheelVelocityRPS": 76.554,
+      "flywheelVelocityRPS": 78.054,
       "flightTimeSeconds": 3.372402
     }
   ],
@@ -312,49 +312,49 @@
     {
       "distanceMeters": 1.4,
       "hoodAngleDegrees": 70,
-      "flywheelVelocityRPS": 24,
+      "flywheelVelocityRPS": 25.5,
       "flightTimeSeconds": 0.8
     },
     {
       "distanceMeters": 2.2,
       "hoodAngleDegrees": 70,
-      "flywheelVelocityRPS": 26.0,
+      "flywheelVelocityRPS": 27.5,
       "flightTimeSeconds": 1
     },
     {
       "distanceMeters": 3.15,
       "hoodAngleDegrees": 65.0,
-      "flywheelVelocityRPS": 29.0,
+      "flywheelVelocityRPS": 30.5,
       "flightTimeSeconds": 1.1
     },
     {
       "distanceMeters": 3.72,
       "hoodAngleDegrees": 60.0,
-      "flywheelVelocityRPS": 29.0,
+      "flywheelVelocityRPS": 30.5,
       "flightTimeSeconds": 1.1
     },
     {
       "distanceMeters": 5.05,
       "hoodAngleDegrees": 58.0,
-      "flywheelVelocityRPS": 33.0,
+      "flywheelVelocityRPS": 34.5,
       "flightTimeSeconds": 1.15
     },
     {
       "distanceMeters": 5.5,
       "hoodAngleDegrees": 57.0,
-      "flywheelVelocityRPS": 33.3,
+      "flywheelVelocityRPS": 34.8,
       "flightTimeSeconds": 1.18
     },
     {
       "distanceMeters": 6.0,
       "hoodAngleDegrees": 57.0,
-      "flywheelVelocityRPS": 36.6,
+      "flywheelVelocityRPS": 38.1,
       "flightTimeSeconds": 1.21
     },
     {
       "distanceMeters": 6.5,
       "hoodAngleDegrees": 57.0,
-      "flywheelVelocityRPS": 39.3,
+      "flywheelVelocityRPS": 40.8,
       "flightTimeSeconds": 1.30
     }
   ]
