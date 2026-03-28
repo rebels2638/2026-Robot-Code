@@ -96,7 +96,7 @@ public class Shooter extends SubsystemBase {
     private final DashboardMotorControlLoopConfigurator turretControlLoopConfigurator;
     private final DashboardMotorControlLoopConfigurator flywheelControlLoopConfigurator;
     private final LoggedNetworkNumber turretOffsetDegreesCCW =
-        new LoggedNetworkNumber("Shooter/turretOffsetDegreesCCW", 0.0);
+        new LoggedNetworkNumber("Shooter/turretOffsetDegreesCCW", 7.0);
     private final LoggedNetworkNumber flywheelOffsetRPS =
         new LoggedNetworkNumber("Shooter/flywheelOffsetRPS", 0.0);
     private boolean pendingHoodControlLoopConfigApply = false;
