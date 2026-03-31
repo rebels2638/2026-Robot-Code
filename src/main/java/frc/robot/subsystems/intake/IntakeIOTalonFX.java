@@ -12,7 +12,7 @@ import com.ctre.phoenix6.BaseStatusSignal;
 import com.ctre.phoenix6.CANBus;
 import com.ctre.phoenix6.StatusSignal;
 import com.ctre.phoenix6.configs.TalonFXConfiguration;
-import com.ctre.phoenix6.controls.DynamicMotionMagicVoltage;
+import com.ctre.phoenix6.controls.MotionMagicVoltage;
 import com.ctre.phoenix6.controls.VelocityVoltage;
 import com.ctre.phoenix6.controls.VoltageOut;
 import com.ctre.phoenix6.hardware.TalonFX;
@@ -47,8 +47,7 @@ public class IntakeIOTalonFX implements IntakeIO {
     private final StatusSignal<Temperature> pivotTemperature;
 
     private final VelocityVoltage rollerMotorRequest = new VelocityVoltage(0).withSlot(0).withEnableFOC(true);
-    private final DynamicMotionMagicVoltage pivotMotorRequest =
-        new DynamicMotionMagicVoltage(0, 0, 0).withSlot(0).withEnableFOC(true);
+    private final MotionMagicVoltage pivotMotorRequest = new MotionMagicVoltage(0).withSlot(0).withEnableFOC(true);
 
     private final TalonFXConfiguration rollerConfig;
     private final TalonFXConfiguration pivotConfig;
@@ -199,13 +198,18 @@ public class IntakeIOTalonFX implements IntakeIO {
 
     @Override
     public void setPivotAngle(double angleRotations, double maxVelocity, double maxAcceleration, double maxJerk) {
+        if (pivotConfig.MotionMagic.MotionMagicCruiseVelocity != maxVelocity
+                || pivotConfig.MotionMagic.MotionMagicAcceleration != maxAcceleration
+                || pivotConfig.MotionMagic.MotionMagicJerk != maxJerk) {
+            pivotConfig.MotionMagic.MotionMagicCruiseVelocity = maxVelocity;
+            pivotConfig.MotionMagic.MotionMagicAcceleration = maxAcceleration;
+            pivotConfig.MotionMagic.MotionMagicJerk = maxJerk;
+            pivotMotor.getConfigurator().apply(pivotConfig.MotionMagic, 0.01);
+        }
+
         double clampedAngle = Math.max(config.pivotMinAngleRotations,
             Math.min(config.pivotMaxAngleRotations, angleRotations));
-        pivotMotor.setControl(pivotMotorRequest
-            .withPosition(clampedAngle)
-            .withVelocity(maxVelocity)
-            .withAcceleration(maxAcceleration)
-            .withJerk(maxJerk));
+        pivotMotor.setControl(pivotMotorRequest.withPosition(clampedAngle));
     }
 
     @Override
