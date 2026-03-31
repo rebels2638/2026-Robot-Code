@@ -62,4 +62,8 @@ public class IntakeConfig {
     public double pivotAlternatingMaxVelocityRotationsPerSec;
     public double pivotAlternatingMaxAccelerationRotationsPerSec2;
     public double pivotAlternatingMaxJerkRotationsPerSec3;
+
+    public double beltSlipVoltageThreshold;
+    public double beltSlipVelocityThresholdRPS;
+    public double beltSlipDetectDurationSec;
 }

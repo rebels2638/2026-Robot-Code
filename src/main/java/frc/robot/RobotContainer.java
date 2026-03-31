@@ -33,6 +33,7 @@ import frc.robot.lib.input.XboxController;
 import frc.robot.lib.util.ballistics.ProjectileVisualizer;
 import frc.robot.subsystems.Superstructure;
 import frc.robot.subsystems.Superstructure.TargetState;
+import frc.robot.subsystems.SystemsMonitor;
 import frc.robot.subsystems.hopper.Hopper;
 import frc.robot.subsystems.hopper.Hopper.HopperSetpoint;
 import frc.robot.subsystems.intake.Intake;
@@ -65,6 +66,9 @@ public class RobotContainer {
     private final Hopper hopper = Hopper.getInstance();
     private final Intake intake = Intake.getInstance();
     private final Superstructure superstructure = Superstructure.getInstance();
+
+    private final SystemsMonitor systemsMonitor = SystemsMonitor.getInstance();
+    
     private final SendableChooser<Command> autoChooser;
 
     LoggedNetworkNumber shooterFlywheelSet = new LoggedNetworkNumber("flywheelSet", 0);

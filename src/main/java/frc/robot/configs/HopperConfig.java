@@ -24,4 +24,8 @@ public class HopperConfig {
     public double reverseVelocityRPS;
 
     public double hopperVelocityToleranceRPS;
+
+    public double beltSlipVoltageThreshold;
+    public double beltSlipVelocityThresholdRPS;
+    public double beltSlipDetectDurationSec;
 }

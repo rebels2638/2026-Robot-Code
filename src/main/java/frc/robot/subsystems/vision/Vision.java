@@ -28,8 +28,8 @@ import org.littletonrobotics.junction.Logger;
 public class Vision extends SubsystemBase {
     private static final double DETAILED_POSE_LOG_PERIOD_SECONDS = 0.1;
     private static final double IMU_MODE_REASSERT_PERIOD_SECONDS = 1.0;
-    private static final boolean ENABLE_DETAILED_POSE_LOGGING = true;
-        // Constants.currentMode == Constants.Mode.REPLAY || Constants.VERBOSE_LOGGING_ENABLED;
+    private static final boolean ENABLE_DETAILED_POSE_LOGGING = 
+        Constants.currentMode == Constants.Mode.REPLAY || Constants.VERBOSE_LOGGING_ENABLED; // Detailed pose logging can consume a lot of bandwidth, so only enable it in replay or verbose logging modes.
 
     private static Vision instance = null;
     private static final VisionConfig config = ConfigLoader.load(
@@ -158,11 +158,10 @@ public class Vision extends SubsystemBase {
 
         boolean shouldFlushRobotOrientation = false;
         for (VisionIO ioImplementation : io) {
-            shouldFlushRobotOrientation |= ioImplementation.publishRobotOrientation();
+            ioImplementation.publishRobotOrientation();
         }
-        if (shouldFlushRobotOrientation) {
-            LimelightHelpers.Flush();
-        }
+        // NT4 in 2025+ flushes automatically at the loop rate.
+        // Explicit Flush() blocks the main thread waiting for network confirmation — removed.
 
         boolean sawReconnectThisCycle = false;
         for (int i = 0; i < io.length; i++) {
