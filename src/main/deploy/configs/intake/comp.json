@@ -31,7 +31,7 @@
   "pivotUpMaxVelocityRotationsPerSec": 0.8,
   "pivotUpMaxAccelerationRotationsPerSec2": 2.2,
   "pivotUpMaxJerkRotationsPerSec3": 40.0,
-  "pivotDownMaxVelocityRotationsPerSec": 0.3],
+  "pivotDownMaxVelocityRotationsPerSec": 0.3,
   "pivotDownMaxAccelerationRotationsPerSec2": 0.6,
   "pivotDownMaxJerkRotationsPerSec3": 40.0,
   "pivotStartingAngleRotations": 0.25,
