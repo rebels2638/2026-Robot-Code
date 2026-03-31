@@ -35,6 +35,8 @@ public final class MapleSimManager {
     private static final double STEER_FRICTION_VOLTS = 0.2;
     private static final double STEER_MOI_KG_M2 = 0.03;
 
+    private int hubHitCount = 0;
+
     private static MapleSimManager instance;
 
     public static MapleSimManager getInstance() {
@@ -124,6 +126,13 @@ public final class MapleSimManager {
         arena.resetFieldForAuto();
     }
 
+    /** Called by projectile hit callbacks to track Hub scoring. */
+    public void incrementHubHitCount() {
+        hubHitCount++;
+        Logger.recordOutput("MapleSim/HubHitCount", hubHitCount);
+        System.out.println("[MapleSim] FUEL hits HUB! Total: " + hubHitCount);
+    }
+
     public double[] getOdometryTimestampsSeconds() {
         int subTicks = SimulatedArena.getSimulationSubTicksIn1Period();
         double dtSeconds = SimulatedArena.getSimulationDt().in(Seconds);
@@ -146,5 +155,6 @@ public final class MapleSimManager {
             driveSimulation.getDriveTrainSimulatedChassisSpeedsRobotRelative()
         );
         Logger.recordOutput("FieldSimulation/FuelPoses", arena.getGamePiecesArrayByType("Fuel"));
+        Logger.recordOutput("MapleSim/HubHitCount", hubHitCount);
     }
 }

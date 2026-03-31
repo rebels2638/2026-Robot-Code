@@ -38,6 +38,7 @@ import edu.wpi.first.wpilibj2.command.sysid.SysIdRoutine.Direction;
 import frc.robot.RobotState;
 import frc.robot.RobotState.OdometryObservation;
 import frc.robot.constants.Constants;
+import frc.robot.configs.RobotStateConfig;
 import frc.robot.configs.SwerveConfig;
 import frc.robot.configs.SwerveDrivetrainConfig;
 import frc.robot.configs.SwerveModuleGeneralConfig;
@@ -224,13 +225,29 @@ public class SwerveDrive extends SubsystemBase {
         new SwerveModulePosition(),
         new SwerveModulePosition(),
         new SwerveModulePosition()
-    };  
+    };
+    private final SwerveModulePosition[] filteredOdometryModulePositions = new SwerveModulePosition[] {
+        new SwerveModulePosition(),
+        new SwerveModulePosition(),
+        new SwerveModulePosition(),
+        new SwerveModulePosition()
+    };
     private SwerveModuleState[] moduleStates = new SwerveModuleState[] {
         new SwerveModuleState(),
         new SwerveModuleState(),
         new SwerveModuleState(),
         new SwerveModuleState()
     };
+    private final SwerveModuleState[] filteredOdometryModuleStates = new SwerveModuleState[] {
+        new SwerveModuleState(),
+        new SwerveModuleState(),
+        new SwerveModuleState(),
+        new SwerveModuleState()
+    };
+    private final double[] lastRawOdometryDrivePositionsMeters = new double[4];
+    private final double[] rejectedOdometryDriveDistanceMeters = new double[4];
+    private boolean hasInitializedFilteredOdometry = false;
+    private boolean isRejectingTiltedOdometry = false;
 
     private ChassisSpeeds desiredRobotRelativeSpeeds = new ChassisSpeeds();
     private ChassisSpeeds obtainableFieldRelativeSpeeds = new ChassisSpeeds();
@@ -240,6 +257,7 @@ public class SwerveDrive extends SubsystemBase {
 
     private final SwerveModuleGeneralConfig moduleGeneralConfig;
     private final SwerveDrivetrainConfig drivetrainConfig;
+    private final RobotStateConfig robotStateConfig;
     private SwerveDriveKinematics kinematics;
 
     private final DashboardMotorControlLoopConfigurator driveControlLoopConfigurator;
@@ -265,6 +283,7 @@ public class SwerveDrive extends SubsystemBase {
         );
         drivetrainConfig = swerveConfig.drivetrain;
         moduleGeneralConfig = swerveConfig.moduleGeneral;
+        robotStateConfig = ConfigLoader.load("robotState", RobotStateConfig.class);
 
         if (useSimulation) {
             modules = new ModuleIO[] {
@@ -461,35 +480,36 @@ public class SwerveDrive extends SubsystemBase {
         }
 
         ArrayList<Pose2d> updatedPoses = Constants.VERBOSE_LOGGING_ENABLED ? new ArrayList<Pose2d>() : null;
+        boolean gyroConnected = gyroInputs.isConnected;
+        double angleToFloorDegrees = getAngleToFloorDegrees(gyroInputs.gyroOrientation);
+        isRejectingTiltedOdometry =
+            gyroConnected && angleToFloorDegrees > robotStateConfig.maxTiltAngleDegrees;
+        Logger.recordOutput("SwerveDrive/odometry/angleToFloorDegrees", angleToFloorDegrees);
+        Logger.recordOutput("SwerveDrive/odometry/isRejectingTiltedOdometry", isRejectingTiltedOdometry);
 
+        RobotState robotState = RobotState.getInstance();
         double[] odometryTimestampsSeconds = moduleInputs[0].odometryTimestampsSeconds;
         for (int i = 0; i < odometryTimestampsSeconds.length; i++) {
-            for (int j = 0; j < 4; j++) {
-                modulePositions[j] = new SwerveModulePosition(
-                    moduleInputs[j].odometryDrivePositionsMeters[i],
-                    moduleInputs[j].odometrySteerPositions[i]
-                );
-            }
-            
-            RobotState.getInstance().addOdometryObservation(
+            Rotation3d odometryGyroOrientation = getOdometryGyroOrientation(i);
+            boolean shouldRejectOdometrySample =
+                gyroConnected && getAngleToFloorDegrees(odometryGyroOrientation) > robotStateConfig.maxTiltAngleDegrees;
+            updateOdometryObservation(i, shouldRejectOdometrySample);
+
+            robotState.addOdometryObservation(
                 new OdometryObservation(
                     odometryTimestampsSeconds[i],
-                    gyroInputs.isConnected,
-                    modulePositions,
-                    moduleStates,
-                    gyroInputs.isConnected ?
-                        new Rotation3d(
-                            gyroInputs.gyroOrientation.getX(),
-                            gyroInputs.gyroOrientation.getY(),
-                            gyroInputs.odometryYawPositions[i].getRadians()
-                        ) :
+                    gyroConnected,
+                    filteredOdometryModulePositions,
+                    filteredOdometryModuleStates,
+                    gyroConnected ?
+                        odometryGyroOrientation :
                         new Rotation3d(),
-                    gyroInputs.isConnected ? gyroInputs.yawVelocityRadPerSec : 0
+                    gyroConnected ? gyroInputs.yawVelocityRadPerSec : 0
                 )
             );
 
             if (updatedPoses != null) {
-                updatedPoses.add(RobotState.getInstance().getEstimatedPose());
+                updatedPoses.add(robotState.getEstimatedPose());
             }
         }
 
@@ -498,6 +518,9 @@ public class SwerveDrive extends SubsystemBase {
         }
         Logger.recordOutput("SwerveDrive/measuredModuleStates", moduleStates);
         Logger.recordOutput("SwerveDrive/measuredModulePositions", modulePositions);
+        Logger.recordOutput("SwerveDrive/filteredOdometryModuleStates", filteredOdometryModuleStates);
+        Logger.recordOutput("SwerveDrive/filteredOdometryModulePositions", filteredOdometryModulePositions);
+        Logger.recordOutput("SwerveDrive/rejectedOdometryDriveDistanceMeters", rejectedOdometryDriveDistanceMeters);
 
         // FSM processing
         handleStateTransitions();
@@ -505,6 +528,57 @@ public class SwerveDrive extends SubsystemBase {
         handleCurrentState();
 
         Logger.recordOutput("SwerveDrive/CurrentCommand", this.getCurrentCommand() == null ? "" : this.getCurrentCommand().toString());
+    }
+
+    private void updateOdometryObservation(int odometrySampleIndex, boolean shouldRejectTiltedOdometry) {
+        for (int moduleIndex = 0; moduleIndex < moduleInputs.length; moduleIndex++) {
+            double rawDrivePositionMeters = moduleInputs[moduleIndex].odometryDrivePositionsMeters[odometrySampleIndex];
+            Rotation2d steerPosition = moduleInputs[moduleIndex].odometrySteerPositions[odometrySampleIndex];
+
+            modulePositions[moduleIndex] = new SwerveModulePosition(rawDrivePositionMeters, steerPosition);
+
+            if (!hasInitializedFilteredOdometry) {
+                lastRawOdometryDrivePositionsMeters[moduleIndex] = rawDrivePositionMeters;
+            } else if (shouldRejectTiltedOdometry) {
+                // Keep odometry continuous by absorbing wheel travel collected while the robot is tilted.
+                rejectedOdometryDriveDistanceMeters[moduleIndex] +=
+                    rawDrivePositionMeters - lastRawOdometryDrivePositionsMeters[moduleIndex];
+            }
+
+            filteredOdometryModulePositions[moduleIndex] = new SwerveModulePosition(
+                rawDrivePositionMeters - rejectedOdometryDriveDistanceMeters[moduleIndex],
+                steerPosition
+            );
+            filteredOdometryModuleStates[moduleIndex] = new SwerveModuleState(
+                shouldRejectTiltedOdometry ? 0.0 : moduleInputs[moduleIndex].driveVelocityMetersPerSec,
+                steerPosition
+            );
+            lastRawOdometryDrivePositionsMeters[moduleIndex] = rawDrivePositionMeters;
+        }
+
+        hasInitializedFilteredOdometry = true;
+    }
+
+    private Rotation3d getOdometryGyroOrientation(int odometrySampleIndex) {
+        if (!gyroInputs.isConnected) {
+            return new Rotation3d();
+        }
+
+        double yawRadians = gyroInputs.gyroOrientation.getZ();
+        if (gyroInputs.odometryYawPositions.length > odometrySampleIndex) {
+            yawRadians = gyroInputs.odometryYawPositions[odometrySampleIndex].getRadians();
+        }
+
+        return new Rotation3d(
+            gyroInputs.gyroOrientation.getX(),
+            gyroInputs.gyroOrientation.getY(),
+            yawRadians
+        );
+    }
+
+    private double getAngleToFloorDegrees(Rotation3d orientation) {
+        double cosine = Math.cos(orientation.getX()) * Math.cos(orientation.getY());
+        return Math.toDegrees(Math.acos(MathUtil.clamp(cosine, -1.0, 1.0)));
     }
 
     /**

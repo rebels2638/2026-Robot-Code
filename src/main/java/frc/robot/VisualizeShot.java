@@ -1,5 +1,11 @@
 package frc.robot;
 
+import static edu.wpi.first.units.Units.Degrees;
+import static edu.wpi.first.units.Units.Meters;
+import static edu.wpi.first.units.Units.MetersPerSecond;
+
+import org.ironmaple.simulation.SimulatedArena;
+import org.ironmaple.simulation.seasonspecific.rebuilt2026.RebuiltFuelOnFly;
 import org.littletonrobotics.junction.Logger;
 
 import edu.wpi.first.math.geometry.Pose3d;
@@ -12,6 +18,7 @@ import edu.wpi.first.math.kinematics.ChassisSpeeds;
 import edu.wpi.first.wpilibj.Timer;
 import frc.robot.constants.Constants;
 import frc.robot.lib.util.ballistics.ProjectileVisualizer;
+import frc.robot.sim.MapleSimManager;
 import frc.robot.subsystems.Superstructure;
 import frc.robot.subsystems.shooter.Shooter;
 
@@ -28,17 +35,17 @@ public class VisualizeShot {
         if (Constants.currentMode != Constants.Mode.SIM) {
             return;
         }
-        
+
         // Convert robot pose from field-relative Pose2d to Pose3d
         Pose3d robotPose3d = new Pose3d(RobotState.getInstance().getEstimatedPose());
         Rotation2d robotHeading = RobotState.getInstance().getEstimatedPose().getRotation();
         ChassisSpeeds fieldRelativeSpeeds = RobotState.getInstance().getFieldRelativeSpeeds();
-        
+
         // Transform shooter relative pose to field coordinates
         Pose3d shooterPose = robotPose3d.plus(
-            new Transform3d(new Pose3d(), Shooter.getInstance().getShooterRelativePose())
-        );
-        Translation2d shooterOffsetFromRobotCenter = Shooter.getInstance().getShooterRelativePose().getTranslation().toTranslation2d();
+                new Transform3d(new Pose3d(), Shooter.getInstance().getShooterRelativePose()));
+        Translation2d shooterOffsetFromRobotCenter = Shooter.getInstance().getShooterRelativePose().getTranslation()
+                .toTranslation2d();
 
         // Apply hood angle and turret rotation as local rotations
         // This needs to be done by creating a proper rotation that combines:
@@ -48,21 +55,22 @@ public class VisualizeShot {
         Rotation3d currentRotation = shooterPose.getRotation();
         double hoodAngleRadians = Shooter.getInstance().getHoodAngleRotations() * (2 * Math.PI);
         double turretAngleRadians = Shooter.getInstance().getTurretAngleRotations() * (2 * Math.PI);
-        
-        // Create new rotation: keep roll (X) at 0, add pitch (Y) from hood, combine yaw (Z) from robot + turret
+
+        // Create new rotation: keep roll (X) at 0, add pitch (Y) from hood, combine yaw
+        // (Z) from robot + turret
         Rotation3d newRotation = new Rotation3d(
-            0,  // roll (X)
-            hoodAngleRadians,  // pitch (Y) from hood
-            currentRotation.getZ() + turretAngleRadians  // yaw (Z) from robot rotation + turret rotation
+                0, // roll (X)
+                hoodAngleRadians, // pitch (Y) from hood
+                currentRotation.getZ() + turretAngleRadians // yaw (Z) from robot rotation + turret rotation
         );
-        
+
         shooterPose = new Pose3d(shooterPose.getTranslation(), newRotation);
 
         double flywheelRPS = Shooter.getInstance().getFlywheelVelocityRotationsPerSec();
         double exitVelocity = launchExitVelocityMetersPerSec;
         Superstructure superstructure = Superstructure.getInstance();
         Translation3d targetLocation = superstructure.getCurrentFieldTargetLocation();
-        
+
         // Include tangential velocity from robot rotation (omega cross r)
         double omega = fieldRelativeSpeeds.omegaRadiansPerSecond;
         double dx = shooterOffsetFromRobotCenter.getX();
@@ -99,11 +107,76 @@ public class VisualizeShot {
         }
 
         ProjectileVisualizer.addProjectile(
-            shooterVxField,
-            shooterVyField,
-            exitVelocity,
-            shooterPose,
-            targetLocation.getZ()
-        );
+                shooterVxField,
+                shooterVyField,
+                exitVelocity,
+                shooterPose,
+                targetLocation.getZ());
+
+        // Launch a MapleSim RebuiltFuelOnFly projectile for physics-based simulation
+        launchMapleSimProjectile(shooterPose, exitVelocity, hoodAngleRadians, turretAngleRadians, fieldRelativeSpeeds);
+    }
+
+    /**
+     * Creates and launches a RebuiltFuelOnFly projectile via MapleSim's
+     * SimulatedArena.
+     * This provides maple-sim's built-in projectile physics with hub target
+     * detection.
+     */
+    private void launchMapleSimProjectile(
+            Pose3d shooterPose,
+            double exitVelocityMps,
+            double hoodAngleRadians,
+            double turretAngleRadians,
+            ChassisSpeeds fieldRelativeSpeeds) {
+
+        MapleSimManager mapleSimManager = MapleSimManager.getInstance();
+
+        // Get the actual robot pose from the MapleSim drive simulation for consistency
+        var driveSimulation = mapleSimManager.getDriveSimulation();
+
+        // The shooter offset from robot center (in robot-relative frame)
+        Translation2d shooterOffset = Shooter.getInstance()
+                .getShooterRelativePose()
+                .getTranslation()
+                .toTranslation2d();
+
+        // The facing direction combines robot heading + turret rotation
+        Rotation2d launchDirection = driveSimulation.getSimulatedDriveTrainPose().getRotation()
+                .plus(Rotation2d.fromRadians(turretAngleRadians));
+
+        // Initial height of the projectile (Z of the shooter pose)
+        double initialHeightMeters = shooterPose.getZ();
+
+        // Hood angle is the pitch (elevation) angle of the launch
+        double launchAngleDegrees = Math.toDegrees(hoodAngleRadians);
+
+        // Create the projectile
+        RebuiltFuelOnFly fuelOnFly = new RebuiltFuelOnFly(
+                driveSimulation.getSimulatedDriveTrainPose().getTranslation(),
+                shooterOffset,
+                driveSimulation.getDriveTrainSimulatedChassisSpeedsFieldRelative(),
+                launchDirection,
+                Meters.of(initialHeightMeters),
+                MetersPerSecond.of(exitVelocityMps),
+                Degrees.of(launchAngleDegrees));
+
+        // Configure trajectory visualization via AdvantageScope
+        fuelOnFly.withProjectileTrajectoryDisplayCallBack(
+                (poses) -> Logger.recordOutput(
+                        "MapleSim/FuelProjectileSuccessful",
+                        poses.toArray(Pose3d[]::new)),
+                (poses) -> Logger.recordOutput(
+                        "MapleSim/FuelProjectileMissed",
+                        poses.toArray(Pose3d[]::new)));
+
+        // Register callback for when this projectile hits the Hub target
+        fuelOnFly.withHitTargetCallBack(() -> mapleSimManager.incrementHubHitCount());
+
+        // Enable the projectile to become a field game piece on touchdown
+        fuelOnFly.enableBecomesGamePieceOnFieldAfterTouchGround();
+
+        // Add the projectile to the simulated arena
+        SimulatedArena.getInstance().addGamePieceProjectile(fuelOnFly);
     }
 }

@@ -242,6 +242,10 @@ public class Shooter extends SubsystemBase {
 
     // Direct setters for mechanism control (exposed for tuning/overrides in RobotContainer)
     public void setHoodAngle(Rotation2d angle) {
+        if (!Double.isFinite(angle.getDegrees())) {
+            return;
+        }
+
         double clampedAngleDeg = MathUtil.clamp(
             angle.getDegrees(),
             config.hoodMinAngleDegrees,
@@ -270,6 +274,10 @@ public class Shooter extends SubsystemBase {
         double requestedVelocityRotPerSec,
         TurretReferenceFrame referenceFrame
     ) {
+        if (!Double.isFinite(angle.getDegrees())) {
+            return;
+        }
+
         Rotation2d robotYaw = RobotState.getInstance().getEstimatedPose().getRotation();
         double robotYawVelocityRotPerSec = RobotState.getInstance().getYawVelocityRadPerSec() / (2.0 * Math.PI);
         double minDeg = config.turretMinAngleDeg;
@@ -323,6 +331,10 @@ public class Shooter extends SubsystemBase {
             "Shooter/turretProfileSetpointVelocityRotationsPerSec",
             turretProfileSetpoint.velocity
         );
+
+        if (!Double.isFinite(turretProfileSetpoint.position) || !Double.isFinite(turretProfileSetpoint.velocity)) {
+            return;
+        }
 
         shooterIO.setTurretAngle(turretProfileSetpoint.position, turretProfileSetpoint.velocity);
     }
@@ -492,6 +504,10 @@ public class Shooter extends SubsystemBase {
     }
 
     public void setShotVelocity(double velocityRotationsPerSec) {
+        if (!Double.isFinite(velocityRotationsPerSec)) {
+            velocityRotationsPerSec = 0.0;
+        }
+
         flywheelSetpointRPS = velocityRotationsPerSec;
         Logger.recordOutput("Shooter/shotVelocitySetpointRotationsPerSec", velocityRotationsPerSec);
         shooterIO.setShotVelocity(velocityRotationsPerSec);

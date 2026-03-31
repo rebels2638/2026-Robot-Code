@@ -1,5 +1,10 @@
 package frc.robot.subsystems.intake;
 
+import static edu.wpi.first.units.Units.Meters;
+
+import org.ironmaple.simulation.IntakeSimulation;
+import org.littletonrobotics.junction.Logger;
+
 import edu.wpi.first.math.MathUtil;
 import edu.wpi.first.math.controller.PIDController;
 import edu.wpi.first.math.controller.ProfiledPIDController;
@@ -11,8 +16,17 @@ import edu.wpi.first.wpilibj.Timer;
 import edu.wpi.first.wpilibj.simulation.DCMotorSim;
 import frc.robot.configs.IntakeConfig;
 import frc.robot.lib.util.DashboardMotorControlLoopConfigurator.MotorControlLoopConfig;
+import frc.robot.sim.MapleSimManager;
 
 public class IntakeIOSim implements IntakeIO {
+    private static final String MAPLE_GAME_PIECE_TYPE = "Fuel";
+    private static final double MAPLE_INTAKE_WIDTH_METERS = 0.70;
+    private static final double MAPLE_INTAKE_EXTENSION_METERS = 0.20;
+    private static final int MAPLE_INTAKE_CAPACITY = 1;
+    private static final double MIN_INTAKE_SPEED_RPS = 1.0;
+    private static final double MIN_INTAKE_VOLTAGE = 0.1;
+    private static final double DEPLOYED_PIVOT_MARGIN_ROTATIONS = 0.01;
+
     private final DCMotor rollerMotorModel = DCMotor.getKrakenX60Foc(1);
     private final DCMotor pivotMotorModel = DCMotor.getKrakenX60Foc(1);
 
@@ -37,9 +51,12 @@ public class IntakeIOSim implements IntakeIO {
     private double desiredRollerVelocityRotationsPerSec = 0;
     private boolean isRollerEStopped = false;
     private boolean isPivotEStopped = false;
+    private double commandedRollerVoltage = 0.0;
+    private boolean mapleIntakeRunning = false;
 
     private double lastTimeInputs = Timer.getTimestamp();
     private final IntakeConfig config;
+    private final IntakeSimulation intakeSimulation;
 
     public IntakeIOSim(IntakeConfig config) {
         this.config = config;
@@ -56,6 +73,15 @@ public class IntakeIOSim implements IntakeIO {
             );
 
         pivotSim.setState(config.pivotStartingAngleRotations * 2 * Math.PI, 0);
+        intakeSimulation = IntakeSimulation.OverTheBumperIntake(
+            MAPLE_GAME_PIECE_TYPE,
+            MapleSimManager.getInstance().getDriveSimulation(),
+            Meters.of(MAPLE_INTAKE_WIDTH_METERS),
+            Meters.of(MAPLE_INTAKE_EXTENSION_METERS),
+            IntakeSimulation.IntakeSide.FRONT,
+            MAPLE_INTAKE_CAPACITY
+        );
+        intakeSimulation.stopIntake();
     }
 
     @Override
@@ -90,6 +116,7 @@ public class IntakeIOSim implements IntakeIO {
 
         rollerSim.update(dt);
         pivotSim.update(dt);
+        updateMapleIntakeSimulation();
 
         inputs.rollerMotorConnected = true;
         inputs.rollerVelocityRotationsPerSec = rollerSim.getAngularVelocityRadPerSec() / (2 * Math.PI);
@@ -103,6 +130,9 @@ public class IntakeIOSim implements IntakeIO {
         inputs.pivotAppliedVolts = pivotSim.getInputVoltage();
         inputs.pivotTorqueCurrent = pivotSim.getCurrentDrawAmps();
         inputs.pivotTemperatureFahrenheit = 70.0;
+
+        Logger.recordOutput("Intake/Sim/MapleIntakeRunning", mapleIntakeRunning);
+        Logger.recordOutput("Intake/Sim/MapleGamePiecesInIntake", intakeSimulation.getGamePiecesAmount());
     }
 
     @Override
@@ -119,6 +149,7 @@ public class IntakeIOSim implements IntakeIO {
 
     @Override
     public void setVoltage(double voltage) {
+        commandedRollerVoltage = voltage;
         rollerSim.setInputVoltage(isRollerEStopped ? 0 : voltage);
         isRollerClosedLoop = false;
     }
@@ -158,6 +189,7 @@ public class IntakeIOSim implements IntakeIO {
     @Override
     public void enableRollerEStop() {
         isRollerEStopped = true;
+        commandedRollerVoltage = 0;
         rollerSim.setInputVoltage(0);
         isRollerClosedLoop = false;
     }
@@ -177,5 +209,46 @@ public class IntakeIOSim implements IntakeIO {
     @Override
     public void disablePivotEStop() {
         isPivotEStopped = false;
+    }
+
+    private void updateMapleIntakeSimulation() {
+        boolean shouldRun = shouldRunMapleIntake();
+        if (shouldRun && !mapleIntakeRunning) {
+            intakeSimulation.startIntake();
+            mapleIntakeRunning = true;
+        } else if (!shouldRun && mapleIntakeRunning) {
+            intakeSimulation.stopIntake();
+            mapleIntakeRunning = false;
+        }
+
+        if (isOuttaking()) {
+            intakeSimulation.obtainGamePieceFromIntake();
+        }
+    }
+
+    private boolean shouldRunMapleIntake() {
+        if (isRollerEStopped || isPivotEStopped) {
+            return false;
+        }
+
+        boolean pivotDeployed =
+            pivotSim.getAngularPositionRotations() > config.pivotUpAngleRotations + DEPLOYED_PIVOT_MARGIN_ROTATIONS;
+        if (!pivotDeployed) {
+            return false;
+        }
+
+        return isRollerClosedLoop
+            ? desiredRollerVelocityRotationsPerSec > MIN_INTAKE_SPEED_RPS
+            : commandedRollerVoltage > MIN_INTAKE_VOLTAGE;
+    }
+
+    private boolean isOuttaking() {
+        if (isRollerEStopped) {
+            return false;
+        }
+
+        return isRollerClosedLoop
+            ? desiredRollerVelocityRotationsPerSec < -MIN_INTAKE_SPEED_RPS
+            : commandedRollerVoltage < -MIN_INTAKE_VOLTAGE;
     }
 }

@@ -20,7 +20,6 @@ import frc.robot.lib.util.ConfigLoader;
 import frc.robot.sim.MapleSimManager;
 import frc.robot.subsystems.swerve.SwerveDrive;
 
-import java.util.NoSuchElementException;
 import org.littletonrobotics.junction.AutoLogOutput;
 import org.littletonrobotics.junction.Logger;
 
@@ -118,6 +117,10 @@ public class RobotState {
 
     /** Add odometry observation */
     public void addOdometryObservation(OdometryObservation observation) {
+        if (!Double.isFinite(observation.timestampsSeconds()) || !Double.isFinite(observation.yawVelocityRadPerSec())) {
+            return;
+        }
+
         observation = new OdometryObservation(
             observation.timestampsSeconds(),
             observation.isGyroConnected(),
@@ -190,19 +193,17 @@ public class RobotState {
     }
 
     public void addVisionObservation(VisionObservation observation) {
+        if (!Double.isFinite(observation.timestampSeconds())
+            || !Double.isFinite(observation.visionRobotPoseMeters().getX())
+            || !Double.isFinite(observation.visionRobotPoseMeters().getY())) {
+            return;
+        }
+
         boolean shouldLogObservation = shouldLogVisionObservation();
         // If measurement is old enough to be outside the pose buffer's timespan, skip.
-        try {
-            if (poseBuffer.getInternalBuffer().lastKey() - robotStateConfig.poseBufferSizeSeconds > observation.timestampSeconds()) {
-                incrementVisionRejectedCount();
-                if (shouldLogObservation) {
-                    logVisionObservationMetrics(null, observation.timestampSeconds(), false);
-                }
-                return;
-            }
-        } 
-        
-        catch (NoSuchElementException ex) {
+        var internalBuffer = poseBuffer.getInternalBuffer();
+        if (internalBuffer.isEmpty()
+            || internalBuffer.lastKey() - robotStateConfig.poseBufferSizeSeconds > observation.timestampSeconds()) {
             incrementVisionRejectedCount();
             if (shouldLogObservation) {
                 logVisionObservationMetrics(null, observation.timestampSeconds(), false);
