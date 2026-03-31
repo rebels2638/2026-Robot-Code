@@ -139,7 +139,8 @@ public class Intake extends SubsystemBase {
                 break;
             case INTAKING:
                 setPivotAngle(config.pivotDownAngleRotations);
-                setRollerVelocity(config.intakingVelocityRPS);
+                boolean pivotBelowThreshold = intakeInputs.pivotAngleRotations <= config.pivotRollerEnableAngleRotations;
+                setRollerVelocity(pivotBelowThreshold ? config.intakingVelocityRPS : 0.0);
                 break;
             case OUTTAKING:
                 setPivotAngle(config.pivotDownAngleRotations);
