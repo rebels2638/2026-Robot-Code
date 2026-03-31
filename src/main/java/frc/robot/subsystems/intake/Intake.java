@@ -114,7 +114,13 @@ public class Intake extends SubsystemBase {
     private void setPivotAngle(double angleRotations) {
         pivotSetpointRotations = angleRotations;
         Logger.recordOutput("Intake/pivotAngleSetpointRotations", angleRotations);
-        intakeIO.setPivotAngle(angleRotations);
+
+        boolean movingUp = angleRotations > intakeInputs.pivotAngleRotations;
+        double velocity = movingUp ? config.pivotUpMaxVelocityRotationsPerSec : config.pivotDownMaxVelocityRotationsPerSec;
+        double acceleration = movingUp ? config.pivotUpMaxAccelerationRotationsPerSec2 : config.pivotDownMaxAccelerationRotationsPerSec2;
+        double jerk = movingUp ? config.pivotUpMaxJerkRotationsPerSec3 : config.pivotDownMaxJerkRotationsPerSec3;
+
+        intakeIO.setPivotAngle(angleRotations, velocity, acceleration, jerk);
     }
 
     public void setSetpoint(IntakeSetpoint setpoint) {

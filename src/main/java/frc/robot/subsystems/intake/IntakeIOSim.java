@@ -45,8 +45,8 @@ public class IntakeIOSim implements IntakeIO {
         this.config = config;
         rollerFeedback = new PIDController(config.rollerKP, config.rollerKI, config.rollerKD);
         rollerFeedforward = new SimpleMotorFeedforward(config.rollerKS, config.rollerKV, config.rollerKA);
-        double pivotMaxVelRadPerSec = config.pivotMaxVelocityRotationsPerSec * 2.0 * Math.PI;
-        double pivotMaxAccelRadPerSec2 = config.pivotMaxAccelerationRotationsPerSec2 * 2.0 * Math.PI;
+        double pivotMaxVelRadPerSec = config.pivotDownMaxVelocityRotationsPerSec * 2.0 * Math.PI;
+        double pivotMaxAccelRadPerSec2 = config.pivotDownMaxAccelerationRotationsPerSec2 * 2.0 * Math.PI;
         pivotFeedback =
             new ProfiledPIDController(
                 config.pivotKP,
@@ -124,7 +124,7 @@ public class IntakeIOSim implements IntakeIO {
     }
 
     @Override
-    public void setPivotAngle(double angleRotations) {
+    public void setPivotAngle(double angleRotations, double maxVelocity, double maxAcceleration, double maxJerk) {
         if (isPivotEStopped) {
             pivotSim.setInputVoltage(0);
             isPivotClosedLoop = false;
@@ -133,6 +133,9 @@ public class IntakeIOSim implements IntakeIO {
         double clampedAngle = MathUtil.clamp(angleRotations,
             config.pivotMinAngleRotations,
             config.pivotMaxAngleRotations);
+        pivotFeedback.setConstraints(new TrapezoidProfile.Constraints(
+            maxVelocity * 2.0 * Math.PI,
+            maxAcceleration * 2.0 * Math.PI));
         pivotFeedback.setGoal(clampedAngle * (2 * Math.PI));
         isPivotClosedLoop = true;
     }
