@@ -42,5 +42,9 @@
   "pivotUpAngleRotations": 0.0,
   "pivotDownAngleRotations": 0.25,
   "pivotAlternatingFirstAngleRotations": 0.0,
-  "pivotAlternatingSecondAngleRotations": 0.25
+  "pivotAlternatingSecondAngleRotations": 0.25,
+  "alternatingTimeoutSeconds": 2.0,
+  "pivotAlternatingMaxVelocityRotationsPerSec": 0.75,
+  "pivotAlternatingMaxAccelerationRotationsPerSec2": 2.5,
+  "pivotAlternatingMaxJerkRotationsPerSec3": 20.0
 }

@@ -58,4 +58,8 @@ public class IntakeConfig {
     public double pivotDownAngleRotations;
     public double pivotAlternatingFirstAngleRotations;
     public double pivotAlternatingSecondAngleRotations;
+    public double alternatingTimeoutSeconds;
+    public double pivotAlternatingMaxVelocityRotationsPerSec;
+    public double pivotAlternatingMaxAccelerationRotationsPerSec2;
+    public double pivotAlternatingMaxJerkRotationsPerSec3;
 }

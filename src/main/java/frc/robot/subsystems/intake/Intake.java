@@ -123,6 +123,12 @@ public class Intake extends SubsystemBase {
         intakeIO.setPivotAngle(angleRotations, velocity, acceleration, jerk);
     }
 
+    private void setPivotAngleWithProfile(double angleRotations, double velocity, double acceleration, double jerk) {
+        pivotSetpointRotations = angleRotations;
+        Logger.recordOutput("Intake/pivotAngleSetpointRotations", angleRotations);
+        intakeIO.setPivotAngle(angleRotations, velocity, acceleration, jerk);
+    }
+
     public void setSetpoint(IntakeSetpoint setpoint) {
         switch (setpoint) {
             case DISABLED:
@@ -147,12 +153,18 @@ public class Intake extends SubsystemBase {
                 setRollerVelocity(config.outtakingVelocityRPS);
                 break;
             case ALTERNATING_FIRST:
-                setPivotAngle(config.pivotAlternatingFirstAngleRotations);
-                setRollerVelocity(config.intakingVelocityRPS);
+                setPivotAngleWithProfile(config.pivotAlternatingFirstAngleRotations,
+                    config.pivotAlternatingMaxVelocityRotationsPerSec,
+                    config.pivotAlternatingMaxAccelerationRotationsPerSec2,
+                    config.pivotAlternatingMaxJerkRotationsPerSec3);
+                setRollerVelocity(0);
                 break;
             case ALTERNATING_SECOND:
-                setPivotAngle(config.pivotAlternatingSecondAngleRotations);
-                setRollerVelocity(config.intakingVelocityRPS);
+                setPivotAngleWithProfile(config.pivotAlternatingSecondAngleRotations,
+                    config.pivotAlternatingMaxVelocityRotationsPerSec,
+                    config.pivotAlternatingMaxAccelerationRotationsPerSec2,
+                    config.pivotAlternatingMaxJerkRotationsPerSec3);
+                setRollerVelocity(0);
                 break;
         }
     }
@@ -202,6 +214,13 @@ public class Intake extends SubsystemBase {
             < config.pivotAngleToleranceRotations;
     }
 
+    @AutoLogOutput(key = "Intake/isDeployed")
+    public boolean isDeployed() {
+        return intakeInputs.pivotMotorConnected
+            && Math.abs(intakeInputs.pivotAngleRotations - config.pivotDownAngleRotations)
+            < config.pivotAngleToleranceRotations;
+    }
+
     @AutoLogOutput(key = "Intake/isRollerMotorConnected")
     public boolean isRollerMotorConnected() {
         return intakeInputs.rollerMotorConnected;
@@ -210,5 +229,9 @@ public class Intake extends SubsystemBase {
     @AutoLogOutput(key = "Intake/isPivotMotorConnected")
     public boolean isPivotMotorConnected() {
         return intakeInputs.pivotMotorConnected;
+    }
+
+    public double getAlternatingTimeoutSeconds() {
+        return config.alternatingTimeoutSeconds;
     }
 }

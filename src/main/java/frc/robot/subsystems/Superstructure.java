@@ -157,6 +157,7 @@ public class Superstructure extends SubsystemBase {
     private double lastBallVisualizedTime = 0;
     private boolean hasStartedShooting = false;
     private AlternatingIntakeTarget alternatingIntakeTarget = null;
+    private double alternatingTargetSetTimestamp = 0;
     private boolean hasWarnedInvalidTurretRotationMargins = false;
     
     // Cached shot data for mechanism control after applying guards.
@@ -382,7 +383,12 @@ public class Superstructure extends SubsystemBase {
             case DEPLOYED -> CurrentIntakeState.DEPLOYED;
             case INTAKING -> CurrentIntakeState.INTAKING;
             case REVERSING -> CurrentIntakeState.REVERSING;
-            case ALTERNATING -> CurrentIntakeState.ALTERNATING;
+            case ALTERNATING -> {
+                if (currentIntakeState != CurrentIntakeState.ALTERNATING && !intake.isDeployed()) {
+                    yield CurrentIntakeState.DEPLOYED;
+                }
+                yield CurrentIntakeState.ALTERNATING;
+            }
         };
     }
 
@@ -580,10 +586,21 @@ public class Superstructure extends SubsystemBase {
     }
 
     private void applyAlternatingIntake() {
+        double now = Timer.getFPGATimestamp();
+        boolean timedOut = alternatingIntakeTarget != null
+            && (now - alternatingTargetSetTimestamp) >= intake.getAlternatingTimeoutSeconds();
+
+        AlternatingIntakeTarget previousTarget = alternatingIntakeTarget;
         alternatingIntakeTarget = resolveNextAlternatingIntakeTarget(
             alternatingIntakeTarget,
-            intake.isPivotAtSetpoint()
+            intake.isPivotAtSetpoint(),
+            timedOut
         );
+
+        if (alternatingIntakeTarget != previousTarget) {
+            alternatingTargetSetTimestamp = now;
+        }
+
         intake.setSetpoint(getAlternatingIntakeSetpoint(alternatingIntakeTarget));
     }
 
@@ -1116,12 +1133,13 @@ public class Superstructure extends SubsystemBase {
 
     static AlternatingIntakeTarget resolveNextAlternatingIntakeTarget(
         AlternatingIntakeTarget currentTarget,
-        boolean pivotAtSetpoint
+        boolean pivotAtSetpoint,
+        boolean timedOut
     ) {
         if (currentTarget == null) {
             return AlternatingIntakeTarget.FIRST;
         }
-        if (!pivotAtSetpoint) {
+        if (!pivotAtSetpoint && !timedOut) {
             return currentTarget;
         }
         return currentTarget == AlternatingIntakeTarget.FIRST

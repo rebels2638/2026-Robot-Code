@@ -127,6 +127,10 @@ public class RobotContainer {
             superstructure.setDesiredIntakeState(Superstructure.DesiredIntakeState.DEPLOYED);
         });
 
+        FollowPath.registerEventTrigger("alt", () -> {
+            superstructure.setDesiredIntakeState(Superstructure.DesiredIntakeState.ALTERNATING);
+        });
+
         FollowPath.registerEventTrigger("lob", this::runAlliancePassHelper);
     }
 
@@ -223,7 +227,13 @@ public class RobotContainer {
         Trigger leftBumperTrigger = xboxDriver.getLeftBumper();
         Trigger rightBumperTrigger = xboxDriver.getRightBumper();
 
-        leftBumperTrigger.onTrue(buildIntakeBumpCommand());
+        // leftBumperTrigger.onTrue(buildIntakeBumpCommand());
+
+        leftBumperTrigger.onTrue(
+            new InstantCommand(() -> superstructure.setDesiredIntakeState(Superstructure.DesiredIntakeState.ALTERNATING))
+        ).onFalse(
+            new InstantCommand(() -> superstructure.setDesiredIntakeState(Superstructure.DesiredIntakeState.DEPLOYED))
+        );
 
         rightBumperTrigger.onTrue(
             new InstantCommand(() -> superstructure.setDesiredIntakeState(Superstructure.DesiredIntakeState.STOWED))
