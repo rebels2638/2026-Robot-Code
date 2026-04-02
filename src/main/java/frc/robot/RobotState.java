@@ -259,6 +259,16 @@ public class RobotState {
         return swerveDrivePoseEstimator.getEstimatedPosition();
     }
 
+    @AutoLogOutput(key = "RobotState/estimatedPoseArray")
+    public double[] getEstimatedPoseArray() {
+        Pose2d pose = getEstimatedPose();
+        return new double[] {
+            pose.getX(),
+            pose.getY(),
+            pose.getRotation().getDegrees()
+        };
+    }
+
     @AutoLogOutput(key = "RobotState/vision/allowVisionGyroReset")
     public boolean getAllowVisionGyroReset() {
         return shouldAllowVisionGyroReset(DriverStation.isDisabled(), zeroGyroButtonHeld.get());
