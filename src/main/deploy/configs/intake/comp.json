@@ -37,14 +37,10 @@
   "pivotStartingAngleRotations": 0.25,
   "pivotMinAngleRotations": -0.025,
   "pivotMaxAngleRotations": 0.25,
-  "pivotRollerEnableAngleRotations": 0.05,
-  "pivotAngleToleranceRotations": 0.04,
-  "pivotUpAngleRotations": 0.235,
-  "pivotDownAngleRotations": -0.019287,
-  "pivotAlternatingFirstAngleRotations": 0.085,
-  "pivotAlternatingSecondAngleRotations": 0.012,
-  "alternatingTimeoutSeconds": 1.4,
-  "pivotAlternatingMaxVelocityRotationsPerSec": 1.5,
-  "pivotAlternatingMaxAccelerationRotationsPerSec2": 4.2,
-  "pivotAlternatingMaxJerkRotationsPerSec3": 60.0
+  "pivotAngleToleranceRotations": 0.01,
+  "pivotUpAngleRotations": 0.0,
+  "pivotDownAngleRotations": 0.25,
+  "beltSlipVoltageThreshold": 4.0,
+  "beltSlipVelocityThresholdRPS": 2.0,
+  "beltSlipDetectDurationSec": 0.3
 }

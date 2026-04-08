@@ -15,6 +15,11 @@ import frc.robot.lib.util.DashboardMotorControlLoopConfigurator;
 public class Intake extends SubsystemBase {
     private static Intake instance = null;
 
+    private double beltSlipTimer = 0.0;
+    private final Alert beltSlipAlert = new Alert(
+        "!! INTAKE BELT SLIP - CHECK MECHANISM !!", AlertType.kError
+    );
+
     public static Intake getInstance() {
         if (instance == null) {
             instance = new Intake();
@@ -87,6 +92,7 @@ public class Intake extends SubsystemBase {
     public void periodic() {
         intakeIO.updateInputs(intakeInputs);
         Logger.processInputs("Intake", intakeInputs);
+        detectBeltSlip();
 
         rollerDisconnectedAlert.set(enableConnectionAlerts && !intakeInputs.rollerMotorConnected);
         pivotDisconnectedAlert.set(enableConnectionAlerts && !intakeInputs.pivotMotorConnected);
@@ -167,6 +173,28 @@ public class Intake extends SubsystemBase {
                 setRollerVelocity(0);
                 break;
         }
+    }
+
+    private void detectBeltSlip() {
+        boolean motorDemandingTorque = intakeInputs.rollerAppliedVolts > config.beltSlipVoltageThreshold
+            && rollerSetpointRPS > 1.0;
+        boolean velocityNearZero = Math.abs(intakeInputs.rollerVelocityRotationsPerSec)
+            < config.beltSlipVelocityThresholdRPS;
+
+        if (motorDemandingTorque && velocityNearZero) {
+            beltSlipTimer += 0.02;
+        } else {
+            beltSlipTimer = 0.0;
+        }
+
+        boolean slipDetected = beltSlipTimer >= config.beltSlipDetectDurationSec;
+        beltSlipAlert.set(slipDetected);
+        Logger.recordOutput("Intake/beltSlipDetected", slipDetected);
+        Logger.recordOutput("Intake/beltSlipTimer", beltSlipTimer);
+    }
+
+    public boolean isBeltSlipping() {
+        return beltSlipTimer >= config.beltSlipDetectDurationSec;
     }
 
     public double getRollerVelocityRotationsPerSec() {

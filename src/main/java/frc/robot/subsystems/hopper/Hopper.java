@@ -13,7 +13,10 @@ import frc.robot.lib.util.ConfigLoader;
 import frc.robot.lib.util.DashboardMotorControlLoopConfigurator;
 
 public class Hopper extends SubsystemBase {
-    private static final double HOPPER_VOLTAGE_SETPOINT_TOLERANCE_VOLTS = 0.25;
+    private double hopperSlipTimer = 0.0;
+    private final Alert hopperBeltSlipAlert = new Alert(
+        "!! HOPPER/DIROTOR BELT SLIP - CHECK MECHANISM !!", AlertType.kError
+    );
 
     private enum HopperControlMode {
         VELOCITY,
@@ -77,6 +80,7 @@ public class Hopper extends SubsystemBase {
     public void periodic() {
         hopperIO.updateInputs(hopperInputs);
         Logger.processInputs("Hopper", hopperInputs);
+        detectBeltSlip();
 
         hopperDisconnectedAlert.set(enableConnectionAlerts && !hopperInputs.hopperMotorConnected);
 
@@ -136,6 +140,28 @@ public class Hopper extends SubsystemBase {
         hopperIO.disableEStop();
     }
 
+    private void detectBeltSlip() {
+        boolean motorDemandingTorque = hopperInputs.appliedVolts > config.beltSlipVoltageThreshold
+            && hopperSetpointRPS > 1.0;
+        boolean velocityNearZero = Math.abs(hopperInputs.velocityRotationsPerSec)
+            < config.beltSlipVelocityThresholdRPS;
+
+        if (motorDemandingTorque && velocityNearZero) {
+            hopperSlipTimer += 0.02;
+        } else {
+            hopperSlipTimer = 0.0;
+        }
+
+        boolean slipDetected = hopperSlipTimer >= config.beltSlipDetectDurationSec;
+        hopperBeltSlipAlert.set(slipDetected);
+        Logger.recordOutput("Hopper/beltSlipDetected", slipDetected);
+        Logger.recordOutput("Hopper/beltSlipTimer", hopperSlipTimer);
+    }
+
+    public boolean isBeltSlipping() {
+        return hopperSlipTimer >= config.beltSlipDetectDurationSec;
+    }
+
     @AutoLogOutput(key = "Hopper/isHopperAtSetpoint")
     public boolean isHopperAtSetpoint() {
         if (!hopperInputs.hopperMotorConnected) {
@@ -144,7 +170,7 @@ public class Hopper extends SubsystemBase {
 
         return hopperControlMode == HopperControlMode.VELOCITY
             ? Math.abs(hopperInputs.velocityRotationsPerSec - hopperSetpointRPS) < config.hopperVelocityToleranceRPS
-            : Math.abs(hopperInputs.appliedVolts - hopperSetpointVolts) < HOPPER_VOLTAGE_SETPOINT_TOLERANCE_VOLTS;
+            : Math.abs(hopperInputs.appliedVolts - hopperSetpointVolts) < hopperSetpointVolts;
     }
 
     @AutoLogOutput(key = "Hopper/isHopperMotorConnected")

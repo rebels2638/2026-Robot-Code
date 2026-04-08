@@ -12,8 +12,11 @@
   "hopperKI": 0.0,
   "hopperKD": 0.0,
   "hopperMotorToOutputShaftRatio": 6.875,
-  "feedingVelocityRPS": 6.3 ,
-  "feedingIdleVoltage": 0.0,
-  "reverseVelocityRPS": 0.0,
-  "hopperVelocityToleranceRPS": 5.0
+  "feedingVelocityRPS": 7.0,
+  "feedingIdleVoltage": 4.0,
+  "reverseVelocityRPS": -7.0,
+  "hopperVelocityToleranceRPS": 5.0,
+  "beltSlipVoltageThreshold": 3.0,
+  "beltSlipVelocityThresholdRPS": 1.0,
+  "beltSlipDetectDurationSec": 0.3
 }
