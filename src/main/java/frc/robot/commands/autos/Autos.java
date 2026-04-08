@@ -72,7 +72,7 @@ public final class Autos {
             "top_sweep_short_depo",
             new Pose2d(
                 new Translation2d(3.83, 5.94),
-                Rotation2d.fromRadians(0)
+                Rotation2d.fromDegrees(165.082)
             ),
             new ParallelCommandGroup(
                 new SequentialCommandGroup(
