@@ -8,20 +8,20 @@
         "intermediate_handoff_radius_meters": 0.55
       },
       "rotation_target": {
-        "rotation_radians": 2.8812274456622786,
+        "rotation_radians": 2.811411265697506,
         "profiled_rotation": true
       }
+    },
+    {
+      "type": "event_trigger",
+      "t_ratio": 0.0,
+      "lib_key": "intake"
     },
     {
       "type": "rotation",
       "rotation_radians": -3.141592653589793,
       "t_ratio": 0.1181989849191725,
       "profiled_rotation": true
-    },
-    {
-      "type": "event_trigger",
-      "t_ratio": 0.6909449724115097,
-      "lib_key": "intake"
     },
     {
       "type": "waypoint",
