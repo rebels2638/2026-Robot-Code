@@ -18,6 +18,8 @@ import frc.robot.configs.SwerveDrivetrainConfig;
 import frc.robot.lib.util.ConfigLoader;
 import frc.robot.subsystems.swerve.SwerveDrive;
 
+import edu.wpi.first.networktables.NetworkTableInstance;
+import edu.wpi.first.networktables.StructPublisher;
 import java.util.NoSuchElementException;
 import org.littletonrobotics.junction.AutoLogOutput;
 import org.littletonrobotics.junction.Logger;
@@ -84,6 +86,10 @@ public class RobotState {
     private final RobotStateConfig robotStateConfig;
     private final LoggedNetworkBoolean zeroGyroButtonHeld =
         new LoggedNetworkBoolean("RobotState/zeroGyroButtonHeld", false);
+    private final StructPublisher<Pose2d> estimatedPosePublisher =
+        NetworkTableInstance.getDefault().getStructTopic("RobotState/ntEstimatedPose", Pose2d.struct).publish();
+    private final StructPublisher<Pose2d> visionPosePublisher =
+        NetworkTableInstance.getDefault().getStructTopic("RobotState/ntVisionPose", Pose2d.struct).publish();
 
     private RobotState() {
         SwerveConfig swerveConfig = ConfigLoader.load("swerve", SwerveConfig.class);
@@ -192,6 +198,7 @@ public class RobotState {
         }
 
         visionObservationsAccepted++;
+        visionPosePublisher.set(observation.visionRobotPoseMeters());
 
         if (shouldLogObservation) {
             logVisionObservationMetrics(observation, observation.timestampSeconds(), true);
@@ -256,7 +263,9 @@ public class RobotState {
 
     @AutoLogOutput(key = "RobotState/estimatedPose")
     public Pose2d getEstimatedPose() {
-        return swerveDrivePoseEstimator.getEstimatedPosition();
+        Pose2d pose = swerveDrivePoseEstimator.getEstimatedPosition();
+        estimatedPosePublisher.set(pose);
+        return pose;
     }
 
     @AutoLogOutput(key = "RobotState/estimatedPoseArray")
