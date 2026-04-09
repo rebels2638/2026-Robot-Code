@@ -28,7 +28,7 @@ import frc.robot.constants.Constants;
 import frc.robot.constants.FieldConstants;
 import frc.robot.lib.BLine.FollowPath;
 import frc.robot.lib.util.Elastic;
-import frc.robot.lib.util.HubShiftUtil;
+// import frc.robot.lib.util.HubShiftUtil;
 import frc.robot.lib.util.PhoenixUtil;
 
 /**
@@ -81,7 +81,7 @@ public class Robot extends LoggedRobot {
             case COMP:
                 // Running on a real robot, log to a USB stick ("/U/logs")
                 Logger.addDataReceiver(new WPILOGWriter());
-                Logger.addDataReceiver(new NT4Publisher());
+                // Logger.addDataReceiver(new NT4Publisher());
 
                 break;
 
@@ -145,7 +145,7 @@ public class Robot extends LoggedRobot {
     @Override
     public void robotPeriodic() {
         PhoenixUtil.refreshAll();
-        HubShiftUtil.getInstance().periodic();
+        // HubShiftUtil.getInstance().periodic();
         // Runs the Scheduler. This is responsible for polling buttons, adding
         // newly-scheduled
         // commands, running already-scheduled commands, removing finished or
@@ -211,7 +211,7 @@ public class Robot extends LoggedRobot {
      */
     @Override
     public void autonomousInit() {
-        HubShiftUtil.getInstance().initializeAuto();
+        // HubShiftUtil.getInstance().initializeAuto();
         m_robotContainer.autonomousInit();
 
         m_autonomousCommand = m_robotContainer.getAutonomousCommand();
@@ -240,7 +240,7 @@ public class Robot extends LoggedRobot {
         }
 
         m_robotContainer.teleopInit();
-        HubShiftUtil.getInstance().initialize();
+        // HubShiftUtil.getInstance().initialize();
 
         // m_robotContainer.offsetAngle();
     }
