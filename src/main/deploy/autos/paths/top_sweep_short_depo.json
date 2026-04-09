@@ -211,6 +211,11 @@
       "lib_key": "ready"
     },
     {
+      "type": "event_trigger",
+      "t_ratio": 0.0,
+      "lib_key": "deploy"
+    },
+    {
       "type": "waypoint",
       "translation_target": {
         "x_meters": 6.01541085904896,
