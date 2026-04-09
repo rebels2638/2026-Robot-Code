@@ -123,28 +123,30 @@ public final class Autos {
             "double_swipe_bottom",
             new Pose2d(
                 new Translation2d(3.41, 2.27),
-                Rotation2d.fromDegrees(118)
+                Rotation2d.fromDegrees(0)
             ),
             setTarget(TargetState.HUB),
             setSystem(DesiredSystemState.HOME),
-            firstFollowPath("bottom_jab_sharp"),
+            firstFollowPath("bottom_jab_sharp", false, false),
             waitSeconds(3.4),
             setSystem(DesiredSystemState.HOME),
-            followPath("bottom_sweep_short"),
-            waitSeconds(6)
+            followPath("bottom_sweep_short", false, false),
+            waitSeconds(1),
+            setIntake(DesiredIntakeState.ALTERNATING)
         ),
         auto(
             "double_swipe_top",
             new Pose2d(
                 new Translation2d(3.569, 5.68),
-                Rotation2d.fromRadians(0)
+                Rotation2d.fromDegrees(0)
             ),
             setTarget(TargetState.HUB),
             setSystem(DesiredSystemState.HOME),
             firstFollowPath("bottom_jab_sharp", false, true),
-            waitSeconds(6),
+            waitSeconds(3.4),
             followPath("bottom_sweep_short", false, true),
-            waitSeconds(6)
+            waitSeconds(1),
+            setIntake(DesiredIntakeState.ALTERNATING)
         )
 
     );
