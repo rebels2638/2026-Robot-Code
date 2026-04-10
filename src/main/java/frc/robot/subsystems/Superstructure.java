@@ -14,6 +14,7 @@ import edu.wpi.first.math.geometry.Translation2d;
 import edu.wpi.first.math.geometry.Translation3d;
 import edu.wpi.first.math.numbers.N1;
 import edu.wpi.first.math.numbers.N3;
+import edu.wpi.first.wpilibj.DriverStation;
 import edu.wpi.first.wpilibj.Timer;
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
 import frc.robot.RobotState;
@@ -521,15 +522,17 @@ public class Superstructure extends SubsystemBase {
     }
 
     private void applyDynamicShotOutputs(HopperSetpoint hopperSetpoint) {
-        applyShotMotionCaps();
+        if (DriverStation.isTeleop()) {
+            applyShotMotionCaps();
+            swerveDrive.setDesiredOmegaOverrideState(SwerveDrive.DesiredOmegaOverrideState.CAPPED);
+            swerveDrive.setDesiredTranslationOverrideState(SwerveDrive.DesiredTranslationOverrideState.CAPPED);
+        }
         applyShooterAndHopperSetpoints(
             HoodSetpoint.DYNAMIC,
             TurretSetpoint.DYNAMIC,
             FlywheelSetpoint.DYNAMIC,
             hopperSetpoint
         );
-        swerveDrive.setDesiredOmegaOverrideState(SwerveDrive.DesiredOmegaOverrideState.CAPPED);
-        swerveDrive.setDesiredTranslationOverrideState(SwerveDrive.DesiredTranslationOverrideState.CAPPED);
     }
 
     private void applyShotMotionCaps() {
