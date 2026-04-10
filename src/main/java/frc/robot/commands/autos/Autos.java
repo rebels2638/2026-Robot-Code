@@ -128,24 +128,23 @@ public final class Autos {
             setTarget(TargetState.HUB),
             setSystem(DesiredSystemState.HOME),
             firstFollowPath("bottom_jab_sharp", false, false),
-            waitSeconds(1.5),
-            setSystem(DesiredSystemState.HOME),
+            waitSeconds(1.8),
             followPath("bottom_sweep_short", false, false),
-            waitSeconds(1.5),
+            waitSeconds(0.5),
             setIntake(DesiredIntakeState.ALTERNATING)
         ),
         auto(
             "double_swipe_top",
             new Pose2d(
                 new Translation2d(3.569, 5.68),
-                Rotation2d.fromDegrees(0)
+                Rotation2d.fromDegrees(147)
             ),
             setTarget(TargetState.HUB),
             setSystem(DesiredSystemState.HOME),
             firstFollowPath("bottom_jab_sharp", false, true),
-            waitSeconds(3.4),
+            waitSeconds(1.8),
             followPath("bottom_sweep_short", false, true),
-            waitSeconds(1),
+            waitSeconds(0.5),
             setIntake(DesiredIntakeState.ALTERNATING)
         )
 
