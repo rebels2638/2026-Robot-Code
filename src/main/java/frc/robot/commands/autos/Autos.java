@@ -127,10 +127,10 @@ public final class Autos {
             ),
             setTarget(TargetState.HUB),
             setSystem(DesiredSystemState.HOME),
-            firstFollowPath("bottom_jab_sharp", false, false),
-            waitSeconds(1.8),
+            firstFollowPath("top_sweep_short_first", false, true),
+            setIntake(DesiredIntakeState.ALTERNATING),
+            waitSeconds(4),
             followPath("bottom_sweep_short", false, false),
-            waitSeconds(0.5),
             setIntake(DesiredIntakeState.ALTERNATING)
         ),
         auto(
@@ -141,10 +141,10 @@ public final class Autos {
             ),
             setTarget(TargetState.HUB),
             setSystem(DesiredSystemState.HOME),
-            firstFollowPath("bottom_jab_sharp", false, true),
-            waitSeconds(1.8),
+            firstFollowPath("top_sweep_short_first", false, false),
+            setIntake(DesiredIntakeState.ALTERNATING),
+            waitSeconds(4),
             followPath("bottom_sweep_short", false, true),
-            waitSeconds(0.5),
             setIntake(DesiredIntakeState.ALTERNATING)
         )
 
