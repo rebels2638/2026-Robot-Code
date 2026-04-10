@@ -3,6 +3,8 @@ package frc.robot.subsystems.hopper;
 import org.littletonrobotics.junction.AutoLogOutput;
 import org.littletonrobotics.junction.Logger;
 
+import edu.wpi.first.networktables.DoublePublisher;
+import edu.wpi.first.networktables.NetworkTableInstance;
 import edu.wpi.first.wpilibj.Alert;
 import edu.wpi.first.wpilibj.Alert.AlertType;
 import edu.wpi.first.wpilibj.DriverStation;
@@ -50,6 +52,11 @@ public class Hopper extends SubsystemBase {
     private double hopperSetpointRPS = 0.0;
     private double hopperSetpointVolts = 0.0;
 
+    private final DoublePublisher hopperTorqueCurrentPublisher =
+        NetworkTableInstance.getDefault().getDoubleTopic("Hopper/torqueCurrent").publish();
+    private final DoublePublisher hopperMeasuredVelocityPublisher =
+        NetworkTableInstance.getDefault().getDoubleTopic("Hopper/measuredVelocityRPS").publish();
+
     private Hopper() {
         boolean useSimulation = Constants.shouldUseSimulation(Constants.SimOnlySubsystems.HOPPER);
         config = ConfigLoader.load(
@@ -77,6 +84,9 @@ public class Hopper extends SubsystemBase {
     public void periodic() {
         hopperIO.updateInputs(hopperInputs);
         Logger.processInputs("Hopper", hopperInputs);
+
+        hopperTorqueCurrentPublisher.set(hopperInputs.torqueCurrent);
+        hopperMeasuredVelocityPublisher.set(hopperInputs.velocityRotationsPerSec);
 
         hopperDisconnectedAlert.set(enableConnectionAlerts && !hopperInputs.hopperMotorConnected);
 
