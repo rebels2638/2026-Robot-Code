@@ -28,8 +28,6 @@ import org.littletonrobotics.junction.Logger;
 public class Vision extends SubsystemBase {
     private static final double DETAILED_POSE_LOG_PERIOD_SECONDS = 0.1;
     private static final double IMU_MODE_REASSERT_PERIOD_SECONDS = 1.0;
-    private static final boolean ENABLE_DETAILED_POSE_LOGGING = true;
-        // Constants.currentMode == Constants.Mode.REPLAY || Constants.VERBOSE_LOGGING_ENABLED;
 
     private static Vision instance = null;
     private static final VisionConfig config = ConfigLoader.load(
@@ -183,7 +181,7 @@ public class Vision extends SubsystemBase {
 
         // Initialize logging values
         boolean shouldLogDetailedPoseArrays =
-            ENABLE_DETAILED_POSE_LOGGING
+            isDetailedPoseLoggingEnabled()
                 && currentTime - lastDetailedPoseLogTimestampSeconds >= DETAILED_POSE_LOG_PERIOD_SECONDS;
         if (shouldLogDetailedPoseArrays) {
             lastDetailedPoseLogTimestampSeconds = currentTime;
@@ -196,6 +194,7 @@ public class Vision extends SubsystemBase {
         int totalRawMegatag1Count = 0;
         int totalRawMegatag2Count = 0;
         int totalRawObservationCount = 0;
+        int totalDroppedObservationCount = 0;
 
         // Loop over cameras
         for (int cameraIndex = 0; cameraIndex < io.length; cameraIndex++) {
@@ -221,6 +220,7 @@ public class Vision extends SubsystemBase {
             totalRawMegatag1Count += inputs[cameraIndex].rawMegatag1ObservationCount;
             totalRawMegatag2Count += inputs[cameraIndex].rawMegatag2ObservationCount;
             totalRawObservationCount += inputs[cameraIndex].rawObservationCount;
+            totalDroppedObservationCount += inputs[cameraIndex].droppedObservationCount;
 
             // Loop over pose observations
             for (var observation : inputs[cameraIndex].robotPoseObservations) {
@@ -330,6 +330,10 @@ public class Vision extends SubsystemBase {
                 cameraTimingPrefix + "/RawObservationCount",
                 inputs[cameraIndex].rawObservationCount
             );
+            Logger.recordOutput(
+                cameraTimingPrefix + "/DroppedObservationCount",
+                inputs[cameraIndex].droppedObservationCount
+            );
             if (shouldLogDetailedPoseArrays) {
                 Logger.recordOutput(cameraTimingPrefix + "/TagPoses", inputs[cameraIndex].tagPoses);
                 Logger.recordOutput(
@@ -360,6 +364,15 @@ public class Vision extends SubsystemBase {
         Logger.recordOutput("Vision/Summary/RawMegatag1ObservationCount", totalRawMegatag1Count);
         Logger.recordOutput("Vision/Summary/RawMegatag2ObservationCount", totalRawMegatag2Count);
         Logger.recordOutput("Vision/Summary/RawObservationCount", totalRawObservationCount);
+        Logger.recordOutput("Vision/Summary/DroppedObservationCount", totalDroppedObservationCount);
+    }
+
+    static boolean isDetailedPoseLoggingEnabled(Constants.Mode mode, boolean verboseLoggingEnabled) {
+        return mode == Constants.Mode.REPLAY || verboseLoggingEnabled;
+    }
+
+    private static boolean isDetailedPoseLoggingEnabled() {
+        return isDetailedPoseLoggingEnabled(Constants.currentMode, Constants.VERBOSE_LOGGING_ENABLED);
     }
 
     private void writeImuMode(int imuMode, double currentTime) {

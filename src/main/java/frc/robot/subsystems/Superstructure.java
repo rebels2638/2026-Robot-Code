@@ -43,6 +43,14 @@ import frc.robot.subsystems.intake.Intake.IntakeSetpoint;
 
 public class Superstructure extends SubsystemBase {
     private static final double TARGET_HEIGHT_REACH_EPSILON_METERS = 5e-4;
+    // Precompute mirrored blockers once so shot calculations do not rebuild geometry every 20 ms.
+    private static final RectangleZone[] HUB_LINE_OF_SIGHT_BLOCKERS =
+        buildMirroredRectangularBlockers(ZoneConstants.Tower.EXCLUSION);
+    private static final RectangleZone[] PASS_LINE_OF_SIGHT_BLOCKERS =
+        buildMirroredRectangularBlockers(
+            ZoneConstants.Hub.EXCLUSION,
+            ZoneConstants.Tower.EXCLUSION
+        );
 
     private static Superstructure instance;
     public static Superstructure getInstance() {
@@ -242,6 +250,7 @@ public class Superstructure extends SubsystemBase {
     private Superstructure() {
         config = ConfigLoader.load("superstructure", SuperstructureConfig.class);
         bumpSnapAngle = Rotation2d.fromDegrees(config.bumpSnapAngleDegrees);
+        latencyCompensationSeconds.setDefault(config.latencyCompensationSeconds);
 
         // Set up suppliers for the shooter - these provide dynamic setpoints based on shot calculation
         shooter.setHoodAngleSupplier(this::getTargetHoodAngle);
@@ -252,8 +261,6 @@ public class Superstructure extends SubsystemBase {
 
     @Override
     public void periodic() {
-        latencyCompensationSeconds.setDefault(config.latencyCompensationSeconds);
-
         // Calculate raw shot data once per cycle, then apply close-shot guard for mechanism setpoints.
         cachedShotComputationContext = buildShotComputationContext();
         mostRecentShotData = calculateShotData(cachedShotComputationContext);
@@ -928,23 +935,18 @@ public class Superstructure extends SubsystemBase {
         boolean passingTarget = zoneResolvedTarget.isPassTarget();
         Translation2d shooterPosition = shooterKinematics.shooterPosition().toTranslation2d();
         Translation2d targetPosition = targetLocation.toTranslation2d();
-        RectangleZone[] hubLineOfSightBlockers = buildMirroredRectangularBlockers(ZoneConstants.Tower.EXCLUSION);
-        RectangleZone[] passLineOfSightBlockers = buildMirroredRectangularBlockers(
-            ZoneConstants.Hub.EXCLUSION,
-            ZoneConstants.Tower.EXCLUSION
-        );
         boolean lineOfSightClear = passingTarget
             ? hasClearLineOfSightWithRectangularBlockers(
                 shooterPosition,
                 targetPosition,
                 config.passHubBlockerRadiusMeters,
-                passLineOfSightBlockers
+                PASS_LINE_OF_SIGHT_BLOCKERS
             )
             : hasClearLineOfSightWithRectangularBlockers(
                 shooterPosition,
                 targetPosition,
                 config.passHubBlockerRadiusMeters,
-                hubLineOfSightBlockers
+                HUB_LINE_OF_SIGHT_BLOCKERS
             );
 
         currentTargetState = zoneResolvedTarget;
@@ -1087,10 +1089,6 @@ public class Superstructure extends SubsystemBase {
             robotState.getFieldRelativeSpeeds()
         );
         Translation2d shooterPosition = shooterKinematics.shooterPosition().toTranslation2d();
-        RectangleZone[] passLineOfSightBlockers = buildMirroredRectangularBlockers(
-            ZoneConstants.Hub.EXCLUSION,
-            ZoneConstants.Tower.EXCLUSION
-        );
 
         ArrayList<TargetCandidate> candidates = new ArrayList<>();
         for (TargetState targetState : TargetState.values()) {
@@ -1102,7 +1100,7 @@ public class Superstructure extends SubsystemBase {
                 shooterPosition,
                 targetPosition,
                 config.passHubBlockerRadiusMeters,
-                passLineOfSightBlockers
+                PASS_LINE_OF_SIGHT_BLOCKERS
             );
             candidates.add(new TargetCandidate(targetState, targetPosition, lineOfSightClear));
         }

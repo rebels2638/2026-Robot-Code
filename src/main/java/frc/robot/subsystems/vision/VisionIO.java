@@ -5,6 +5,8 @@ import edu.wpi.first.math.geometry.Rotation2d;
 import org.littletonrobotics.junction.AutoLog;
 
 public interface VisionIO {
+    int MAX_OBSERVATION_SAMPLES_PER_UPDATE = 5;
+
     @AutoLog
     public static class VisionIOInputs {
         public boolean connected = false;
@@ -15,6 +17,7 @@ public interface VisionIO {
         public int rawMegatag1ObservationCount = 0;
         public int rawMegatag2ObservationCount = 0;
         public int rawObservationCount = 0;
+        public int droppedObservationCount = 0;
         public TargetObservation latestTargetObservation = new TargetObservation(Rotation2d.kZero, Rotation2d.kZero);
     }
 
@@ -41,4 +44,8 @@ public interface VisionIO {
     }
 
     public default void updateInputs(VisionIOInputs inputs) {}
+
+    static int getLatestSampleStartIndex(int availableSampleCount) {
+        return Math.max(0, availableSampleCount - MAX_OBSERVATION_SAMPLES_PER_UPDATE);
+    }
 }
