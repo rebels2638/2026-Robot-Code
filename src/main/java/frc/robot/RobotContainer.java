@@ -258,13 +258,9 @@ public class RobotContainer {
         );
 
         xboxDriver.getXButton().onTrue(
-            new InstantCommand(() -> swerveDrive.setDesiredSystemState(
-                SwerveDrive.DesiredSystemState.TELOP_ROBOT_RELATIVE
-            ))
+            new InstantCommand(() -> superstructure.setDesiredHopperState(Superstructure.DesiredHopperState.REVERSE))
         ).onFalse(
-            new InstantCommand(() -> swerveDrive.setDesiredSystemState(
-                SwerveDrive.DesiredSystemState.TELOP_FIELD_RELATIVE
-            ))
+            new InstantCommand(() -> superstructure.setDesiredHopperState(Superstructure.DesiredHopperState.DEFAULT))
         );
 
         xboxDriver.getBButton().whileTrue(
@@ -298,7 +294,8 @@ public class RobotContainer {
         // Ensure we're in teleop state
         swerveDrive.setDesiredSystemState(SwerveDrive.DesiredSystemState.TELOP_FIELD_RELATIVE);
         superstructure.setDesiredSystemState(Superstructure.DesiredSystemState.HOME);
-        superstructure.setDesiredIntakeState(Superstructure.DesiredIntakeState.STOWED);
+        superstructure.setDesiredIntakeState(Superstructure.DesiredIntakeState.DEPLOYED);
+        superstructure.setDesiredHopperState(Superstructure.DesiredHopperState.DEFAULT);
         // dont set climb state leave up to driver
     }
 
@@ -306,12 +303,14 @@ public class RobotContainer {
         // Set up for autonomous
         superstructure.setDesiredSystemState(Superstructure.DesiredSystemState.HOME);
         superstructure.setDesiredClimbState(Superstructure.DesiredClimbState.RETRACTED);
+        superstructure.setDesiredHopperState(Superstructure.DesiredHopperState.DEFAULT);
         swerveDrive.setDesiredSystemState(SwerveDrive.DesiredSystemState.IDLE);
     }
 
     public void disabledInit() {
         superstructure.setDesiredSystemState(Superstructure.DesiredSystemState.DISABLED);
         superstructure.setDesiredClimbState(Superstructure.DesiredClimbState.DISABLED);
+        superstructure.setDesiredHopperState(Superstructure.DesiredHopperState.DEFAULT);
         swerveDrive.setDesiredSystemState(SwerveDrive.DesiredSystemState.DISABLED);
     }
 

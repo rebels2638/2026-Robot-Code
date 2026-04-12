@@ -101,6 +101,11 @@ public class Superstructure extends SubsystemBase {
         CLIMBED
     }
 
+    public enum DesiredHopperState {
+        DEFAULT,
+        REVERSE
+    }
+
     public enum CurrentClimbState {
         DISABLED,
         RETRACTED,
@@ -141,6 +146,7 @@ public class Superstructure extends SubsystemBase {
     private CurrentIntakeState currentIntakeState = CurrentIntakeState.DISABLED;
     private DesiredClimbState desiredClimbState = DesiredClimbState.RETRACTED;
     private CurrentClimbState currentClimbState = CurrentClimbState.DISABLED;
+    private DesiredHopperState desiredHopperState = DesiredHopperState.DEFAULT;
     private TargetState desiredTargetState = TargetState.HUB;
     private TargetState currentTargetState = TargetState.HUB;
 
@@ -436,6 +442,30 @@ public class Superstructure extends SubsystemBase {
                 ? DesiredClimbState.DISABLED
                 : desiredClimbState
         );
+        applyHopperOverride();
+    }
+
+    /**
+     * Applies driver-commanded hopper overrides (e.g. manual reverse) on top of the
+     * system-state hopper setpoint. Only runs in non-shot states so it cannot
+     * interrupt a shot sequence by stealing the hopper from FEEDING/FEEDING_IDLE.
+     */
+    private void applyHopperOverride() {
+        if (desiredHopperState == DesiredHopperState.DEFAULT) {
+            return;
+        }
+        switch (currentSystemState) {
+            case PREPARING_FOR_SHOT:
+            case READY_FOR_SHOT:
+            case SHOOTING:
+            case DISABLED:
+                return;
+            default:
+                break;
+        }
+        if (desiredHopperState == DesiredHopperState.REVERSE) {
+            hopper.setSetpoint(HopperSetpoint.REVERSE);
+        }
     }
 
     private void handleDisabledState() {
@@ -1169,6 +1199,10 @@ public class Superstructure extends SubsystemBase {
         this.desiredClimbState = desiredClimbState;
     }
 
+    public void setDesiredHopperState(DesiredHopperState desiredHopperState) {
+        this.desiredHopperState = desiredHopperState;
+    }
+
     public void setDesiredTargetState(TargetState desiredTargetState) {
         this.desiredTargetState = desiredTargetState;
     }
@@ -1211,6 +1245,11 @@ public class Superstructure extends SubsystemBase {
     @AutoLogOutput(key = "Superstructure/desiredClimbState")
     public DesiredClimbState getDesiredClimbState() {
         return desiredClimbState;
+    }
+
+    @AutoLogOutput(key = "Superstructure/desiredHopperState")
+    public DesiredHopperState getDesiredHopperState() {
+        return desiredHopperState;
     }
 
     @AutoLogOutput(key = "Superstructure/currentTargetState")

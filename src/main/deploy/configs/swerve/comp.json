@@ -45,9 +45,9 @@
   },
   "moduleGeneral": {
     "canBusName": "drivetrain",
-    "driveStatorCurrentLimit": 50.0,
-    "drivePeakForwardTorqueCurrent": 50.0,
-    "drivePeakReverseTorqueCurrent": -50.0,
+    "driveStatorCurrentLimit": 56.0,
+    "drivePeakForwardTorqueCurrent": 56.0,
+    "drivePeakReverseTorqueCurrent": -56.0,
     "driveKS": 0.25,
     "driveKV": 2.35,
     "driveKA": 0.5,
