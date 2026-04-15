@@ -14,6 +14,7 @@ import edu.wpi.first.math.geometry.Translation2d;
 import edu.wpi.first.math.geometry.Translation3d;
 import edu.wpi.first.math.numbers.N1;
 import edu.wpi.first.math.numbers.N3;
+import edu.wpi.first.wpilibj.DriverStation;
 import edu.wpi.first.wpilibj.Timer;
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
 import frc.robot.RobotState;
@@ -100,6 +101,11 @@ public class Superstructure extends SubsystemBase {
         CLIMBED
     }
 
+    public enum DesiredHopperState {
+        DEFAULT,
+        REVERSE
+    }
+
     public enum CurrentClimbState {
         DISABLED,
         RETRACTED,
@@ -140,6 +146,7 @@ public class Superstructure extends SubsystemBase {
     private CurrentIntakeState currentIntakeState = CurrentIntakeState.DISABLED;
     private DesiredClimbState desiredClimbState = DesiredClimbState.RETRACTED;
     private CurrentClimbState currentClimbState = CurrentClimbState.DISABLED;
+    private DesiredHopperState desiredHopperState = DesiredHopperState.DEFAULT;
     private TargetState desiredTargetState = TargetState.HUB;
     private TargetState currentTargetState = TargetState.HUB;
 
@@ -157,6 +164,7 @@ public class Superstructure extends SubsystemBase {
     private double lastBallVisualizedTime = 0;
     private boolean hasStartedShooting = false;
     private AlternatingIntakeTarget alternatingIntakeTarget = null;
+    private double alternatingTargetSetTimestamp = 0;
     private boolean hasWarnedInvalidTurretRotationMargins = false;
     
     // Cached shot data for mechanism control after applying guards.
@@ -382,7 +390,12 @@ public class Superstructure extends SubsystemBase {
             case DEPLOYED -> CurrentIntakeState.DEPLOYED;
             case INTAKING -> CurrentIntakeState.INTAKING;
             case REVERSING -> CurrentIntakeState.REVERSING;
-            case ALTERNATING -> CurrentIntakeState.ALTERNATING;
+            case ALTERNATING -> {
+                if (currentIntakeState != CurrentIntakeState.ALTERNATING && !intake.isDeployed()) {
+                    yield CurrentIntakeState.DEPLOYED;
+                }
+                yield CurrentIntakeState.ALTERNATING;
+            }
         };
     }
 
@@ -429,6 +442,30 @@ public class Superstructure extends SubsystemBase {
                 ? DesiredClimbState.DISABLED
                 : desiredClimbState
         );
+        applyHopperOverride();
+    }
+
+    /**
+     * Applies driver-commanded hopper overrides (e.g. manual reverse) on top of the
+     * system-state hopper setpoint. Only runs in non-shot states so it cannot
+     * interrupt a shot sequence by stealing the hopper from FEEDING/FEEDING_IDLE.
+     */
+    private void applyHopperOverride() {
+        if (desiredHopperState == DesiredHopperState.DEFAULT) {
+            return;
+        }
+        switch (currentSystemState) {
+            case PREPARING_FOR_SHOT:
+            case READY_FOR_SHOT:
+            case SHOOTING:
+            case DISABLED:
+                return;
+            default:
+                break;
+        }
+        if (desiredHopperState == DesiredHopperState.REVERSE) {
+            hopper.setSetpoint(HopperSetpoint.REVERSE);
+        }
     }
 
     private void handleDisabledState() {
@@ -477,6 +514,7 @@ public class Superstructure extends SubsystemBase {
     }
 
     private void handleBumpState() {
+        applyDefaultMotionCaps();
         swerveDrive.setSnapTargetAngle(bumpSnapAngle);
         swerveDrive.setTranslationVelocityCapMaxVelocityMetersPerSec(config.bumpMaxVelocityMetersPerSec);
         swerveDrive.setDesiredOmegaOverrideState(SwerveDrive.DesiredOmegaOverrideState.SNAPPED);
@@ -490,6 +528,7 @@ public class Superstructure extends SubsystemBase {
     }
 
     private void applyHomeOutputs() {
+        applyDefaultMotionCaps();
         applyShooterAndHopperSetpoints(
             HoodSetpoint.HOME,
             TurretSetpoint.HOME,
@@ -501,6 +540,7 @@ public class Superstructure extends SubsystemBase {
     }
 
     private void applyTrackingOutputs() {
+        applyDefaultMotionCaps();
         applyShooterAndHopperSetpoints(
             HoodSetpoint.DYNAMIC,
             TurretSetpoint.DYNAMIC,
@@ -512,20 +552,31 @@ public class Superstructure extends SubsystemBase {
     }
 
     private void applyDynamicShotOutputs(HopperSetpoint hopperSetpoint) {
-        applyShotMotionCaps();
+        if (DriverStation.isTeleop()) {
+            applyShotMotionCaps();
+            swerveDrive.setDesiredOmegaOverrideState(SwerveDrive.DesiredOmegaOverrideState.CAPPED);
+            swerveDrive.setDesiredTranslationOverrideState(SwerveDrive.DesiredTranslationOverrideState.CAPPED);
+        }
         applyShooterAndHopperSetpoints(
             HoodSetpoint.DYNAMIC,
             TurretSetpoint.DYNAMIC,
             FlywheelSetpoint.DYNAMIC,
             hopperSetpoint
         );
-        swerveDrive.setDesiredOmegaOverrideState(SwerveDrive.DesiredOmegaOverrideState.CAPPED);
-        swerveDrive.setDesiredTranslationOverrideState(SwerveDrive.DesiredTranslationOverrideState.CAPPED);
     }
 
     private void applyShotMotionCaps() {
         swerveDrive.setTranslationVelocityCapMaxVelocityMetersPerSec(config.maxTranslationalVelocityDuringShotMetersPerSec);
+        swerveDrive.setTranslationAccelerationCapMaxMetersPerSecSec(
+            config.maxTranslationalAccelerationDuringShotMetersPerSecSec
+        );
         swerveDrive.setOmegaVelocityCapMaxRadiansPerSec(config.maxAngularVelocityDuringShotRadPerSec);
+        swerveDrive.setOmegaAccelerationCapMaxRadiansPerSecSec(config.maxAngularAccelerationDuringShotRadPerSecSec);
+    }
+
+    private void applyDefaultMotionCaps() {
+        swerveDrive.clearTranslationAccelerationCap();
+        swerveDrive.clearOmegaAccelerationCap();
     }
 
     private void applyShooterAndHopperSetpoints(
@@ -568,10 +619,21 @@ public class Superstructure extends SubsystemBase {
     }
 
     private void applyAlternatingIntake() {
+        double now = Timer.getFPGATimestamp();
+        boolean timedOut = alternatingIntakeTarget != null
+            && (now - alternatingTargetSetTimestamp) >= intake.getAlternatingTimeoutSeconds();
+
+        AlternatingIntakeTarget previousTarget = alternatingIntakeTarget;
         alternatingIntakeTarget = resolveNextAlternatingIntakeTarget(
             alternatingIntakeTarget,
-            intake.isPivotAtSetpoint()
+            intake.isPivotAtSetpoint(),
+            timedOut
         );
+
+        if (alternatingIntakeTarget != previousTarget) {
+            alternatingTargetSetTimestamp = now;
+        }
+
         intake.setSetpoint(getAlternatingIntakeSetpoint(alternatingIntakeTarget));
     }
 
@@ -1104,12 +1166,13 @@ public class Superstructure extends SubsystemBase {
 
     static AlternatingIntakeTarget resolveNextAlternatingIntakeTarget(
         AlternatingIntakeTarget currentTarget,
-        boolean pivotAtSetpoint
+        boolean pivotAtSetpoint,
+        boolean timedOut
     ) {
         if (currentTarget == null) {
             return AlternatingIntakeTarget.FIRST;
         }
-        if (!pivotAtSetpoint) {
+        if (!pivotAtSetpoint && !timedOut) {
             return currentTarget;
         }
         return currentTarget == AlternatingIntakeTarget.FIRST
@@ -1134,6 +1197,10 @@ public class Superstructure extends SubsystemBase {
 
     public void setDesiredClimbState(DesiredClimbState desiredClimbState) {
         this.desiredClimbState = desiredClimbState;
+    }
+
+    public void setDesiredHopperState(DesiredHopperState desiredHopperState) {
+        this.desiredHopperState = desiredHopperState;
     }
 
     public void setDesiredTargetState(TargetState desiredTargetState) {
@@ -1178,6 +1245,11 @@ public class Superstructure extends SubsystemBase {
     @AutoLogOutput(key = "Superstructure/desiredClimbState")
     public DesiredClimbState getDesiredClimbState() {
         return desiredClimbState;
+    }
+
+    @AutoLogOutput(key = "Superstructure/desiredHopperState")
+    public DesiredHopperState getDesiredHopperState() {
+        return desiredHopperState;
     }
 
     @AutoLogOutput(key = "Superstructure/currentTargetState")

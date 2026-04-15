@@ -6,7 +6,9 @@ public class SuperstructureConfig {
 
     public double turretRotationBufferDeg = 20.0;
     public double maxTranslationalVelocityDuringShotMetersPerSec = 2.5;
+    public double maxTranslationalAccelerationDuringShotMetersPerSecSec = Double.NaN;
     public double maxAngularVelocityDuringShotRadPerSec = 3.0;
+    public double maxAngularAccelerationDuringShotRadPerSecSec = Double.NaN;
     public double shotImpactToleranceMeters = 0.3;
     public double lastInRangeShotMaxAgeSeconds = 1.0;
     public double bumpMaxVelocityMetersPerSec = 1.8;

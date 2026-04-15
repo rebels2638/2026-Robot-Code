@@ -71,8 +71,8 @@ public final class Autos {
         auto(
             "top_sweep_short_depo",
             new Pose2d(
-                new Translation2d(3.511, 2.160),
-                Rotation2d.fromRadians(Math.PI)
+                new Translation2d(3.83, 5.94),
+                Rotation2d.fromDegrees(165.082)
             ),
             new ParallelCommandGroup(
                 new SequentialCommandGroup(
@@ -123,28 +123,29 @@ public final class Autos {
             "double_swipe_bottom",
             new Pose2d(
                 new Translation2d(3.41, 2.27),
-                Rotation2d.fromDegrees(118)
+                Rotation2d.fromDegrees(-147.204)
             ),
             setTarget(TargetState.HUB),
             setSystem(DesiredSystemState.HOME),
-            firstFollowPath("bottom_jab_sharp"),
-            waitSeconds(3.4),
-            setSystem(DesiredSystemState.HOME),
-            followPath("bottom_sweep_short"),
-            waitSeconds(6)
+            firstFollowPath("top_sweep_short_first", false, true),
+            setIntake(DesiredIntakeState.ALTERNATING),
+            waitSeconds(4),
+            followPath("bottom_sweep_short", false, false),
+            setIntake(DesiredIntakeState.ALTERNATING)
         ),
         auto(
             "double_swipe_top",
             new Pose2d(
                 new Translation2d(3.569, 5.68),
-                Rotation2d.fromRadians(0)
+                Rotation2d.fromDegrees(147)
             ),
             setTarget(TargetState.HUB),
             setSystem(DesiredSystemState.HOME),
-            firstFollowPath("bottom_jab_sharp", false, true),
-            waitSeconds(6),
+            firstFollowPath("top_sweep_short_first", false, false),
+            setIntake(DesiredIntakeState.ALTERNATING),
+            waitSeconds(4),
             followPath("bottom_sweep_short", false, true),
-            waitSeconds(6)
+            setIntake(DesiredIntakeState.ALTERNATING)
         )
 
     );

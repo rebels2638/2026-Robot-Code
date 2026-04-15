@@ -9,7 +9,7 @@ class SuperstructureAlternatingIntakeTest {
     void resolveNextAlternatingIntakeTarget_startsAtFirst() {
         assertEquals(
             Superstructure.AlternatingIntakeTarget.FIRST,
-            Superstructure.resolveNextAlternatingIntakeTarget(null, false)
+            Superstructure.resolveNextAlternatingIntakeTarget(null, false, false)
         );
     }
 
@@ -19,6 +19,7 @@ class SuperstructureAlternatingIntakeTest {
             Superstructure.AlternatingIntakeTarget.FIRST,
             Superstructure.resolveNextAlternatingIntakeTarget(
                 Superstructure.AlternatingIntakeTarget.FIRST,
+                false,
                 false
             )
         );
@@ -26,6 +27,7 @@ class SuperstructureAlternatingIntakeTest {
             Superstructure.AlternatingIntakeTarget.SECOND,
             Superstructure.resolveNextAlternatingIntakeTarget(
                 Superstructure.AlternatingIntakeTarget.SECOND,
+                false,
                 false
             )
         );
@@ -37,7 +39,8 @@ class SuperstructureAlternatingIntakeTest {
             Superstructure.AlternatingIntakeTarget.SECOND,
             Superstructure.resolveNextAlternatingIntakeTarget(
                 Superstructure.AlternatingIntakeTarget.FIRST,
-                true
+                true,
+                false
             )
         );
     }
@@ -48,6 +51,27 @@ class SuperstructureAlternatingIntakeTest {
             Superstructure.AlternatingIntakeTarget.FIRST,
             Superstructure.resolveNextAlternatingIntakeTarget(
                 Superstructure.AlternatingIntakeTarget.SECOND,
+                true,
+                false
+            )
+        );
+    }
+
+    @Test
+    void resolveNextAlternatingIntakeTarget_flipsOnTimeout() {
+        assertEquals(
+            Superstructure.AlternatingIntakeTarget.SECOND,
+            Superstructure.resolveNextAlternatingIntakeTarget(
+                Superstructure.AlternatingIntakeTarget.FIRST,
+                false,
+                true
+            )
+        );
+        assertEquals(
+            Superstructure.AlternatingIntakeTarget.FIRST,
+            Superstructure.resolveNextAlternatingIntakeTarget(
+                Superstructure.AlternatingIntakeTarget.SECOND,
+                false,
                 true
             )
         );

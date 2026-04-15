@@ -96,10 +96,6 @@ public class IntakeIOTalonFX implements IntakeIO {
         // CTRE arm gravity compensation expects 0 rotations to be horizontal.
         pivotConfig.Slot0.GravityType = GravityTypeValue.Arm_Cosine;
         pivotConfig.Slot0.StaticFeedforwardSign = StaticFeedforwardSignValue.UseVelocitySign;
-        pivotConfig.MotionMagic.MotionMagicCruiseVelocity = config.pivotMaxVelocityRotationsPerSec;
-        pivotConfig.MotionMagic.MotionMagicAcceleration = config.pivotMaxAccelerationRotationsPerSec2;
-        pivotConfig.MotionMagic.MotionMagicJerk = config.pivotMaxJerkRotationsPerSec3;
-
         pivotConfig.ClosedLoopGeneral.ContinuousWrap = false;
         pivotConfig.Feedback.SensorToMechanismRatio = config.pivotMotorToOutputShaftRatio;
 
@@ -201,7 +197,16 @@ public class IntakeIOTalonFX implements IntakeIO {
     }
 
     @Override
-    public void setPivotAngle(double angleRotations) {
+    public void setPivotAngle(double angleRotations, double maxVelocity, double maxAcceleration, double maxJerk) {
+        if (pivotConfig.MotionMagic.MotionMagicCruiseVelocity != maxVelocity
+                || pivotConfig.MotionMagic.MotionMagicAcceleration != maxAcceleration
+                || pivotConfig.MotionMagic.MotionMagicJerk != maxJerk) {
+            pivotConfig.MotionMagic.MotionMagicCruiseVelocity = maxVelocity;
+            pivotConfig.MotionMagic.MotionMagicAcceleration = maxAcceleration;
+            pivotConfig.MotionMagic.MotionMagicJerk = maxJerk;
+            pivotMotor.getConfigurator().apply(pivotConfig.MotionMagic, 0.01);
+        }
+
         double clampedAngle = Math.max(config.pivotMinAngleRotations,
             Math.min(config.pivotMaxAngleRotations, angleRotations));
         pivotMotor.setControl(pivotMotorRequest.withPosition(clampedAngle));

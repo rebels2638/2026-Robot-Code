@@ -24,7 +24,7 @@ public interface IntakeIO {
     public default void updateInputs(IntakeIOInputs inputs) {}
     public default void setVelocity(double velocityRotationsPerSec) {}
     public default void setVoltage(double voltage) {}
-    public default void setPivotAngle(double angleRotations) {}
+    public default void setPivotAngle(double angleRotations, double maxVelocity, double maxAcceleration, double maxJerk) {}
     public default void configureControlLoop(MotorControlLoopConfig config) {}
     public default void configurePivotControlLoop(MotorControlLoopConfig config) {}
     public default void enableRollerEStop() {}

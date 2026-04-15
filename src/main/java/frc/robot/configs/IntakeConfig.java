@@ -40,17 +40,26 @@ public class IntakeConfig {
     public double pivotKD;
 
     public double pivotMotorToOutputShaftRatio;
-    public double pivotMaxVelocityRotationsPerSec;
-    public double pivotMaxAccelerationRotationsPerSec2;
-    public double pivotMaxJerkRotationsPerSec3;
+    public double pivotUpMaxVelocityRotationsPerSec;
+    public double pivotUpMaxAccelerationRotationsPerSec2;
+    public double pivotUpMaxJerkRotationsPerSec3;
+
+    public double pivotDownMaxVelocityRotationsPerSec;
+    public double pivotDownMaxAccelerationRotationsPerSec2;
+    public double pivotDownMaxJerkRotationsPerSec3;
 
     public double pivotStartingAngleRotations;
     public double pivotMinAngleRotations;
     public double pivotMaxAngleRotations;
 
+    public double pivotRollerEnableAngleRotations;
     public double pivotAngleToleranceRotations;
     public double pivotUpAngleRotations;
     public double pivotDownAngleRotations;
     public double pivotAlternatingFirstAngleRotations;
     public double pivotAlternatingSecondAngleRotations;
+    public double alternatingTimeoutSeconds;
+    public double pivotAlternatingMaxVelocityRotationsPerSec;
+    public double pivotAlternatingMaxAccelerationRotationsPerSec2;
+    public double pivotAlternatingMaxJerkRotationsPerSec3;
 }

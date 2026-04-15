@@ -37,6 +37,22 @@ class SwerveDriveRangedRotationTest {
     }
 
     @Test
+    void resolveActiveLimit_returnsOverrideWhenEnabledAndFinite() {
+        assertEquals(4.8, SwerveDrive.resolveActiveLimit(true, 4.8, 12.0), 1e-9);
+    }
+
+    @Test
+    void resolveActiveLimit_returnsDefaultWhenOverrideDisabled() {
+        assertEquals(12.0, SwerveDrive.resolveActiveLimit(false, 4.8, 12.0), 1e-9);
+    }
+
+    @Test
+    void resolveActiveLimit_returnsDefaultWhenOverrideValueIsInvalid() {
+        assertEquals(12.0, SwerveDrive.resolveActiveLimit(true, Double.NaN, 12.0), 1e-9);
+        assertEquals(12.0, SwerveDrive.resolveActiveLimit(true, 0.0, 12.0), 1e-9);
+    }
+
+    @Test
     void applyRobotRelativeTeleopHeadingOffset_rotatesTranslationCounterClockwise() {
         ChassisSpeeds rotatedSpeeds = SwerveDrive.applyRobotRelativeTeleopHeadingOffset(
             new ChassisSpeeds(1.0, 0.0, 2.0),
