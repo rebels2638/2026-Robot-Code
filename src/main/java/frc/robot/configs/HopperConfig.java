@@ -24,4 +24,13 @@ public class HopperConfig {
     public double reverseVelocityRPS;
 
     public double hopperVelocityToleranceRPS;
+
+    public boolean jamDetectionEnabled;
+    public double jamDetectionCurrentThresholdAmps;
+    public double jamDetectionMaxVelocityRPS;
+    public double jamDetectionDebounceSeconds;
+
+    public int unjamCycleCount;
+    public double unjamSegmentDurationSeconds;
+    public double unjamCooldownSeconds;
 }

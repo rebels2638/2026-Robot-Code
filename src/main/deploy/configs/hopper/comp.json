@@ -15,5 +15,12 @@
   "feedingVelocityRPS": 6.3 ,
   "feedingIdleVoltage": 0.0,
   "reverseVelocityRPS": -6.0,
-  "hopperVelocityToleranceRPS": 5.0
+  "hopperVelocityToleranceRPS": 5.0,
+  "jamDetectionEnabled": true,
+  "jamDetectionCurrentThresholdAmps": 60.0,
+  "jamDetectionMaxVelocityRPS": 1.0,
+  "jamDetectionDebounceSeconds": 0.15,
+  "unjamCycleCount": 2,
+  "unjamSegmentDurationSeconds": 0.15,
+  "unjamCooldownSeconds": 0.5
 }
