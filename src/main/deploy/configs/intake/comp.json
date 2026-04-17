@@ -42,7 +42,7 @@
   "pivotUpAngleRotations": 0.235,
   "pivotDownAngleRotations": -0.019287,
   "pivotAlternatingFirstAngleRotations": 0.22,
-  "pivotAlternatingSecondAngleRotations": 0.02,
+  "pivotAlternatingSecondAngleRotations": 0.1,
   "alternatingTimeoutSeconds": 1.4,
   "pivotAlternatingMaxVelocityRotationsPerSec": 1.5,
   "pivotAlternatingMaxAccelerationRotationsPerSec2": 4.2,
