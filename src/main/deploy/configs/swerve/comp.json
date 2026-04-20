@@ -53,7 +53,7 @@
     "driveKA": 0.5,
     "driveKP": 2.0,
     "driveKI": 0.0,
-    "driveKD": 0.4,
+    "driveKD": 0.2,
     "driveMaxVelocityMetersPerSec": 4.5,
     "isDriveNeutralModeBrake": true,
     "driveMotorToOutputShaftRatio": 6.03,
