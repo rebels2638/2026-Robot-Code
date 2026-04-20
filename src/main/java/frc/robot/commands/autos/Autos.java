@@ -129,8 +129,8 @@ public final class Autos {
             setSystem(DesiredSystemState.HOME),
             firstFollowPath("top_sweep_short_first", false, true),
             setIntake(DesiredIntakeState.ALTERNATING),
-            waitSeconds(4),
-            followPath("bottom_sweep_short", false, false),
+            waitSeconds(7),
+            followPath("top_sweep_short_second", false, true),
             setIntake(DesiredIntakeState.ALTERNATING)
         ),
         auto(
@@ -143,8 +143,8 @@ public final class Autos {
             setSystem(DesiredSystemState.HOME),
             firstFollowPath("top_sweep_short_first", false, false),
             setIntake(DesiredIntakeState.ALTERNATING),
-            waitSeconds(4),
-            followPath("bottom_sweep_short", false, true),
+            waitSeconds(5),
+            followPath("top_sweep_short_first", false, false),
             setIntake(DesiredIntakeState.ALTERNATING)
         )
 
