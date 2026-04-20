@@ -155,7 +155,7 @@ public class Robot extends LoggedRobot {
         // robot's periodic
         // block in order for anything in the Command-based framework to work.
         CommandScheduler.getInstance().run();
-        Logger.recordOutput("shot/shotDistanceMeters", RobotState.getInstance().getEstimatedPose().getTranslation().getDistance(FieldConstants.Hub.hubCenter.toTranslation2d()));
+        Logger.recordOutput("shot/shotDistanceMeters", RobotState.getInstance().getEstimatedPose().getTranslation().getDistance(FieldConstants.Passing.allianceTop.toTranslation2d()));
     }
 
     /** This function is called once each time the robot enters Disabled mode. */

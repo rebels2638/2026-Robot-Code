@@ -3,32 +3,20 @@ package frc.robot;
 import org.littletonrobotics.junction.networktables.LoggedNetworkNumber;
 
 import edu.wpi.first.math.MathUtil;
-import edu.wpi.first.math.geometry.Pose2d;
-import edu.wpi.first.math.geometry.Pose3d;
 import edu.wpi.first.math.geometry.Rotation2d;
-import edu.wpi.first.math.geometry.Rotation3d;
-import edu.wpi.first.math.geometry.Translation3d;
 import edu.wpi.first.wpilibj.smartdashboard.SendableChooser;
 import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
 import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.Commands;
-import edu.wpi.first.wpilibj2.command.ConditionalCommand;
 import edu.wpi.first.wpilibj2.command.InstantCommand;
 import edu.wpi.first.wpilibj2.command.ParallelDeadlineGroup;
 import edu.wpi.first.wpilibj2.command.RunCommand;
 import edu.wpi.first.wpilibj2.command.SequentialCommandGroup;
-import edu.wpi.first.wpilibj2.command.WaitCommand;
 import edu.wpi.first.wpilibj2.command.WaitUntilCommand;
 import edu.wpi.first.wpilibj2.command.button.Trigger;
 import frc.robot.commands.autos.Autos;
-import frc.robot.constants.AlignmentConstants;
-// import frc.robot.commands.autos.tower.ScoreL1;
 import frc.robot.constants.Constants;
 import frc.robot.lib.BLine.FollowPath;
-import frc.robot.lib.BLine.Path;
-import frc.robot.lib.BLine.Path.EventTrigger;
-import frc.robot.lib.BLine.Path.PathConstraints;
-import frc.robot.lib.BLine.Path.Waypoint;
 import frc.robot.lib.input.XboxController;
 import frc.robot.lib.util.ballistics.ProjectileVisualizer;
 import frc.robot.subsystems.Superstructure;
@@ -37,13 +25,19 @@ import frc.robot.subsystems.hopper.Hopper;
 import frc.robot.subsystems.hopper.Hopper.HopperSetpoint;
 import frc.robot.subsystems.intake.Intake;
 import frc.robot.subsystems.shooter.Shooter;
+import frc.robot.subsystems.shooter.Shooter.FlywheelSetpoint;
+import frc.robot.subsystems.shooter.Shooter.HoodSetpoint;
+import frc.robot.subsystems.shooter.Shooter.TurretSetpoint;
 import frc.robot.subsystems.swerve.SwerveDrive;
-// import frc.robot.subsystems.vision.Vision;
 import frc.robot.subsystems.vision.Vision;
 
 //: TODO: make sure all lisences in tuner are activated
 public class RobotContainer {
     private static final double DRIVE_HELPER_TRIGGER_THRESHOLD = 0.5;
+
+    // Flip this single flag when you want dashboard-driven shooter testing instead of
+    // the normal competition container wiring.
+    private static final boolean USE_MANUAL_SHOOTER_TEST_CONFIG = false;
 
     public static RobotContainer instance = null;
 
@@ -64,165 +58,146 @@ public class RobotContainer {
     private final Shooter shooter = Shooter.getInstance();
     private final Hopper hopper = Hopper.getInstance();
     private final Intake intake = Intake.getInstance();
-    private final Superstructure superstructure = Superstructure.getInstance();
+    private final Superstructure superstructure;
     private final SendableChooser<Command> autoChooser;
 
-    LoggedNetworkNumber shooterFlywheelSet = new LoggedNetworkNumber("flywheelSet", 0);
-    LoggedNetworkNumber turret = new LoggedNetworkNumber("turretSet", 180);
-    LoggedNetworkNumber hood = new LoggedNetworkNumber("hoodSet", 70);
+    private final LoggedNetworkNumber manualFlywheelRps = new LoggedNetworkNumber("flywheelSet", 0.0);
+    private final LoggedNetworkNumber manualTurretDegrees = new LoggedNetworkNumber("turretSet", 180.0);
+    private final LoggedNetworkNumber manualHoodDegrees = new LoggedNetworkNumber("hoodSet", 70.0);
 
     @SuppressWarnings("unused")
     private final ProjectileVisualizer projectileVisualizer = ProjectileVisualizer.getInstance();
 
-
     private RobotContainer() {
+        superstructure = USE_MANUAL_SHOOTER_TEST_CONFIG ? null : Superstructure.getInstance();
+
         registerEventTriggers();
 
         this.xboxTester = new XboxController(1);
         this.xboxOperator = new XboxController(2);
         this.xboxDriver = new XboxController(3);
 
-        // Configure field-relative teleop input suppliers for SwerveDrive FSM.
+        configureDriveInputSuppliers();
+        configureInitialState();
+
+        autoChooser = Autos.getChooser();
+        SmartDashboard.putData("Auto Chooser", autoChooser);
+
+        configureBindings();
+    }
+
+    private boolean isManualShooterTestConfig() {
+        return superstructure == null;
+    }
+
+    private void configureDriveInputSuppliers() {
         swerveDrive.setFieldRelativeTeleopInputSuppliers(
             () -> -MathUtil.applyDeadband(xboxDriver.getLeftY(), Constants.OperatorConstants.LEFT_Y_DEADBAND),
             () -> -MathUtil.applyDeadband(xboxDriver.getLeftX(), Constants.OperatorConstants.LEFT_X_DEADBAND),
             () -> -MathUtil.applyDeadband(xboxDriver.getRightX(), Constants.OperatorConstants.RIGHT_X_DEADBAND)
         );
 
-        // Configure robot-relative teleop input suppliers for SwerveDrive FSM.
         swerveDrive.setRobotRelativeTeleopInputSuppliers(
             () -> -MathUtil.applyDeadband(xboxDriver.getLeftY(), Constants.OperatorConstants.LEFT_Y_DEADBAND),
             () -> -MathUtil.applyDeadband(xboxDriver.getLeftX(), Constants.OperatorConstants.LEFT_X_DEADBAND),
             () -> -MathUtil.applyDeadband(xboxDriver.getRightX(), Constants.OperatorConstants.RIGHT_X_DEADBAND)
         );
         swerveDrive.setRobotRelativeTeleopHeadingOffset(Rotation2d.fromDegrees(25.0));
+    }
 
-        // Default teleop drive mode is field-relative.
+    private void configureInitialState() {
         swerveDrive.setDesiredSystemState(SwerveDrive.DesiredSystemState.TELOP_FIELD_RELATIVE);
+
+        if (isManualShooterTestConfig()) {
+            stopManualShooterTest();
+            hopper.setSetpoint(HopperSetpoint.OFF);
+            return;
+        }
+
         superstructure.setDesiredTargetState(TargetState.HUB);
-        
-        // Set default superstructure state to HOME
         superstructure.setDesiredSystemState(Superstructure.DesiredSystemState.HOME);
         superstructure.setDesiredIntakeState(Superstructure.DesiredIntakeState.STOWED);
         superstructure.setDesiredClimbState(Superstructure.DesiredClimbState.RETRACTED);
-
-        autoChooser = Autos.getChooser();
-        SmartDashboard.putData("Auto Chooser", autoChooser);
-
-        // superstructure.setDesiredTargetState(Superstructure.TargetState.PASS_ALLIANCE_TOP);
-
-        configureBindings();
     }
 
     private void registerEventTriggers() {
-        FollowPath.registerEventTrigger("ready", new InstantCommand(() -> {
-            superstructure.setDesiredSystemState(Superstructure.DesiredSystemState.READY_FOR_SHOT);
-        }));
+        if (isManualShooterTestConfig()) {
+            return;
+        }
+
+        FollowPath.registerEventTrigger(
+            "ready",
+            new InstantCommand(() -> superstructure.setDesiredSystemState(Superstructure.DesiredSystemState.READY_FOR_SHOT))
+        );
         FollowPath.registerEventTrigger("shoot", this::runHubShootingHelper);
-        
-        FollowPath.registerEventTrigger("intake", () -> {
-            superstructure.setDesiredIntakeState(Superstructure.DesiredIntakeState.INTAKING);
-        });
-        FollowPath.registerEventTrigger("deploy", () -> {
-            superstructure.setDesiredIntakeState(Superstructure.DesiredIntakeState.DEPLOYED);
-        });
 
-        FollowPath.registerEventTrigger("alt", () -> {
-            superstructure.setDesiredIntakeState(Superstructure.DesiredIntakeState.ALTERNATING);
-        });
-
+        FollowPath.registerEventTrigger(
+            "intake",
+            () -> superstructure.setDesiredIntakeState(Superstructure.DesiredIntakeState.INTAKING)
+        );
+        FollowPath.registerEventTrigger(
+            "deploy",
+            () -> superstructure.setDesiredIntakeState(Superstructure.DesiredIntakeState.DEPLOYED)
+        );
+        FollowPath.registerEventTrigger(
+            "alt",
+            () -> superstructure.setDesiredIntakeState(Superstructure.DesiredIntakeState.ALTERNATING)
+        );
         FollowPath.registerEventTrigger("lob", this::runAlliancePassHelper);
     }
 
     private void configureBindings() {
-        bindCompetitionDriveHelpers();
-        // xboxDriver.getXButton().onTrue(
-        //     new InstantCommand(() -> robotState.resetPose(new Pose2d(robotState.getEstimatedPose().getTranslation(), new Rotation2d(0))))
-        // );
-        // xboxDriver.getAButton().onTrue(
-        //     new InstantCommand(this::runHubShootingHelper)
-        // );
-        // xboxDriver.getBButton().onTrue(
-        //     new InstantCommand(this::runAlliancePassHelper)
-        // );
-        // xboxDriver.getBButton().onTrue(
-        //     new InstantCommand(() -> Shooter.getInstance().setShotVelocity(shooterFlywheelSet.getAsDouble()))
-        // );
-        // xboxDriver.getXButton().onTrue(
-        //     new InstantCommand(() -> Hopper.getInstance().setSetpoint(HopperSetpoint.FEEDING))
-        // );
-        // xboxDriver.getYButton().onTrue(
-        //     new InstantCommand(() -> Shooter.getInstance().setHoodAngle(Rotation2d.fromDegrees(70))).andThen(
-        //         new InstantCommand(() -> Shooter.getInstance().setShotVelocity(0))
-        //     ).andThen(
-        //         new InstantCommand(() -> Hopper.getInstance().setSetpoint(HopperSetpoint.OFF))
-        //     )
-        // );
+        if (isManualShooterTestConfig()) {
+            configureManualShooterTestBindings();
+            return;
+        }
 
-        // xboxDriver.getBButton().onTrue(
-        //     new InstantCommand(() -> superstructure.setDesiredSystemState(Superstructure.DesiredSystemState.SHOOTING))
-        // );
-        // xboxDriver.getXButton().onTrue(
-        //     new InstantCommand(() -> superstructure.setDesiredSystemState(Superstructure.DesiredSystemState.TRACKING))
-        // );
-        // );
-
-        // xboxDriver.getAButton().onTrue(
-        //     new InstantCommand(() -> shooter.setTurretAngle(new Rotation2d(180
-        //     )))
-        // );
-        // xboxDriver.getBButton().onTrue(
-        //     new InstantCommand(() -> shooter.setTurretAngle((Rotation2d.fromDegrees(turret.getAsDouble()))))
-        // );
-
-        // xboxDriver.getXButton().onTrue(
-        //     new InstantCommand(() -> hopper.setSetpoint(HopperSetpoint.FEEDING))
-        // );
-        // xboxDriver.getYButton().onTrue(
-        //     new InstantCommand(() -> hopper.setSetpoint(HopperSetpoint.OFF))
-        // );
-                // xboxOperator.getYButton().onTrue(
-        //     new InstantCommand(() -> superstructure.setDesiredTargetState(Superstructure.TargetState.HUB))
-        // );
-        // xboxOperator.getUpDpad().onTrue(
-        //     new InstantCommand(() -> superstructure.setDesiredTargetState(Superstructure.TargetState.PASS_ALLIANCE_TOP))
-        // );
-        // xboxOperator.getDownDpad().onTrue(
-        //     new InstantCommand(() -> superstructure.setDesiredTargetState(Superstructure.TargetState.PASS_ALLIANCE_BOTTOM))
-        // );
-        // xboxOperator.getLeftBumper().onTrue(
-        //     new InstantCommand(() -> superstructure.setDesiredTargetState(Superstructure.TargetState.PASS_NEUTRAL_TOP))
-        // );
-        // xboxOperator.getRightBumper().onTrue(
-        //     new InstantCommand(() -> superstructure.setDesiredTargetState(Superstructure.TargetState.PASS_NEUTRAL_BOTTOM))
-        // );
-
-        // Split-state pattern example:
-        // superstructure.setDesiredSystemState(Superstructure.DesiredSystemState.TRACKING);
-        // superstructure.setDesiredIntakeState(Superstructure.DesiredIntakeState.INTAKING);
-
-        // xboxDriver.getAButton().onTrue(
-        //     new InstantCommand(() -> Intake.getInstance().setSetpoint(Intake.IntakeSetpoint.INTAKING))
-        // );
-        // xboxDriver.getBButton().onTrue(
-        //     new InstantCommand(() -> Intake.getInstance().setSetpoint(Intake.IntakeSetpoint.STOWED))
-        // );
-
-        // Test snap-to-angle bindings with split superstructure states:
-        // xboxDriver.getAButton().onTrue(new InstantCommand(() -> superstructure.setDesiredSystemState(Superstructure.DesiredSystemState.BUMP)));
-        // xboxDriver.getAButton().onFalse(new InstantCommand(() -> superstructure.setDesiredSystemState(Superstructure.DesiredSystemState.HOME)));
+        configureCompetitionBindings();
     }
 
-    public Command buildIntakeBumpCommand() {
+    private void configureCompetitionBindings() {
+        bindCompetitionDriveHelpers();
+    }
+
+    private void configureManualShooterTestBindings() {
+        shooter.setHoodAngleSupplier(() -> Rotation2d.fromDegrees(manualHoodDegrees.getAsDouble()));
+        shooter.setFlywheelRPSSupplier(() -> manualFlywheelRps.getAsDouble());
+
+        xboxDriver.getAButton().onTrue(buildApplyManualShooterTestCommand());
+        xboxDriver.getBButton().onTrue(new InstantCommand(() -> hopper.setSetpoint(HopperSetpoint.FEEDING)));
+        xboxDriver.getYButton().onTrue(new InstantCommand(() -> hopper.setSetpoint(HopperSetpoint.OFF)));
+        xboxDriver.getXButton().onTrue(buildStopManualShooterTestCommand());
+    }
+
+    private Command buildApplyManualShooterTestCommand() {
+        return Commands.sequence(
+            Commands.runOnce(() -> shooter.setHoodSetpoint(HoodSetpoint.DYNAMIC)),
+            Commands.runOnce(() -> shooter.setTurretAngle(Rotation2d.fromDegrees(manualTurretDegrees.getAsDouble()))),
+            Commands.runOnce(() -> shooter.setFlywheelSetpoint(FlywheelSetpoint.DYNAMIC))
+        );
+    }
+
+    private Command buildStopManualShooterTestCommand() {
+        return Commands.runOnce(this::stopManualShooterTest);
+    }
+
+    private void stopManualShooterTest() {
+        shooter.setFlywheelSetpoint(FlywheelSetpoint.OFF);
+        shooter.setHoodSetpoint(HoodSetpoint.HOME);
+        shooter.setTurretSetpoint(TurretSetpoint.HOME);
+    }
+
+    private Command buildIntakeBumpCommand() {
         return new SequentialCommandGroup(
             new InstantCommand(() -> superstructure.setDesiredIntakeState(Superstructure.DesiredIntakeState.INTAKING)),
             new ParallelDeadlineGroup(
-                new WaitUntilCommand(() -> intake.getPivotAngleRotations()/360 > 10),
+                new WaitUntilCommand(() -> intake.getPivotAngleRotations() / 360 > 10),
                 new InstantCommand(() -> superstructure.setDesiredIntakeState(Superstructure.DesiredIntakeState.STOWED))
             ),
             new InstantCommand(() -> superstructure.setDesiredIntakeState(Superstructure.DesiredIntakeState.INTAKING))
         );
     }
+
     private void bindCompetitionDriveHelpers() {
         Trigger leftBumperTrigger = xboxDriver.getLeftBumper();
         Trigger rightBumperTrigger = xboxDriver.getRightBumper();
@@ -291,8 +266,12 @@ public class RobotContainer {
     }
 
     public void teleopInit() {
-        // Ensure we're in teleop state
         swerveDrive.setDesiredSystemState(SwerveDrive.DesiredSystemState.TELOP_FIELD_RELATIVE);
+
+        if (isManualShooterTestConfig()) {
+            return;
+        }
+
         superstructure.setDesiredSystemState(Superstructure.DesiredSystemState.HOME);
         superstructure.setDesiredIntakeState(Superstructure.DesiredIntakeState.DEPLOYED);
         superstructure.setDesiredHopperState(Superstructure.DesiredHopperState.DEFAULT);
@@ -300,7 +279,13 @@ public class RobotContainer {
     }
 
     public void autonomousInit() {
-        // Set up for autonomous
+        if (isManualShooterTestConfig()) {
+            stopManualShooterTest();
+            hopper.setSetpoint(HopperSetpoint.OFF);
+            swerveDrive.setDesiredSystemState(SwerveDrive.DesiredSystemState.IDLE);
+            return;
+        }
+
         superstructure.setDesiredSystemState(Superstructure.DesiredSystemState.HOME);
         superstructure.setDesiredClimbState(Superstructure.DesiredClimbState.RETRACTED);
         superstructure.setDesiredHopperState(Superstructure.DesiredHopperState.DEFAULT);
@@ -308,6 +293,13 @@ public class RobotContainer {
     }
 
     public void disabledInit() {
+        if (isManualShooterTestConfig()) {
+            stopManualShooterTest();
+            hopper.setSetpoint(HopperSetpoint.OFF);
+            swerveDrive.setDesiredSystemState(SwerveDrive.DesiredSystemState.DISABLED);
+            return;
+        }
+
         superstructure.setDesiredSystemState(Superstructure.DesiredSystemState.DISABLED);
         superstructure.setDesiredClimbState(Superstructure.DesiredClimbState.DISABLED);
         superstructure.setDesiredHopperState(Superstructure.DesiredHopperState.DEFAULT);
@@ -317,6 +309,5 @@ public class RobotContainer {
     public Command getAutonomousCommand() {
         Command selectedAuto = autoChooser.getSelected();
         return selectedAuto != null ? selectedAuto : Commands.none();
-        // return Autos.followPath("bottom_sweep_long", true, true);
     }
 }
