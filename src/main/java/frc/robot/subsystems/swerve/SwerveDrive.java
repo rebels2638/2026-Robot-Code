@@ -2044,6 +2044,20 @@ public class SwerveDrive extends SubsystemBase {
         return gyroInputs.gyroOrientation.toRotation2d();
     }
 
+    public SwerveModulePosition[] getSwerveModulePositions() {
+        return modulePositions;
+    }
+
+    public SwerveModuleState[] getSwerveModuleStates() {
+        return moduleStates;
+    }
+
+    public void setWheelCoast(boolean isCoast) {
+        for (ModuleIO module : modules) {
+            module.setWheelCoast(isCoast);
+        }
+    }
+
     public void enableFrontLeftDriveEStop() {
         modules[FRONT_LEFT_INDEX].enableDriveEStop();
     }

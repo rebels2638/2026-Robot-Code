@@ -155,6 +155,13 @@ public class Robot extends LoggedRobot {
         // block in order for anything in the Command-based framework to work.
         CommandScheduler.getInstance().run();
         Logger.recordOutput("shot/shotDistanceMeters", RobotState.getInstance().getEstimatedPose().getTranslation().getDistance(FieldConstants.Hub.hubCenter.toTranslation2d()));
+        LoopCycleProfiler.endSection("Robot/SuperstructureShotDistanceLog", shotDistanceLogStartNanos);
+
+        LoopCycleProfiler.finishCycle(SLOW_LOOP_WARNING_THRESHOLD_MS);
+
+        // Dashboard updates
+        Dashboard.updateData();
+        ManualOverride.update();
     }
 
     /** This function is called once each time the robot enters Disabled mode. */
