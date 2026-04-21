@@ -226,6 +226,13 @@ public class RobotContainer {
             new InstantCommand(this::runHubTrackingHelper)
         );
 
+        xboxDriver.getAButton().whileTrue(
+            Commands.startEnd(
+                () -> robotState.setZeroGyroButtonHeld(true),
+                () -> robotState.setZeroGyroButtonHeld(false)
+            ).ignoringDisable(true)
+        );
+
         xboxDriver.getYButton().onTrue(
             new InstantCommand(() -> superstructure.setDesiredIntakeState(Superstructure.DesiredIntakeState.REVERSING))
         ).onFalse(

@@ -247,6 +247,10 @@ public class RobotState {
         resetPose(new Pose2d(getEstimatedPose().getTranslation(), new Rotation2d()));
     }
 
+    public void setZeroGyroButtonHeld(boolean isHeld) {
+        zeroGyroButtonHeld.set(isHeld);
+    }
+
     static boolean shouldAllowVisionGyroReset(boolean isDisabled, boolean zeroGyroButtonHeld) {
         return isDisabled || zeroGyroButtonHeld;
     }

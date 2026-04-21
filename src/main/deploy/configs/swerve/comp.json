@@ -28,7 +28,7 @@
     "followPathTranslationKP": 3.5,
     "followPathTranslationKI": 0.0,
     "followPathTranslationKD": 0.0,
-    "followPathRotationKP": 3.0,
+    "followPathRotationKP": 3.4,
     "followPathRotationKI": 0.0,
     "followPathRotationKD": 0.0,
     "followPathCrossTrackKP": 1.0,

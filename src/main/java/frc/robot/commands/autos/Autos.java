@@ -17,6 +17,7 @@ import frc.robot.constants.ClimbingConstants.AutoClimbTarget;
 import frc.robot.constants.Constants;
 import frc.robot.lib.BLine.FlippingUtil;
 import frc.robot.lib.BLine.Path;
+import frc.robot.lib.BLine.Path.PathConstraints;
 import frc.robot.subsystems.Superstructure;
 import frc.robot.subsystems.Superstructure.DesiredClimbState;
 import frc.robot.subsystems.Superstructure.DesiredIntakeState;
@@ -143,9 +144,23 @@ public final class Autos {
             setSystem(DesiredSystemState.HOME),
             firstFollowPath("top_sweep_short_first", false, false),
             setIntake(DesiredIntakeState.ALTERNATING),
-            waitSeconds(5),
+            waitSeconds(3.8),
             followPath("top_sweep_short_first", false, false),
             setIntake(DesiredIntakeState.ALTERNATING)
+        ),
+        auto(
+            "double_swipe_top_depo",
+            new Pose2d(
+                new Translation2d(3.569, 5.68),
+                Rotation2d.fromDegrees(147)
+            ),
+            setTarget(TargetState.HUB),
+            setSystem(DesiredSystemState.HOME),
+            firstFollowPath("top_sweep_short_first", false, false),
+            setIntake(DesiredIntakeState.ALTERNATING),
+            waitSeconds(3),
+            followPath(pathWithEndTolerances("top_sweep_short_first", 0.5, 70.0), false, false),
+            followPath("double_swipe_top_depo", false, false)
         )
 
     );
@@ -205,6 +220,10 @@ public final class Autos {
         return SwerveDrive.getInstance().followPathCommand(new Path(pathName), shouldResetPose, shouldMirrorPath);
     }
 
+    private static Command followPath(Path path, boolean shouldResetPose, boolean shouldMirrorPath) {
+        return SwerveDrive.getInstance().followPathCommand(path, shouldResetPose, shouldMirrorPath);
+    }
+
     public static Command firstFollowPath(String pathName, boolean shouldResetPose, boolean shouldMirrorPath) {
         Path path = new Path(pathName);
         SwerveDrive swerveDrive = SwerveDrive.getInstance();
@@ -260,6 +279,20 @@ public final class Autos {
         return new InstantCommand(() ->
             RobotState.getInstance().resetPose(resolveSimResetPose(simResetPose, Constants.shouldFlipPath()))
         );
+    }
+
+    private static Path pathWithEndTolerances(
+        String pathName,
+        double endTranslationToleranceMeters,
+        double endRotationToleranceDeg
+    ) {
+        Path path = new Path(pathName);
+        path.setPathConstraints(
+            path.getPathConstraints()
+                .setEndTranslationToleranceMeters(endTranslationToleranceMeters)
+                .setEndRotationToleranceDeg(endRotationToleranceDeg)
+        );
+        return path;
     }
 
     public static Command waitSeconds(double seconds) {
