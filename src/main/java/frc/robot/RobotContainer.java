@@ -3,6 +3,7 @@ package frc.robot;
 import org.littletonrobotics.junction.networktables.LoggedNetworkNumber;
 
 import edu.wpi.first.math.MathUtil;
+import edu.wpi.first.math.geometry.Pose2d;
 import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.wpilibj.smartdashboard.SendableChooser;
 import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
@@ -232,12 +233,14 @@ public class RobotContainer {
             new InstantCommand(this::runHubTrackingHelper)
         );
 
-        xboxDriver.getAButton().whileTrue(
-            Commands.startEnd(
-                () -> robotState.setZeroGyroButtonHeld(true),
-                () -> robotState.setZeroGyroButtonHeld(false)
-            ).ignoringDisable(true)
-        );
+        // xboxDriver.getAButton().whileTrue(
+        //     Commands.startEnd(
+        //         () -> robotState.setZeroGyroButtonHeld(true),
+        //         () -> robotState.setZeroGyroButtonHeld(false)
+        //     ).ignoringDisable(true)
+        // );
+
+        xboxDriver.getAButton().onTrue(new InstantCommand(() -> robotState.resetPose(new Pose2d(16.081, 6.992, new Rotation2d()))));
 
         xboxDriver.getYButton().onTrue(
             new InstantCommand(() -> superstructure.setDesiredIntakeState(Superstructure.DesiredIntakeState.REVERSING))
