@@ -158,9 +158,10 @@ public final class Autos {
             setSystem(DesiredSystemState.HOME),
             firstFollowPath("top_sweep_short_first", false, false),
             setIntake(DesiredIntakeState.ALTERNATING),
-            waitSeconds(3),
-            followPath(pathWithEndTolerances("top_sweep_short_first", 0.5, 70.0), false, false),
-            followPath("double_swipe_top_depo", false, false)
+            waitSeconds(2.5),
+            followPath(pathWithEndTolerances("top_sweep_hub", 0.5, 70.0), false, false),
+            followPath("double_swipe_top_depo", false, false),
+            setIntake(DesiredIntakeState.ALTERNATING)
         ),
         auto(
             "top_lob",
