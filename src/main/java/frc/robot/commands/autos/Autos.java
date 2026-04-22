@@ -161,6 +161,18 @@ public final class Autos {
             waitSeconds(3),
             followPath(pathWithEndTolerances("top_sweep_short_first", 0.5, 70.0), false, false),
             followPath("double_swipe_top_depo", false, false)
+        ),
+        auto(
+            "top_lob",
+            new Pose2d(
+                new Translation2d(3.569, 5.68),
+                Rotation2d.fromDegrees(147)
+            ),
+            setTarget(TargetState.HUB),
+            setSystem(DesiredSystemState.HOME),
+            firstFollowPath("top_sweep_lob_first", false, false),
+            waitSeconds(1.5),
+            followPath("top_sweep_lob_depo", false, false)
         )
 
     );
