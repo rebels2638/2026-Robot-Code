@@ -144,6 +144,12 @@ public class RobotContainer {
             () -> superstructure.setDesiredIntakeState(Superstructure.DesiredIntakeState.ALTERNATING)
         );
         FollowPath.registerEventTrigger("lob", this::runAlliancePassHelper);
+        FollowPath.registerEventTrigger("lob_top_corner", this::runAllianceTopCornerPassHelper);
+        FollowPath.registerEventTrigger("lob_bottom_corner", this::runAllianceBottomCornerPassHelper);
+        FollowPath.registerEventTrigger(
+            "reverse",
+            () -> superstructure.setDesiredIntakeState(Superstructure.DesiredIntakeState.REVERSING)
+        );
     }
 
     private void configureBindings() {
@@ -270,6 +276,19 @@ public class RobotContainer {
             },
             () -> superstructure.setDesiredSystemState(Superstructure.DesiredSystemState.HOME)
         );
+    }
+
+    private void runAllianceTopCornerPassHelper() {
+        runExplicitAlliancePassHelper(TargetState.PASS_ALLIANCE_TOP_CORNER);
+    }
+
+    private void runAllianceBottomCornerPassHelper() {
+        runExplicitAlliancePassHelper(TargetState.PASS_ALLIANCE_BOTTOM_CORNER);
+    }
+
+    private void runExplicitAlliancePassHelper(TargetState targetState) {
+        superstructure.setDesiredTargetState(targetState);
+        superstructure.setDesiredSystemState(Superstructure.DesiredSystemState.SHOOTING);
     }
 
     public void teleopInit() {
