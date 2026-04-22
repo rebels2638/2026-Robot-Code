@@ -117,6 +117,8 @@ public class Superstructure extends SubsystemBase {
         HUB,
         PASS_ALLIANCE_TOP,
         PASS_ALLIANCE_BOTTOM,
+        PASS_ALLIANCE_TOP_CORNER,
+        PASS_ALLIANCE_BOTTOM_CORNER,
         PASS_NEUTRAL_TOP,
         PASS_NEUTRAL_BOTTOM;
 
@@ -126,7 +128,10 @@ public class Superstructure extends SubsystemBase {
 
         public boolean isAlliancePassTarget() {
             return switch (this) {
-                case PASS_ALLIANCE_TOP, PASS_ALLIANCE_BOTTOM -> true;
+                case PASS_ALLIANCE_TOP,
+                    PASS_ALLIANCE_BOTTOM,
+                    PASS_ALLIANCE_TOP_CORNER,
+                    PASS_ALLIANCE_BOTTOM_CORNER -> true;
                 default -> false;
             };
         }
@@ -1100,6 +1105,8 @@ public class Superstructure extends SubsystemBase {
             case HUB -> FieldConstants.Hub.hubCenter;
             case PASS_ALLIANCE_TOP -> FieldConstants.Passing.allianceTop;
             case PASS_ALLIANCE_BOTTOM -> FieldConstants.Passing.allianceBottom;
+            case PASS_ALLIANCE_TOP_CORNER -> FieldConstants.Passing.allianceTopCorner;
+            case PASS_ALLIANCE_BOTTOM_CORNER -> FieldConstants.Passing.allianceBottomCorner;
             case PASS_NEUTRAL_TOP -> FieldConstants.Passing.neutralTop;
             case PASS_NEUTRAL_BOTTOM -> FieldConstants.Passing.neutralBottom;
         };
@@ -1123,10 +1130,11 @@ public class Superstructure extends SubsystemBase {
         );
 
         ArrayList<TargetCandidate> candidates = new ArrayList<>();
-        for (TargetState targetState : TargetState.values()) {
-            if (!targetState.isAlliancePassTarget()) {
-                continue;
-            }
+        TargetState[] autoSelectableAlliancePassTargets = {
+            TargetState.PASS_ALLIANCE_TOP,
+            TargetState.PASS_ALLIANCE_BOTTOM
+        };
+        for (TargetState targetState : autoSelectableAlliancePassTargets) {
             Translation2d targetPosition = getFieldTargetLocation(targetState).toTranslation2d();
             boolean lineOfSightClear = hasClearLineOfSightWithRectangularBlockers(
                 shooterPosition,

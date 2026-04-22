@@ -394,6 +394,8 @@ class SuperstructureShotReadinessTest {
         Superstructure.TargetState[] passTargets = {
             Superstructure.TargetState.PASS_ALLIANCE_TOP,
             Superstructure.TargetState.PASS_ALLIANCE_BOTTOM,
+            Superstructure.TargetState.PASS_ALLIANCE_TOP_CORNER,
+            Superstructure.TargetState.PASS_ALLIANCE_BOTTOM_CORNER,
             Superstructure.TargetState.PASS_NEUTRAL_TOP,
             Superstructure.TargetState.PASS_NEUTRAL_BOTTOM
         };
@@ -412,6 +414,14 @@ class SuperstructureShotReadinessTest {
                 );
             }
         }
+    }
+
+    @Test
+    void cornerAlliancePassTargets_areAlliancePassTargets() {
+        assertTrue(Superstructure.TargetState.PASS_ALLIANCE_TOP_CORNER.isPassTarget());
+        assertTrue(Superstructure.TargetState.PASS_ALLIANCE_BOTTOM_CORNER.isPassTarget());
+        assertTrue(Superstructure.TargetState.PASS_ALLIANCE_TOP_CORNER.isAlliancePassTarget());
+        assertTrue(Superstructure.TargetState.PASS_ALLIANCE_BOTTOM_CORNER.isAlliancePassTarget());
     }
 
     @Test
