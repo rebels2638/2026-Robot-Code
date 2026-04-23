@@ -2,6 +2,7 @@ package frc.robot.commands.autos;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -9,6 +10,7 @@ import edu.wpi.first.math.geometry.Pose2d;
 import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.math.geometry.Translation2d;
 import frc.robot.constants.Constants;
+import frc.robot.lib.BLine.Path;
 import org.junit.jupiter.api.Test;
 
 class AutosTest {
@@ -41,5 +43,33 @@ class AutosTest {
     @Test
     void resolveSimResetPose_rejectsNullPose() {
         assertThrows(IllegalArgumentException.class, () -> Autos.resolveSimResetPose(null, false));
+    }
+
+    @Test
+    void loadPreloadedPath_returnsIndependentCopies() {
+        Path firstPath = Autos.loadPreloadedPath("straight");
+        Path secondPath = Autos.loadPreloadedPath("straight");
+
+        double originalEndTranslationToleranceMeters = secondPath.getEndTranslationToleranceMeters();
+        double originalEndRotationToleranceDeg = secondPath.getEndRotationToleranceDeg();
+
+        firstPath.setPathConstraints(
+            firstPath.getPathConstraints()
+                .setEndTranslationToleranceMeters(0.5)
+                .setEndRotationToleranceDeg(70.0)
+        );
+
+        assertTrue(firstPath.isValid());
+        assertTrue(secondPath.isValid());
+        assertNotSame(firstPath, secondPath);
+        assertEquals(0.5, firstPath.getEndTranslationToleranceMeters(), 1e-9);
+        assertEquals(70.0, firstPath.getEndRotationToleranceDeg(), 1e-9);
+        assertEquals(originalEndTranslationToleranceMeters, secondPath.getEndTranslationToleranceMeters(), 1e-9);
+        assertEquals(originalEndRotationToleranceDeg, secondPath.getEndRotationToleranceDeg(), 1e-9);
+    }
+
+    @Test
+    void loadPreloadedPath_rejectsUnknownPathName() {
+        assertThrows(IllegalArgumentException.class, () -> Autos.loadPreloadedPath("not_a_real_auto_path"));
     }
 }
