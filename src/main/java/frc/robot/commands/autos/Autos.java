@@ -235,8 +235,7 @@ public final class Autos {
                 firstFollowPath("top_sweep_short_first", false, false),
                 setIntake(DesiredIntakeState.ALTERNATING),
                 waitSeconds(2.5),
-                followPath(pathWithEndTolerances("top_sweep_hub", 0.5, 70.0), false, false),
-                followPath("double_swipe_top_depo", false, false),
+                followPath("top_sweep_hub", false, false),
                 setIntake(DesiredIntakeState.ALTERNATING)
             ),
             auto(
