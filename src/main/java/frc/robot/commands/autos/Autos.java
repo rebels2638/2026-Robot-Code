@@ -234,7 +234,7 @@ public final class Autos {
                 setSystem(DesiredSystemState.HOME),
                 firstFollowPath("top_sweep_short_first", false, false),
                 setIntake(DesiredIntakeState.ALTERNATING),
-                waitSeconds(2.5),
+                waitSeconds(2.3),
                 followPath("top_sweep_hub", false, false),
                 setIntake(DesiredIntakeState.ALTERNATING)
             ),
