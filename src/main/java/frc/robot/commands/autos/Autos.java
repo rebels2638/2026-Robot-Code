@@ -238,6 +238,18 @@ public final class Autos {
                 followPath("top_sweep_hub", false, false),
                 setIntake(DesiredIntakeState.ALTERNATING)
             ),
+
+            auto(
+                "mid_depo",
+                new Pose2d(
+                    new Translation2d(3.569, 4.01),
+                    Rotation2d.fromDegrees(0)
+                ),
+                setTarget(TargetState.HUB),
+                setSystem(DesiredSystemState.HOME),
+                firstFollowPath("mid_depo", false, false),
+                setIntake(DesiredIntakeState.ALTERNATING)
+            ),
             auto(
                 "top_lob",
                 new Pose2d(
