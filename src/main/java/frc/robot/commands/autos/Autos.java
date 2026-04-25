@@ -240,15 +240,20 @@ public final class Autos {
             ),
 
             auto(
-                "mid_depo",
+                "middle_depo",
                 new Pose2d(
                     new Translation2d(3.569, 4.01),
                     Rotation2d.fromDegrees(0)
                 ),
                 setTarget(TargetState.HUB),
                 setSystem(DesiredSystemState.HOME),
-                firstFollowPath("mid_depo", false, false),
-                setIntake(DesiredIntakeState.ALTERNATING)
+                new ParallelCommandGroup(
+                    firstFollowPath("middle_depo", false, false),
+                    new SequentialCommandGroup(
+                        new WaitCommand(12),
+                        setIntake(DesiredIntakeState.ALTERNATING)
+                    )
+                )
             ),
             auto(
                 "top_lob",

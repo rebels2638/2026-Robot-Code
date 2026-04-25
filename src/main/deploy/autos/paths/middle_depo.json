@@ -8,19 +8,19 @@
         "intermediate_handoff_radius_meters": 0.25
       },
       "rotation_target": {
-        "rotation_radians": 0.0,
+        "rotation_radians": 3.141592653589793,
         "profiled_rotation": true
       }
     },
     {
       "type": "event_trigger",
-      "t_ratio": 0.18028380888888274,
-      "lib_key": "shoot"
+      "t_ratio": 0.0,
+      "lib_key": "intake"
     },
     {
       "type": "event_trigger",
-      "t_ratio": 0.42706109869285397,
-      "lib_key": "intake"
+      "t_ratio": 0.0,
+      "lib_key": "shoot"
     },
     {
       "type": "translation",
@@ -54,7 +54,7 @@
     },
     {
       "type": "event_trigger",
-      "t_ratio": 0.8910516957335245,
+      "t_ratio": 0.9285996685645209,
       "lib_key": "alt"
     },
     {
