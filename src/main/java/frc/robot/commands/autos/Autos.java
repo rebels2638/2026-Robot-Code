@@ -206,8 +206,8 @@ public final class Autos {
                 setSystem(DesiredSystemState.HOME),
                 firstFollowPath("top_sweep_short_first", false, true),
                 setIntake(DesiredIntakeState.ALTERNATING),
-                waitSeconds(7),
-                followPath("top_sweep_short_second", false, true),
+                waitSeconds(3.8),
+                followPath("top_sweep_short_first", false, true),
                 setIntake(DesiredIntakeState.ALTERNATING)
             ),
             auto(
@@ -243,7 +243,7 @@ public final class Autos {
                 "middle_depo",
                 new Pose2d(
                     new Translation2d(3.569, 4.01),
-                    Rotation2d.fromDegrees(0)
+                    Rotation2d.fromDegrees(180)
                 ),
                 setTarget(TargetState.HUB),
                 setSystem(DesiredSystemState.HOME),
