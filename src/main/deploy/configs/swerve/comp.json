@@ -41,7 +41,7 @@
     "mountPoseYaw": -90.314,
     "mountPosePitch": 1.517,
     "mountPoseRoll": 179.986,
-    "gyroScalarZ": 0.0
+    "gyroScalarZ": -4.0
   },
   "moduleGeneral": {
     "canBusName": "drivetrain",
