@@ -238,7 +238,22 @@ public final class Autos {
                 followPath("top_sweep_hub", false, false),
                 setIntake(DesiredIntakeState.ALTERNATING)
             ),
-
+            auto(
+                "single_swipe_top_depo",
+                new Pose2d(
+                    new Translation2d(3.569, 5.68),
+                    Rotation2d.fromDegrees(0)
+                ),
+                setTarget(TargetState.HUB),
+                setSystem(DesiredSystemState.HOME),
+                setIntake(DesiredIntakeState.DEPLOYED),
+                new WaitCommand(3),
+                firstFollowPath("top_sweep_short_first", false, false),
+                setIntake(DesiredIntakeState.ALTERNATING),
+                waitSeconds(2.3),
+                followPath("fast_depo", false, false),
+                setIntake(DesiredIntakeState.ALTERNATING)
+            ),
             auto(
                 "middle_depo",
                 new Pose2d(
