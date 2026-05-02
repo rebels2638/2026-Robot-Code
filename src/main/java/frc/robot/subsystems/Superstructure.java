@@ -5,6 +5,7 @@ import java.util.Optional;
 
 import org.littletonrobotics.junction.AutoLogOutput;
 import org.littletonrobotics.junction.Logger;
+import org.littletonrobotics.junction.networktables.LoggedNetworkBoolean;
 import org.littletonrobotics.junction.networktables.LoggedNetworkNumber;
 
 import edu.wpi.first.math.InterpolatingMatrixTreeMap;
@@ -165,6 +166,8 @@ public class Superstructure extends SubsystemBase {
     private final Rotation2d bumpSnapAngle;
 
     private final LoggedNetworkNumber latencyCompensationSeconds = new LoggedNetworkNumber("Shooter/latencyCompSec");
+    private final LoggedNetworkBoolean forceTurretAtSetpoint =
+        new LoggedNetworkBoolean("Superstructure/forceTurretAtSetpoint", false);
     private double shotStartTime = 0;
     private double lastBallVisualizedTime = 0;
     private boolean hasStartedShooting = false;
@@ -688,9 +691,10 @@ public class Superstructure extends SubsystemBase {
         );
         double flywheelErrorRps = Math.abs(actualFlywheel - setpointFlywheel);
         boolean hoodAtSetpoint = shooter.isHoodAtSetpoint();
-        boolean turretAtSetpoint = shooter.isTurretAtSetpoint();
-        boolean turretFieldRelativeAtSetpoint =
-            turretFieldRelativeErrorDegrees <= shooter.getTurretAngleToleranceDegrees();
+        boolean forceTurretReady = forceTurretAtSetpoint.get();
+        boolean turretAtSetpoint = forceTurretReady || shooter.isTurretAtSetpoint();
+        boolean turretFieldRelativeAtSetpoint = forceTurretReady
+            || turretFieldRelativeErrorDegrees <= shooter.getTurretAngleToleranceDegrees();
         boolean flywheelAtSetpoint = shooter.isFlywheelAtSetpoint();
         boolean swerveOmegaCapped = isSwerveOmegaCappedForShot();
 
@@ -737,6 +741,7 @@ public class Superstructure extends SubsystemBase {
         Logger.recordOutput("Superstructure/hoodAtSetpoint", data.hoodAtSetpoint());
         Logger.recordOutput("Superstructure/turretAtSetpoint", data.turretAtSetpoint());
         Logger.recordOutput("Superstructure/turretFieldRelativeAtSetpoint", data.turretFieldRelativeAtSetpoint());
+        Logger.recordOutput("Superstructure/forceTurretAtSetpoint", forceTurretAtSetpoint.get());
         Logger.recordOutput("Superstructure/flywheelAtSetpoint", data.flywheelAtSetpoint());
         Logger.recordOutput("Superstructure/swerveOmegaCapped", data.swerveOmegaCapped());
         Logger.recordOutput("Superstructure/hoodErrorDegrees", data.hoodErrorDegrees());
