@@ -3,12 +3,12 @@
     {
       "type": "waypoint",
       "translation_target": {
-        "x_meters": 1.0045748418833447,
-        "y_meters": 2.3409592410400553,
+        "x_meters": 1.00457,
+        "y_meters": 2.34096,
         "intermediate_handoff_radius_meters": 0.25
       },
       "rotation_target": {
-        "rotation_radians": 3.1415926535897913,
+        "rotation_radians": 3.14159,
         "profiled_rotation": true
       }
     }
