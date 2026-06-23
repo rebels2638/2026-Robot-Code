@@ -95,6 +95,19 @@ public class FieldConstants {
         public static final Translation3d neutralBottom = new Translation3d(6.028, 0.688, passTargetHeightMeters);
     }
 
+    public static class Demo {
+        private Demo() {}
+
+        public static final Pose2d hubResetPose =
+            new Pose2d(Hub.hubCenter.toTranslation2d(), Rotation2d.fromDegrees(0.0));
+
+        public static final Translation3d hubPassTarget = new Translation3d(
+            Hub.hubCenter.getX(),
+            Hub.hubCenter.getY(),
+            Passing.passTargetHeightMeters
+        );
+    }
+
     public static class AllianceBounds {
         public static final double blueZoneLineX = Units.inchesToMeters(182.11);
         public static final double redZoneLineX = FieldConstants.fieldLength - blueZoneLineX;

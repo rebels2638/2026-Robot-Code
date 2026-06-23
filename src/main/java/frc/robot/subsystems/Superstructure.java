@@ -963,7 +963,7 @@ public class Superstructure extends SubsystemBase {
         );
         RobotFieldZone robotFieldZone = getRobotFieldZone();
         TargetState zoneResolvedTarget = resolveTargetForZoneConstraints(desiredTargetState, robotFieldZone);
-        boolean zoneAllowsTarget = isTargetAllowedInZone(zoneResolvedTarget, robotFieldZone);
+        boolean zoneAllowsTarget = isTargetAllowedInZone(zoneResolvedTarget, robotFieldZone, Constants.DEMO_MODE);
         Translation3d targetLocation = getFieldTargetLocation(zoneResolvedTarget);
         boolean passingTarget = zoneResolvedTarget.isPassTarget();
         Translation2d shooterPosition = shooterKinematics.shooterPosition().toTranslation2d();
@@ -973,18 +973,21 @@ public class Superstructure extends SubsystemBase {
             ZoneConstants.Hub.EXCLUSION,
             ZoneConstants.Tower.EXCLUSION
         );
-        boolean lineOfSightClear = passingTarget
-            ? hasClearLineOfSightWithRectangularBlockers(
-                shooterPosition,
-                targetPosition,
-                config.passHubBlockerRadiusMeters,
-                passLineOfSightBlockers
-            )
-            : hasClearLineOfSightWithRectangularBlockers(
-                shooterPosition,
-                targetPosition,
-                config.passHubBlockerRadiusMeters,
-                hubLineOfSightBlockers
+        boolean lineOfSightClear = Constants.DEMO_MODE
+            || (
+                passingTarget
+                    ? hasClearLineOfSightWithRectangularBlockers(
+                        shooterPosition,
+                        targetPosition,
+                        config.passHubBlockerRadiusMeters,
+                        passLineOfSightBlockers
+                    )
+                    : hasClearLineOfSightWithRectangularBlockers(
+                        shooterPosition,
+                        targetPosition,
+                        config.passHubBlockerRadiusMeters,
+                        hubLineOfSightBlockers
+                    )
             );
 
         currentTargetState = zoneResolvedTarget;
@@ -1004,6 +1007,7 @@ public class Superstructure extends SubsystemBase {
         Logger.recordOutput("Superstructure/robotFieldZone", robotFieldZone.toString());
         Logger.recordOutput("Superstructure/targetLocation", targetLocation);
         Logger.recordOutput("Superstructure/passingTarget", passingTarget);
+        Logger.recordOutput("Superstructure/demoMode", Constants.DEMO_MODE);
 
         return new ShotComputationContext(
             currentTargetState,
@@ -1037,6 +1041,17 @@ public class Superstructure extends SubsystemBase {
     }
 
     static boolean isTargetAllowedInZone(TargetState targetState, RobotFieldZone robotFieldZone) {
+        return isTargetAllowedInZone(targetState, robotFieldZone, false);
+    }
+
+    static boolean isTargetAllowedInZone(
+        TargetState targetState,
+        RobotFieldZone robotFieldZone,
+        boolean demoMode
+    ) {
+        if (demoMode) {
+            return true;
+        }
         if (targetState == TargetState.HUB) {
             return robotFieldZone == RobotFieldZone.CURRENT_ALLIANCE;
         }
@@ -1069,11 +1084,19 @@ public class Superstructure extends SubsystemBase {
         Translation2d shooterPosition,
         TargetCandidate... candidates
     ) {
+        return selectClosestLineOfSightTarget(shooterPosition, false, candidates);
+    }
+
+    static Optional<TargetState> selectClosestLineOfSightTarget(
+        Translation2d shooterPosition,
+        boolean ignoreLineOfSight,
+        TargetCandidate... candidates
+    ) {
         TargetState closestLineOfSightTarget = null;
         double closestDistanceMeters = Double.POSITIVE_INFINITY;
 
         for (TargetCandidate candidate : candidates) {
-            if (!candidate.lineOfSightClear()) {
+            if (!ignoreLineOfSight && !candidate.lineOfSightClear()) {
                 continue;
             }
 
@@ -1106,6 +1129,27 @@ public class Superstructure extends SubsystemBase {
     }
 
     private Translation3d getFieldTargetLocation(TargetState targetState) {
+        return resolveFieldTargetLocation(targetState, Constants.shouldFlipPath(), Constants.DEMO_MODE);
+    }
+
+    static Translation3d resolveFieldTargetLocation(
+        TargetState targetState,
+        boolean shouldFlipPath,
+        boolean demoMode
+    ) {
+        Translation3d targetLocation = getBaseFieldTargetLocation(targetState, demoMode);
+        if (shouldFlipPath) {
+            Translation2d fieldPosition = FlippingUtil.flipFieldPosition(targetLocation.toTranslation2d());
+            targetLocation = new Translation3d(fieldPosition.getX(), fieldPosition.getY(), targetLocation.getZ());
+        }
+        return targetLocation;
+    }
+
+    private static Translation3d getBaseFieldTargetLocation(TargetState targetState, boolean demoMode) {
+        if (demoMode && targetState.isPassTarget()) {
+            return FieldConstants.Demo.hubPassTarget;
+        }
+
         Translation3d targetLocation = switch (targetState) {
             case HUB -> FieldConstants.Hub.hubCenter;
             case PASS_ALLIANCE_TOP -> FieldConstants.Passing.allianceTop;
@@ -1115,10 +1159,6 @@ public class Superstructure extends SubsystemBase {
             case PASS_NEUTRAL_TOP -> FieldConstants.Passing.neutralTop;
             case PASS_NEUTRAL_BOTTOM -> FieldConstants.Passing.neutralBottom;
         };
-        if (Constants.shouldFlipPath()) {
-            Translation2d fieldPosition = FlippingUtil.flipFieldPosition(targetLocation.toTranslation2d());
-            targetLocation = new Translation3d(fieldPosition.getX(), fieldPosition.getY(), targetLocation.getZ());
-        }
         return targetLocation;
     }
 
@@ -1152,6 +1192,7 @@ public class Superstructure extends SubsystemBase {
 
         Optional<TargetState> selectedTarget = selectClosestLineOfSightTarget(
             shooterPosition,
+            Constants.DEMO_MODE,
             candidates.toArray(TargetCandidate[]::new)
         );
         Logger.recordOutput("Superstructure/closestAlliancePassTargetFound", selectedTarget.isPresent());
@@ -1159,6 +1200,7 @@ public class Superstructure extends SubsystemBase {
             "Superstructure/closestAlliancePassTarget",
             selectedTarget.map(Enum::name).orElse("NONE")
         );
+        Logger.recordOutput("Superstructure/closestAlliancePassTargetLineOfSightBypassed", Constants.DEMO_MODE);
         return selectedTarget;
     }
 

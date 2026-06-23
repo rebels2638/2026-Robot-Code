@@ -51,6 +51,12 @@ class VisionUtilTest {
     }
 
     @Test
+    void shouldSuppressVisionMeasurements_matchesDemoMode() {
+        assertFalse(Vision.shouldSuppressVisionMeasurements(false));
+        assertTrue(Vision.shouldSuppressVisionMeasurements(true));
+    }
+
+    @Test
     void observationModeBothAllowsAllVisionTypes() {
         assertTrue(
             VisionUtil.isObservationTypeAllowed(

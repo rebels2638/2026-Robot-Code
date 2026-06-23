@@ -16,6 +16,7 @@ import edu.wpi.first.wpilibj2.command.WaitUntilCommand;
 import edu.wpi.first.wpilibj2.command.button.Trigger;
 import frc.robot.commands.autos.Autos;
 import frc.robot.constants.Constants;
+import frc.robot.constants.FieldConstants;
 import frc.robot.lib.BLine.FollowPath;
 import frc.robot.lib.input.XboxController;
 import frc.robot.lib.util.ballistics.ProjectileVisualizer;
@@ -187,6 +188,11 @@ public class RobotContainer {
         return Commands.runOnce(this::stopManualShooterTest);
     }
 
+    private Command buildDemoHubPoseResetCommand() {
+        return Commands.runOnce(() -> robotState.resetPose(FieldConstants.Demo.hubResetPose))
+            .ignoringDisable(true);
+    }
+
     private void stopManualShooterTest() {
         shooter.setFlywheelSetpoint(FlywheelSetpoint.OFF);
         shooter.setHoodSetpoint(HoodSetpoint.HOME);
@@ -232,12 +238,16 @@ public class RobotContainer {
             new InstantCommand(this::runHubTrackingHelper)
         );
 
-        xboxDriver.getAButton().whileTrue(
-            Commands.startEnd(
-                () -> robotState.setZeroGyroButtonHeld(true),
-                () -> robotState.setZeroGyroButtonHeld(false)
-            ).ignoringDisable(true)
-        );
+        if (Constants.DEMO_MODE) {
+            xboxDriver.getAButton().onTrue(buildDemoHubPoseResetCommand());
+        } else {
+            xboxDriver.getAButton().whileTrue(
+                Commands.startEnd(
+                    () -> robotState.setZeroGyroButtonHeld(true),
+                    () -> robotState.setZeroGyroButtonHeld(false)
+                ).ignoringDisable(true)
+            );
+        }
 
         xboxDriver.getYButton().onTrue(
             new InstantCommand(() -> superstructure.setDesiredIntakeState(Superstructure.DesiredIntakeState.REVERSING))

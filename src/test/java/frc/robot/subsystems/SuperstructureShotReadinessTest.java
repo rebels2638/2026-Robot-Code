@@ -8,6 +8,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.math.geometry.Translation2d;
 import edu.wpi.first.math.geometry.Translation3d;
+import frc.robot.constants.FieldConstants;
 import frc.robot.constants.ZoneConstants.RectangleZone;
 import frc.robot.lib.util.ShotCalculator.ShotData;
 import frc.robot.subsystems.hopper.Hopper.HopperSetpoint;
@@ -390,6 +391,15 @@ class SuperstructureShotReadinessTest {
     }
 
     @Test
+    void isTargetAllowedInZone_demoModeAllowsEveryTargetFromEveryZone() {
+        for (Superstructure.TargetState targetState : Superstructure.TargetState.values()) {
+            for (Superstructure.RobotFieldZone zone : Superstructure.RobotFieldZone.values()) {
+                assertTrue(Superstructure.isTargetAllowedInZone(targetState, zone, true));
+            }
+        }
+    }
+
+    @Test
     void resolveTargetForZoneConstraints_allPassTargetsAreAllowedFromAnyZone() {
         Superstructure.TargetState[] passTargets = {
             Superstructure.TargetState.PASS_ALLIANCE_TOP,
@@ -422,6 +432,33 @@ class SuperstructureShotReadinessTest {
         assertTrue(Superstructure.TargetState.PASS_ALLIANCE_BOTTOM_CORNER.isPassTarget());
         assertTrue(Superstructure.TargetState.PASS_ALLIANCE_TOP_CORNER.isAlliancePassTarget());
         assertTrue(Superstructure.TargetState.PASS_ALLIANCE_BOTTOM_CORNER.isAlliancePassTarget());
+    }
+
+    @Test
+    void demoHubResetPose_matchesHubCenterWithZeroHeading() {
+        assertEquals(FieldConstants.Hub.hubCenter.getX(), FieldConstants.Demo.hubResetPose.getX(), 1e-9);
+        assertEquals(FieldConstants.Hub.hubCenter.getY(), FieldConstants.Demo.hubResetPose.getY(), 1e-9);
+        assertEquals(0.0, FieldConstants.Demo.hubResetPose.getRotation().getDegrees(), 1e-9);
+    }
+
+    @Test
+    void resolveFieldTargetLocation_demoPassTargetsUseHubXyAtPassHeight() {
+        Superstructure.TargetState[] passTargets = {
+            Superstructure.TargetState.PASS_ALLIANCE_TOP,
+            Superstructure.TargetState.PASS_ALLIANCE_BOTTOM,
+            Superstructure.TargetState.PASS_ALLIANCE_TOP_CORNER,
+            Superstructure.TargetState.PASS_ALLIANCE_BOTTOM_CORNER,
+            Superstructure.TargetState.PASS_NEUTRAL_TOP,
+            Superstructure.TargetState.PASS_NEUTRAL_BOTTOM
+        };
+
+        for (Superstructure.TargetState passTarget : passTargets) {
+            Translation3d target = Superstructure.resolveFieldTargetLocation(passTarget, false, true);
+
+            assertEquals(FieldConstants.Hub.hubCenter.getX(), target.getX(), 1e-9);
+            assertEquals(FieldConstants.Hub.hubCenter.getY(), target.getY(), 1e-9);
+            assertEquals(FieldConstants.Passing.passTargetHeightMeters, target.getZ(), 1e-9);
+        }
     }
 
     @Test
@@ -485,6 +522,27 @@ class SuperstructureShotReadinessTest {
                     false
                 )
             ).isPresent()
+        );
+    }
+
+    @Test
+    void selectClosestLineOfSightTarget_canIgnoreLineOfSightForDemoMode() {
+        assertEquals(
+            Superstructure.TargetState.PASS_ALLIANCE_TOP,
+            Superstructure.selectClosestLineOfSightTarget(
+                new Translation2d(0.0, 0.0),
+                true,
+                new Superstructure.TargetCandidate(
+                    Superstructure.TargetState.PASS_ALLIANCE_TOP,
+                    new Translation2d(1.0, 0.0),
+                    false
+                ),
+                new Superstructure.TargetCandidate(
+                    Superstructure.TargetState.PASS_ALLIANCE_BOTTOM,
+                    new Translation2d(2.0, 0.0),
+                    false
+                )
+            ).orElseThrow()
         );
     }
 

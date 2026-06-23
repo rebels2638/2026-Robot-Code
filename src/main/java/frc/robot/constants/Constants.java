@@ -21,6 +21,7 @@ import edu.wpi.first.wpilibj.DriverStation;
 public final class Constants {
     public static final Mode currentMode = Mode.COMP; // TODO: change this if sim
     public static boolean VERBOSE_LOGGING_ENABLED = false;
+    public static boolean DEMO_MODE = true;
 
     // public static final boolean isSYSID = true; // TODO: change this if sysid
 

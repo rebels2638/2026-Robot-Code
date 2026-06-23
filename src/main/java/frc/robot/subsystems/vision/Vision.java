@@ -180,6 +180,7 @@ public class Vision extends SubsystemBase {
         // Record current rotation rate
         // Store rotation rate in buffer
         rotationRateBuffer.addSample(currentTime, rotationRateDegreesPerSecondSupplier.getAsDouble());
+        boolean suppressVisionMeasurements = shouldSuppressVisionMeasurements(Constants.DEMO_MODE);
 
         // Initialize logging values
         boolean shouldLogDetailedPoseArrays =
@@ -193,6 +194,7 @@ public class Vision extends SubsystemBase {
         int totalRejectedCount = 0;
         int totalObservationCount = 0;
         int totalModeFilteredCount = 0;
+        int totalSuppressedCount = 0;
         int totalRawMegatag1Count = 0;
         int totalRawMegatag2Count = 0;
         int totalRawObservationCount = 0;
@@ -218,6 +220,7 @@ public class Vision extends SubsystemBase {
             int acceptedCount = 0;
             int rejectedCount = 0;
             int modeFilteredCount = 0;
+            int suppressedCount = 0;
             totalRawMegatag1Count += inputs[cameraIndex].rawMegatag1ObservationCount;
             totalRawMegatag2Count += inputs[cameraIndex].rawMegatag2ObservationCount;
             totalRawObservationCount += inputs[cameraIndex].rawObservationCount;
@@ -297,6 +300,12 @@ public class Vision extends SubsystemBase {
                     poseTypesAccepted.add(observation.type().name());
                 }
 
+                if (suppressVisionMeasurements) {
+                    suppressedCount++;
+                    totalSuppressedCount++;
+                    continue;
+                }
+
                 consumer.accept(
                     new VisionObservation(
                         observation.pose().toPose2d(),
@@ -318,6 +327,7 @@ public class Vision extends SubsystemBase {
             Logger.recordOutput(cameraTimingPrefix + "/PoseAcceptedCount", acceptedCount);
             Logger.recordOutput(cameraTimingPrefix + "/PoseRejectedCount", rejectedCount);
             Logger.recordOutput(cameraTimingPrefix + "/ModeFilteredCount", modeFilteredCount);
+            Logger.recordOutput(cameraTimingPrefix + "/PoseSuppressedCount", suppressedCount);
             Logger.recordOutput(
                 cameraTimingPrefix + "/RawMegatag1ObservationCount",
                 inputs[cameraIndex].rawMegatag1ObservationCount
@@ -357,6 +367,8 @@ public class Vision extends SubsystemBase {
         Logger.recordOutput("Vision/Summary/PoseAcceptedCount", totalAcceptedCount);
         Logger.recordOutput("Vision/Summary/PoseRejectedCount", totalRejectedCount);
         Logger.recordOutput("Vision/Summary/ModeFilteredCount", totalModeFilteredCount);
+        Logger.recordOutput("Vision/Summary/MeasurementsSuppressed", suppressVisionMeasurements);
+        Logger.recordOutput("Vision/Summary/PoseSuppressedCount", totalSuppressedCount);
         Logger.recordOutput("Vision/Summary/RawMegatag1ObservationCount", totalRawMegatag1Count);
         Logger.recordOutput("Vision/Summary/RawMegatag2ObservationCount", totalRawMegatag2Count);
         Logger.recordOutput("Vision/Summary/RawObservationCount", totalRawObservationCount);
@@ -393,5 +405,9 @@ public class Vision extends SubsystemBase {
 
     private static double computeStdDevFactor(double averageTagDistance, int tagCount) {
         return Math.pow(averageTagDistance, 2.0) / Math.max(tagCount, 1);
+    }
+
+    static boolean shouldSuppressVisionMeasurements(boolean demoMode) {
+        return demoMode;
     }
 }
