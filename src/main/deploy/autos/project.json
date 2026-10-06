@@ -1,0 +1,140 @@
+{
+  "schema_version": 1,
+  "project_id": "workspace-c93f4bc5-8e25-4693-a9b4-085374b9a26d",
+  "display_name": "autos",
+  "editor_config": {
+    "gui": {
+      "robot": {
+        "length_meters": 0.8,
+        "width_meters": 0.8,
+        "drive_type": "swerve"
+      },
+      "protrusions": {
+        "enabled": false,
+        "distance_meters": 0,
+        "side": "none",
+        "default_state": "",
+        "show_on_event_keys": [],
+        "hide_on_event_keys": []
+      }
+    },
+    "kinematic_constraints": {
+      "default_auto_velocity_velocity_safety_factor": 1,
+      "default_auto_velocity_acceleration_safety_factor": 1,
+      "default_auto_velocity_merge_tolerance_meters_per_sec": 0.3
+    }
+  },
+  "paths": [
+    {
+      "path_id": "path-485644eb-0d96-4869-8d75-d67b6300a768",
+      "display_name": "bottom_jab_sharp",
+      "file_name": "bottom_jab_sharp.json"
+    },
+    {
+      "path_id": "path-b0fddccc-8bee-4771-80c6-9d3190a573f4",
+      "display_name": "bottom_sweep_long",
+      "file_name": "bottom_sweep_long.json"
+    },
+    {
+      "path_id": "path-87569673-025f-4b2b-a3c1-8466ab373d19",
+      "display_name": "bottom_sweep_over",
+      "file_name": "bottom_sweep_over.json"
+    },
+    {
+      "path_id": "path-ee968c92-1889-4c0c-82f0-76a097147772",
+      "display_name": "bottom_sweep_short",
+      "file_name": "bottom_sweep_short.json"
+    },
+    {
+      "path_id": "path-8592e390-8962-4842-824f-5abc7e01ea08",
+      "display_name": "depo",
+      "file_name": "depo.json"
+    },
+    {
+      "path_id": "path-6ba3d8c5-9951-4271-a453-1684b2259a47",
+      "display_name": "double_swipe_top_depo",
+      "file_name": "double_swipe_top_depo.json"
+    },
+    {
+      "path_id": "path-b1589145-4bb0-4ee8-8275-e94b80b9ec13",
+      "display_name": "fast_depo",
+      "file_name": "fast_depo.json"
+    },
+    {
+      "path_id": "path-49446b40-9890-4c73-80d8-ffac43a70442",
+      "display_name": "middle_depo",
+      "file_name": "middle_depo.json"
+    },
+    {
+      "path_id": "path-a8c24472-32fb-497a-99b8-a22e380e2bd9",
+      "display_name": "outpost",
+      "file_name": "outpost.json"
+    },
+    {
+      "path_id": "path-8cb2eb07-15f3-4f3d-9cf2-c289e764d404",
+      "display_name": "outpost_tower",
+      "file_name": "outpost_tower.json"
+    },
+    {
+      "path_id": "path-5a9bf1c6-c0ae-4ac6-92c4-63eed3ed6bf8",
+      "display_name": "straight",
+      "file_name": "straight.json"
+    },
+    {
+      "path_id": "path-4a130cf7-3499-4310-b1f6-6af116717fd2",
+      "display_name": "top_sweep_hub",
+      "file_name": "top_sweep_hub.json"
+    },
+    {
+      "path_id": "path-433a6af8-babc-472a-a2de-ee48d5e96a9e",
+      "display_name": "top_sweep_lob_depo",
+      "file_name": "top_sweep_lob_depo.json"
+    },
+    {
+      "path_id": "path-08c603a1-a870-476a-bba5-94e0c402d873",
+      "display_name": "top_sweep_lob_first",
+      "file_name": "top_sweep_lob_first.json"
+    },
+    {
+      "path_id": "path-65ecc1d3-7019-4814-b0d1-458959266a96",
+      "display_name": "top_sweep_lob_second",
+      "file_name": "top_sweep_lob_second.json"
+    },
+    {
+      "path_id": "path-12a8355a-d234-47f5-b094-5d4058df8835",
+      "display_name": "top_sweep_short_depo",
+      "file_name": "top_sweep_short_depo.json"
+    },
+    {
+      "path_id": "path-11531ebb-2eca-4eff-96d7-5fcdfe022b68",
+      "display_name": "top_sweep_short_first",
+      "file_name": "top_sweep_short_first.json"
+    },
+    {
+      "path_id": "path-d6344ee2-1f22-439d-8bf5-e81856874db5",
+      "display_name": "top_sweep_short_first_deep",
+      "file_name": "top_sweep_short_first_deep.json"
+    },
+    {
+      "path_id": "path-10e45a90-59f5-40c7-81b3-a1e61b8a6af9",
+      "display_name": "top_sweep_short_second",
+      "file_name": "top_sweep_short_second.json"
+    },
+    {
+      "path_id": "path-030d41ef-51c7-4177-987c-c4eb301b2220",
+      "display_name": "New Path",
+      "file_name": "New Path.json",
+      "editor_metadata": {
+        "preview": {
+          "start_pose": {
+            "x_meters": 8.27,
+            "y_meters": 4.035,
+            "rotation_radians": 0
+          }
+        }
+      }
+    }
+  ],
+  "path_groups": [],
+  "linked_targets": []
+}

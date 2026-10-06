@@ -50,8 +50,8 @@
     {
       "type": "waypoint",
       "translation_target": {
-        "x_meters": 7.71198,
-        "y_meters": 2.42302,
+        "x_meters": 6.99885,
+        "y_meters": 6.00191,
         "intermediate_handoff_radius_meters": 0.4
       },
       "rotation_target": {
@@ -62,7 +62,7 @@
     {
       "type": "rotation",
       "rotation_radians": 0.0,
-      "t_ratio": 0.46434,
+      "t_ratio": 0.41379,
       "profiled_rotation": true
     },
     {
@@ -118,6 +118,7 @@
       }
     }
   ],
+  "tank_drive_direction": "backward",
   "constraints": {
     "max_velocity_meters_per_sec": [
       {
