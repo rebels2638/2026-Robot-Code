@@ -188,3 +188,6 @@ compile_commands.json
 
 # oh-my-claudecode state
 .omc/
+
+# Demo calibration written by desktop simulation runs (the deploy copy is tracked)
+/demo-calibration.json
