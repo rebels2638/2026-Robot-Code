@@ -22,7 +22,7 @@ Branch `optimum-demo` (COMP mode, `Constants.DEMO_MODE = true`). Deploy from the
    Note where *Tag locked* drops out.
 5. **Tag mode.** Press A until *Fire mode* = TAG. Turret should follow the tag with RT released.
    Hold RT: READY then FIRING. Read *Status* if it won't fire (NO TARGET / OUT OF RANGE / CEILING /
-   SHOOTER NOT READY). Set *Ceiling m* to the real ceiling (0 turns that limit off).
+   SHOOTER NOT READY). *Ceiling m* defaults to 3.66 (12 ft); change it if the room differs (0 turns that limit off).
    *Speed at tag* is shown for information only; it never blocks a shot.
 6. **Saved target.** Show tag, press B (one rumble = saved, three = no tag). Remove the tag: still aims there.
    *Zero gyro* must not move the saved spot. *Clear saved* returns to live tag.

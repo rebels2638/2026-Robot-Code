@@ -1,5 +1,6 @@
 package frc.robot.demo;
 
+import edu.wpi.first.math.util.Units;
 import frc.robot.constants.FieldConstants;
 
 /** Tunable defaults for the field-trip demo. Dashboard inputs start from these values. */
@@ -39,7 +40,8 @@ public final class DemoConstants {
     public static final double MIN_TAG_SHOT_DISTANCE_METERS = 1.0;
     public static final double MAX_TAG_SHOT_DISTANCE_METERS = 10.0;
     public static final double TAG_LERP_TABLE_STEP_METERS = 0.25;
-    public static final double DEFAULT_CEILING_HEIGHT_METERS = 3.0;
+    /** 12 ft venue ceiling. Editable on the dashboard ("Ceiling m"); 0 turns the limit off. */
+    public static final double DEFAULT_CEILING_HEIGHT_METERS = Units.feetToMeters(12.0);
     public static final double CEILING_MARGIN_METERS = 0.25;
     public static final double MIN_TARGET_HEIGHT_METERS = 0.0;
     public static final double MAX_TARGET_HEIGHT_METERS = 3.0;
