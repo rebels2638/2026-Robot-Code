@@ -64,7 +64,14 @@ public class Vision extends SubsystemBase {
         return instance;
     }
     
+    /** Receives every raw pose observation, before any pose-estimation filtering. */
+    @FunctionalInterface
+    public interface RawObservationListener {
+        void accept(int cameraIndex, VisionIO.PoseObservation observation);
+    }
+
     private final Consumer<VisionObservation> consumer;
+    private RawObservationListener rawObservationListener = null;
     private final DoubleSupplier rotationRateDegreesPerSecondSupplier;
     private final VisionIO[] io;
     private final VisionIOInputsAutoLogged[] inputs;
@@ -172,6 +179,11 @@ public class Vision extends SubsystemBase {
             }
             lastConnectedStates[i] = inputs[i].connected;
             Logger.processInputs("Vision/Camera" + Integer.toString(i), inputs[i]);
+            if (rawObservationListener != null) {
+                for (VisionIO.PoseObservation observation : inputs[i].robotPoseObservations) {
+                    rawObservationListener.accept(i, observation);
+                }
+            }
         }
         if (sawReconnectThisCycle && !wroteImuModeThisCycle) {
             writeImuMode(imuMode, currentTime);
@@ -405,6 +417,25 @@ public class Vision extends SubsystemBase {
 
     private static double computeStdDevFactor(double averageTagDistance, int tagCount) {
         return Math.pow(averageTagDistance, 2.0) / Math.max(tagCount, 1);
+    }
+
+    public void setRawObservationListener(RawObservationListener listener) {
+        rawObservationListener = listener;
+    }
+
+    public int getCameraCount() {
+        return io.length;
+    }
+
+    public String getCameraName(int cameraIndex) {
+        if (config.cameras != null && cameraIndex >= 0 && cameraIndex < config.cameras.size()) {
+            return config.cameras.get(cameraIndex).name;
+        }
+        return "camera" + cameraIndex;
+    }
+
+    public boolean isCameraConnected(int cameraIndex) {
+        return cameraIndex >= 0 && cameraIndex < inputs.length && inputs[cameraIndex].connected;
     }
 
     static boolean shouldSuppressVisionMeasurements(boolean demoMode) {

@@ -16,7 +16,7 @@ import edu.wpi.first.wpilibj2.command.WaitUntilCommand;
 import edu.wpi.first.wpilibj2.command.button.Trigger;
 import frc.robot.commands.autos.Autos;
 import frc.robot.constants.Constants;
-import frc.robot.constants.FieldConstants;
+import frc.robot.demo.DemoController;
 import frc.robot.lib.BLine.FollowPath;
 import frc.robot.lib.input.XboxController;
 import frc.robot.lib.util.ballistics.ProjectileVisualizer;
@@ -60,6 +60,8 @@ public class RobotContainer {
     private final Hopper hopper = Hopper.getInstance();
     private final Intake intake = Intake.getInstance();
     private final Superstructure superstructure;
+    /** Field-trip demo controls; null unless Constants.DEMO_MODE. */
+    private final DemoController demoController;
     private final SendableChooser<Command> autoChooser;
 
     private final LoggedNetworkNumber manualFlywheelRps = new LoggedNetworkNumber("flywheelSet", 0.0);
@@ -78,6 +80,13 @@ public class RobotContainer {
         this.xboxOperator = new XboxController(2);
         this.xboxDriver = new XboxController(3);
 
+        demoController = Constants.DEMO_MODE && superstructure != null
+            ? new DemoController(superstructure, shooter, robotState, swerveDrive, vision, xboxDriver)
+            : null;
+        if (demoController != null) {
+            superstructure.setDemoShotSource(demoController);
+        }
+
         configureDriveInputSuppliers();
         configureInitialState();
 
@@ -93,17 +102,26 @@ public class RobotContainer {
 
     private void configureDriveInputSuppliers() {
         swerveDrive.setFieldRelativeTeleopInputSuppliers(
-            () -> -MathUtil.applyDeadband(xboxDriver.getLeftY(), Constants.OperatorConstants.LEFT_Y_DEADBAND),
-            () -> -MathUtil.applyDeadband(xboxDriver.getLeftX(), Constants.OperatorConstants.LEFT_X_DEADBAND),
-            () -> -MathUtil.applyDeadband(xboxDriver.getRightX(), Constants.OperatorConstants.RIGHT_X_DEADBAND)
+            () -> -MathUtil.applyDeadband(xboxDriver.getLeftY(), Constants.OperatorConstants.LEFT_Y_DEADBAND) * getTranslationScale(),
+            () -> -MathUtil.applyDeadband(xboxDriver.getLeftX(), Constants.OperatorConstants.LEFT_X_DEADBAND) * getTranslationScale(),
+            () -> -MathUtil.applyDeadband(xboxDriver.getRightX(), Constants.OperatorConstants.RIGHT_X_DEADBAND) * getRotationScale()
         );
 
         swerveDrive.setRobotRelativeTeleopInputSuppliers(
-            () -> -MathUtil.applyDeadband(xboxDriver.getLeftY(), Constants.OperatorConstants.LEFT_Y_DEADBAND),
-            () -> -MathUtil.applyDeadband(xboxDriver.getLeftX(), Constants.OperatorConstants.LEFT_X_DEADBAND),
-            () -> -MathUtil.applyDeadband(xboxDriver.getRightX(), Constants.OperatorConstants.RIGHT_X_DEADBAND)
+            () -> -MathUtil.applyDeadband(xboxDriver.getLeftY(), Constants.OperatorConstants.LEFT_Y_DEADBAND) * getTranslationScale(),
+            () -> -MathUtil.applyDeadband(xboxDriver.getLeftX(), Constants.OperatorConstants.LEFT_X_DEADBAND) * getTranslationScale(),
+            () -> -MathUtil.applyDeadband(xboxDriver.getRightX(), Constants.OperatorConstants.RIGHT_X_DEADBAND) * getRotationScale()
         );
         swerveDrive.setRobotRelativeTeleopHeadingOffset(Rotation2d.fromDegrees(25.0));
+    }
+
+    /** Demo slows the sticks; comp is full speed. */
+    private double getTranslationScale() {
+        return demoController != null ? demoController.getTranslationScale() : 1.0;
+    }
+
+    private double getRotationScale() {
+        return demoController != null ? demoController.getRotationScale() : 1.0;
     }
 
     private void configureInitialState() {
@@ -163,7 +181,28 @@ public class RobotContainer {
     }
 
     private void configureCompetitionBindings() {
+        if (demoController != null) {
+            bindDemoControls();
+            return;
+        }
         bindCompetitionDriveHelpers();
+    }
+
+    /**
+     * Single-controller demo layout: intake/hopper buttons as at comp, RT fires in the current mode,
+     * A switches Manual/Tag, B saves the tag target. Back, Start and the D-pad are unused.
+     */
+    private void bindDemoControls() {
+        bindIntakeAndHopperHelpers();
+
+        xboxDriver.getRightTriggerButton(DRIVE_HELPER_TRIGGER_THRESHOLD).onTrue(
+            new InstantCommand(() -> demoController.setShootHeld(true))
+        ).onFalse(
+            new InstantCommand(() -> demoController.setShootHeld(false))
+        );
+
+        xboxDriver.getAButton().onTrue(Commands.runOnce(demoController::toggleMode).ignoringDisable(true));
+        xboxDriver.getBButton().onTrue(Commands.runOnce(demoController::saveTargetFromTag).ignoringDisable(true));
     }
 
     private void configureManualShooterTestBindings() {
@@ -188,11 +227,6 @@ public class RobotContainer {
         return Commands.runOnce(this::stopManualShooterTest);
     }
 
-    private Command buildDemoHubPoseResetCommand() {
-        return Commands.runOnce(() -> robotState.resetPose(FieldConstants.Demo.hubResetPose))
-            .ignoringDisable(true);
-    }
-
     private void stopManualShooterTest() {
         shooter.setFlywheelSetpoint(FlywheelSetpoint.OFF);
         shooter.setHoodSetpoint(HoodSetpoint.HOME);
@@ -211,6 +245,30 @@ public class RobotContainer {
     }
 
     private void bindCompetitionDriveHelpers() {
+        bindIntakeAndHopperHelpers();
+
+        xboxDriver.getRightTriggerButton(DRIVE_HELPER_TRIGGER_THRESHOLD).onTrue(
+            new InstantCommand(this::runHubShootingHelper)
+        ).onFalse(
+            new InstantCommand(this::runHubTrackingHelper)
+        );
+
+        xboxDriver.getAButton().whileTrue(
+            Commands.startEnd(
+                () -> robotState.setZeroGyroButtonHeld(true),
+                () -> robotState.setZeroGyroButtonHeld(false)
+            ).ignoringDisable(true)
+        );
+
+        xboxDriver.getBButton().whileTrue(
+            new RunCommand(this::runAlliancePassHelper)
+        ).onFalse(
+            new InstantCommand(() -> superstructure.setDesiredSystemState(Superstructure.DesiredSystemState.TRACKING))
+        );
+    }
+
+    /** Intake and hopper buttons shared by the comp and demo layouts. */
+    private void bindIntakeAndHopperHelpers() {
         Trigger leftBumperTrigger = xboxDriver.getLeftBumper();
         Trigger rightBumperTrigger = xboxDriver.getRightBumper();
 
@@ -232,23 +290,6 @@ public class RobotContainer {
             new InstantCommand(() -> superstructure.setDesiredIntakeState(Superstructure.DesiredIntakeState.DEPLOYED))
         );
 
-        xboxDriver.getRightTriggerButton(DRIVE_HELPER_TRIGGER_THRESHOLD).onTrue(
-            new InstantCommand(this::runHubShootingHelper)
-        ).onFalse(
-            new InstantCommand(this::runHubTrackingHelper)
-        );
-
-        if (Constants.DEMO_MODE) {
-            xboxDriver.getAButton().onTrue(buildDemoHubPoseResetCommand());
-        } else {
-            xboxDriver.getAButton().whileTrue(
-                Commands.startEnd(
-                    () -> robotState.setZeroGyroButtonHeld(true),
-                    () -> robotState.setZeroGyroButtonHeld(false)
-                ).ignoringDisable(true)
-            );
-        }
-
         xboxDriver.getYButton().onTrue(
             new InstantCommand(() -> superstructure.setDesiredIntakeState(Superstructure.DesiredIntakeState.REVERSING))
         ).onFalse(
@@ -259,12 +300,6 @@ public class RobotContainer {
             new InstantCommand(() -> superstructure.setDesiredHopperState(Superstructure.DesiredHopperState.REVERSE))
         ).onFalse(
             new InstantCommand(() -> superstructure.setDesiredHopperState(Superstructure.DesiredHopperState.DEFAULT))
-        );
-
-        xboxDriver.getBButton().whileTrue(
-            new RunCommand(this::runAlliancePassHelper)
-        ).onFalse(
-            new InstantCommand(() -> superstructure.setDesiredSystemState(Superstructure.DesiredSystemState.TRACKING))
         );
     }
 
@@ -336,6 +371,9 @@ public class RobotContainer {
             return;
         }
 
+        if (demoController != null) {
+            demoController.onDisabled();
+        }
         superstructure.setDesiredSystemState(Superstructure.DesiredSystemState.DISABLED);
         superstructure.setDesiredClimbState(Superstructure.DesiredClimbState.DISABLED);
         superstructure.setDesiredHopperState(Superstructure.DesiredHopperState.DEFAULT);
@@ -343,6 +381,10 @@ public class RobotContainer {
     }
 
     public Command getAutonomousCommand() {
+        if (demoController != null) {
+            // Demo: autonomous does nothing, so an accidental Auto enable can never run a path.
+            return Commands.none();
+        }
         Command selectedAuto = autoChooser.getSelected();
         return selectedAuto != null ? selectedAuto : Commands.none();
     }

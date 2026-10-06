@@ -1,0 +1,984 @@
+{
+  "version": 1.0,
+  "grid_size": 128,
+  "tabs": [
+    {
+      "name": "Demo",
+      "grid_layout": {
+        "layouts": [],
+        "containers": [
+          {
+            "title": "Driver view (you are at the bottom)",
+            "x": 0.0,
+            "y": 0.0,
+            "width": 384.0,
+            "height": 384.0,
+            "type": "Field",
+            "properties": {
+              "topic": "/SmartDashboard/Demo/Field",
+              "period": 0.06,
+              "field_game": "Rebuilt",
+              "robot_width": 0.8,
+              "robot_length": 0.8,
+              "show_other_objects": true,
+              "show_trajectories": false,
+              "field_rotation": 270.0,
+              "show_robot_outside_widget": true
+            }
+          },
+          {
+            "title": "Status",
+            "x": 384.0,
+            "y": 0.0,
+            "width": 512.0,
+            "height": 128.0,
+            "type": "Large Text Display",
+            "properties": {
+              "topic": "/SmartDashboard/Demo/Status/Reason",
+              "period": 0.06
+            }
+          },
+          {
+            "title": "Ready",
+            "x": 896.0,
+            "y": 0.0,
+            "width": 128.0,
+            "height": 128.0,
+            "type": "Boolean Box",
+            "properties": {
+              "topic": "/SmartDashboard/Demo/Status/Ready",
+              "period": 0.06
+            }
+          },
+          {
+            "title": "Tag locked",
+            "x": 1024.0,
+            "y": 0.0,
+            "width": 128.0,
+            "height": 128.0,
+            "type": "Boolean Box",
+            "properties": {
+              "topic": "/SmartDashboard/Demo/Tag/Locked",
+              "period": 0.06
+            }
+          },
+          {
+            "title": "Fire mode",
+            "x": 1152.0,
+            "y": 0.0,
+            "width": 128.0,
+            "height": 128.0,
+            "type": "Text Display",
+            "properties": {
+              "topic": "/SmartDashboard/Demo/Status/Mode",
+              "period": 0.06,
+              "show_submit_button": false
+            }
+          },
+          {
+            "title": "Tag distance m",
+            "x": 384.0,
+            "y": 128.0,
+            "width": 128.0,
+            "height": 128.0,
+            "type": "Text Display",
+            "properties": {
+              "topic": "/SmartDashboard/Demo/Tag/Distance M",
+              "period": 0.06,
+              "show_submit_button": false
+            }
+          },
+          {
+            "title": "Tag height m",
+            "x": 512.0,
+            "y": 128.0,
+            "width": 128.0,
+            "height": 128.0,
+            "type": "Text Display",
+            "properties": {
+              "topic": "/SmartDashboard/Demo/Tag/Height M",
+              "period": 0.06,
+              "show_submit_button": false
+            }
+          },
+          {
+            "title": "Tag bearing deg",
+            "x": 640.0,
+            "y": 128.0,
+            "width": 128.0,
+            "height": 128.0,
+            "type": "Text Display",
+            "properties": {
+              "topic": "/SmartDashboard/Demo/Tag/Bearing Deg",
+              "period": 0.06,
+              "show_submit_button": false
+            }
+          },
+          {
+            "title": "Sec since seen",
+            "x": 768.0,
+            "y": 128.0,
+            "width": 128.0,
+            "height": 128.0,
+            "type": "Text Display",
+            "properties": {
+              "topic": "/SmartDashboard/Demo/Tag/Seconds Since Seen",
+              "period": 0.06,
+              "show_submit_button": false
+            }
+          },
+          {
+            "title": "Target source",
+            "x": 896.0,
+            "y": 128.0,
+            "width": 128.0,
+            "height": 128.0,
+            "type": "Text Display",
+            "properties": {
+              "topic": "/SmartDashboard/Demo/Status/Target Source",
+              "period": 0.06,
+              "show_submit_button": false
+            }
+          },
+          {
+            "title": "Tag tilt deg",
+            "x": 1024.0,
+            "y": 128.0,
+            "width": 128.0,
+            "height": 128.0,
+            "type": "Text Display",
+            "properties": {
+              "topic": "/SmartDashboard/Demo/Tag/Tilt Deg",
+              "period": 0.06,
+              "show_submit_button": false
+            }
+          },
+          {
+            "title": "Camera",
+            "x": 1152.0,
+            "y": 128.0,
+            "width": 128.0,
+            "height": 128.0,
+            "type": "Text Display",
+            "properties": {
+              "topic": "/SmartDashboard/Demo/Tag/Camera",
+              "period": 0.06,
+              "show_submit_button": false
+            }
+          },
+          {
+            "title": "Shot distance m",
+            "x": 384.0,
+            "y": 256.0,
+            "width": 128.0,
+            "height": 128.0,
+            "type": "Text Display",
+            "properties": {
+              "topic": "/SmartDashboard/Demo/Shot/Distance M",
+              "period": 0.06,
+              "show_submit_button": false
+            }
+          },
+          {
+            "title": "Shot hood deg",
+            "x": 512.0,
+            "y": 256.0,
+            "width": 128.0,
+            "height": 128.0,
+            "type": "Text Display",
+            "properties": {
+              "topic": "/SmartDashboard/Demo/Shot/Hood Deg",
+              "period": 0.06,
+              "show_submit_button": false
+            }
+          },
+          {
+            "title": "Shot RPS",
+            "x": 640.0,
+            "y": 256.0,
+            "width": 128.0,
+            "height": 128.0,
+            "type": "Text Display",
+            "properties": {
+              "topic": "/SmartDashboard/Demo/Shot/Flywheel RPS",
+              "period": 0.06,
+              "show_submit_button": false
+            }
+          },
+          {
+            "title": "Speed at tag m/s",
+            "x": 768.0,
+            "y": 256.0,
+            "width": 128.0,
+            "height": 128.0,
+            "type": "Text Display",
+            "properties": {
+              "topic": "/SmartDashboard/Demo/Shot/Speed At Tag MPS",
+              "period": 0.06,
+              "show_submit_button": false
+            }
+          },
+          {
+            "title": "Peak height m",
+            "x": 896.0,
+            "y": 256.0,
+            "width": 128.0,
+            "height": 128.0,
+            "type": "Text Display",
+            "properties": {
+              "topic": "/SmartDashboard/Demo/Shot/Peak Height M",
+              "period": 0.06,
+              "show_submit_button": false
+            }
+          },
+          {
+            "title": "Flywheel RPS",
+            "x": 1024.0,
+            "y": 256.0,
+            "width": 128.0,
+            "height": 128.0,
+            "type": "Text Display",
+            "properties": {
+              "topic": "/SmartDashboard/Demo/Shooter/Flywheel RPS",
+              "period": 0.06,
+              "show_submit_button": false
+            }
+          },
+          {
+            "title": "Flywheel target",
+            "x": 1152.0,
+            "y": 256.0,
+            "width": 128.0,
+            "height": 128.0,
+            "type": "Text Display",
+            "properties": {
+              "topic": "/SmartDashboard/Demo/Shooter/Flywheel Setpoint RPS",
+              "period": 0.06,
+              "show_submit_button": false
+            }
+          },
+          {
+            "title": "Zero gyro",
+            "x": 0.0,
+            "y": 384.0,
+            "width": 128.0,
+            "height": 128.0,
+            "type": "Command",
+            "properties": {
+              "topic": "/SmartDashboard/Demo/Actions/Zero Gyro",
+              "period": 0.06,
+              "show_type": false,
+              "maximize_button_space": true
+            }
+          },
+          {
+            "title": "Manual mode",
+            "x": 128.0,
+            "y": 384.0,
+            "width": 128.0,
+            "height": 128.0,
+            "type": "Command",
+            "properties": {
+              "topic": "/SmartDashboard/Demo/Actions/Manual Mode",
+              "period": 0.06,
+              "show_type": false,
+              "maximize_button_space": true
+            }
+          },
+          {
+            "title": "Tag mode",
+            "x": 256.0,
+            "y": 384.0,
+            "width": 128.0,
+            "height": 128.0,
+            "type": "Command",
+            "properties": {
+              "topic": "/SmartDashboard/Demo/Actions/Tag Mode",
+              "period": 0.06,
+              "show_type": false,
+              "maximize_button_space": true
+            }
+          },
+          {
+            "title": "Save tag target",
+            "x": 384.0,
+            "y": 384.0,
+            "width": 128.0,
+            "height": 128.0,
+            "type": "Command",
+            "properties": {
+              "topic": "/SmartDashboard/Demo/Target/Save Tag Target",
+              "period": 0.06,
+              "show_type": false,
+              "maximize_button_space": true
+            }
+          },
+          {
+            "title": "Clear saved",
+            "x": 512.0,
+            "y": 384.0,
+            "width": 128.0,
+            "height": 128.0,
+            "type": "Command",
+            "properties": {
+              "topic": "/SmartDashboard/Demo/Target/Clear Saved Target",
+              "period": 0.06,
+              "show_type": false,
+              "maximize_button_space": true
+            }
+          },
+          {
+            "title": "Place target",
+            "x": 640.0,
+            "y": 384.0,
+            "width": 128.0,
+            "height": 128.0,
+            "type": "Command",
+            "properties": {
+              "topic": "/SmartDashboard/Demo/Target/Place Target",
+              "period": 0.06,
+              "show_type": false,
+              "maximize_button_space": true
+            }
+          },
+          {
+            "title": "Manual RPS",
+            "x": 768.0,
+            "y": 384.0,
+            "width": 128.0,
+            "height": 128.0,
+            "type": "Text Display",
+            "properties": {
+              "topic": "/SmartDashboard/Demo/Manual/Flywheel RPS",
+              "period": 0.06,
+              "show_submit_button": true
+            }
+          },
+          {
+            "title": "Manual hood deg",
+            "x": 896.0,
+            "y": 384.0,
+            "width": 128.0,
+            "height": 128.0,
+            "type": "Text Display",
+            "properties": {
+              "topic": "/SmartDashboard/Demo/Manual/Hood Deg",
+              "period": 0.06,
+              "show_submit_button": true
+            }
+          },
+          {
+            "title": "Manual turret deg",
+            "x": 1024.0,
+            "y": 384.0,
+            "width": 128.0,
+            "height": 128.0,
+            "type": "Text Display",
+            "properties": {
+              "topic": "/SmartDashboard/Demo/Manual/Turret Deg",
+              "period": 0.06,
+              "show_submit_button": true
+            }
+          },
+          {
+            "title": "Force feed",
+            "x": 1152.0,
+            "y": 384.0,
+            "width": 128.0,
+            "height": 128.0,
+            "type": "Toggle Switch",
+            "properties": {
+              "topic": "/SmartDashboard/Demo/Manual/Force Feed",
+              "period": 0.06
+            }
+          },
+          {
+            "title": "Drive speed",
+            "x": 0.0,
+            "y": 512.0,
+            "width": 256.0,
+            "height": 128.0,
+            "type": "Number Slider",
+            "properties": {
+              "topic": "/SmartDashboard/Demo/Drive/Translation Scale",
+              "period": 0.06,
+              "min_value": 0.05,
+              "max_value": 0.5,
+              "divisions": 9,
+              "publish_all": false
+            }
+          },
+          {
+            "title": "Turn speed",
+            "x": 256.0,
+            "y": 512.0,
+            "width": 256.0,
+            "height": 128.0,
+            "type": "Number Slider",
+            "properties": {
+              "topic": "/SmartDashboard/Demo/Drive/Rotation Scale",
+              "period": 0.06,
+              "min_value": 0.05,
+              "max_value": 0.5,
+              "divisions": 9,
+              "publish_all": false
+            }
+          },
+          {
+            "title": "Robot relative",
+            "x": 512.0,
+            "y": 512.0,
+            "width": 128.0,
+            "height": 128.0,
+            "type": "Toggle Switch",
+            "properties": {
+              "topic": "/SmartDashboard/Demo/Drive/Robot Relative",
+              "period": 0.06
+            }
+          },
+          {
+            "title": "Max speed at tag",
+            "x": 640.0,
+            "y": 512.0,
+            "width": 128.0,
+            "height": 128.0,
+            "type": "Text Display",
+            "properties": {
+              "topic": "/SmartDashboard/Demo/Tag/Max Speed At Tag MPS",
+              "period": 0.06,
+              "show_submit_button": true
+            }
+          },
+          {
+            "title": "Ceiling m",
+            "x": 768.0,
+            "y": 512.0,
+            "width": 128.0,
+            "height": 128.0,
+            "type": "Text Display",
+            "properties": {
+              "topic": "/SmartDashboard/Demo/Tag/Ceiling Height M",
+              "period": 0.06,
+              "show_submit_button": true
+            }
+          },
+          {
+            "title": "Last event",
+            "x": 896.0,
+            "y": 512.0,
+            "width": 384.0,
+            "height": 128.0,
+            "type": "Text Display",
+            "properties": {
+              "topic": "/SmartDashboard/Demo/Status/Last Event",
+              "period": 0.06,
+              "show_submit_button": false
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "Demo Setup",
+      "grid_layout": {
+        "layouts": [],
+        "containers": [
+          {
+            "title": "Tag ID",
+            "x": 0.0,
+            "y": 0.0,
+            "width": 128.0,
+            "height": 128.0,
+            "type": "Text Display",
+            "properties": {
+              "topic": "/SmartDashboard/Demo/Tag/Tag ID",
+              "period": 0.06,
+              "show_submit_button": true
+            }
+          },
+          {
+            "title": "Offset out m",
+            "x": 128.0,
+            "y": 0.0,
+            "width": 128.0,
+            "height": 128.0,
+            "type": "Text Display",
+            "properties": {
+              "topic": "/SmartDashboard/Demo/Tag/Offset Out M",
+              "period": 0.06,
+              "show_submit_button": true
+            }
+          },
+          {
+            "title": "Offset left m",
+            "x": 256.0,
+            "y": 0.0,
+            "width": 128.0,
+            "height": 128.0,
+            "type": "Text Display",
+            "properties": {
+              "topic": "/SmartDashboard/Demo/Tag/Offset Left M",
+              "period": 0.06,
+              "show_submit_button": true
+            }
+          },
+          {
+            "title": "Offset up m",
+            "x": 384.0,
+            "y": 0.0,
+            "width": 128.0,
+            "height": 128.0,
+            "type": "Text Display",
+            "properties": {
+              "topic": "/SmartDashboard/Demo/Tag/Offset Up M",
+              "period": 0.06,
+              "show_submit_button": true
+            }
+          },
+          {
+            "title": "Height override",
+            "x": 512.0,
+            "y": 0.0,
+            "width": 128.0,
+            "height": 128.0,
+            "type": "Toggle Switch",
+            "properties": {
+              "topic": "/SmartDashboard/Demo/Tag/Height Override",
+              "period": 0.06
+            }
+          },
+          {
+            "title": "Override height m",
+            "x": 640.0,
+            "y": 0.0,
+            "width": 128.0,
+            "height": 128.0,
+            "type": "Text Display",
+            "properties": {
+              "topic": "/SmartDashboard/Demo/Tag/Override Height M",
+              "period": 0.06,
+              "show_submit_button": true
+            }
+          },
+          {
+            "title": "Place forward m",
+            "x": 768.0,
+            "y": 0.0,
+            "width": 128.0,
+            "height": 128.0,
+            "type": "Text Display",
+            "properties": {
+              "topic": "/SmartDashboard/Demo/Target/Place Forward M",
+              "period": 0.06,
+              "show_submit_button": true
+            }
+          },
+          {
+            "title": "Place left m",
+            "x": 896.0,
+            "y": 0.0,
+            "width": 128.0,
+            "height": 128.0,
+            "type": "Text Display",
+            "properties": {
+              "topic": "/SmartDashboard/Demo/Target/Place Left M",
+              "period": 0.06,
+              "show_submit_button": true
+            }
+          },
+          {
+            "title": "Place height m",
+            "x": 1024.0,
+            "y": 0.0,
+            "width": 128.0,
+            "height": 128.0,
+            "type": "Text Display",
+            "properties": {
+              "topic": "/SmartDashboard/Demo/Target/Place Height M",
+              "period": 0.06,
+              "show_submit_button": true
+            }
+          },
+          {
+            "title": "Place target",
+            "x": 1152.0,
+            "y": 0.0,
+            "width": 128.0,
+            "height": 128.0,
+            "type": "Command",
+            "properties": {
+              "topic": "/SmartDashboard/Demo/Target/Place Target",
+              "period": 0.06,
+              "show_type": false,
+              "maximize_button_space": true
+            }
+          },
+          {
+            "title": "Calibration mode",
+            "x": 0.0,
+            "y": 128.0,
+            "width": 128.0,
+            "height": 128.0,
+            "type": "Toggle Switch",
+            "properties": {
+              "topic": "/SmartDashboard/Demo/Calibration/Enabled",
+              "period": 0.06
+            }
+          },
+          {
+            "title": "Cal hood deg",
+            "x": 128.0,
+            "y": 128.0,
+            "width": 128.0,
+            "height": 128.0,
+            "type": "Text Display",
+            "properties": {
+              "topic": "/SmartDashboard/Demo/Calibration/Hood Deg",
+              "period": 0.06,
+              "show_submit_button": true
+            }
+          },
+          {
+            "title": "Cal RPS",
+            "x": 256.0,
+            "y": 128.0,
+            "width": 128.0,
+            "height": 128.0,
+            "type": "Text Display",
+            "properties": {
+              "topic": "/SmartDashboard/Demo/Calibration/Flywheel RPS",
+              "period": 0.06,
+              "show_submit_button": true
+            }
+          },
+          {
+            "title": "Load current shot",
+            "x": 384.0,
+            "y": 128.0,
+            "width": 128.0,
+            "height": 128.0,
+            "type": "Command",
+            "properties": {
+              "topic": "/SmartDashboard/Demo/Calibration/Load Current Shot",
+              "period": 0.06,
+              "show_type": false,
+              "maximize_button_space": true
+            }
+          },
+          {
+            "title": "Save point",
+            "x": 512.0,
+            "y": 128.0,
+            "width": 128.0,
+            "height": 128.0,
+            "type": "Command",
+            "properties": {
+              "topic": "/SmartDashboard/Demo/Calibration/Save Point",
+              "period": 0.06,
+              "show_type": false,
+              "maximize_button_space": true
+            }
+          },
+          {
+            "title": "Delete last point",
+            "x": 640.0,
+            "y": 128.0,
+            "width": 128.0,
+            "height": 128.0,
+            "type": "Command",
+            "properties": {
+              "topic": "/SmartDashboard/Demo/Calibration/Delete Last Point",
+              "period": 0.06,
+              "show_type": false,
+              "maximize_button_space": true
+            }
+          },
+          {
+            "title": "Clear all points",
+            "x": 768.0,
+            "y": 128.0,
+            "width": 128.0,
+            "height": 128.0,
+            "type": "Command",
+            "properties": {
+              "topic": "/SmartDashboard/Demo/Calibration/Clear All Points",
+              "period": 0.06,
+              "show_type": false,
+              "maximize_button_space": true
+            }
+          },
+          {
+            "title": "Point count",
+            "x": 896.0,
+            "y": 128.0,
+            "width": 128.0,
+            "height": 128.0,
+            "type": "Text Display",
+            "properties": {
+              "topic": "/SmartDashboard/Demo/Calibration/Point Count",
+              "period": 0.06,
+              "show_submit_button": false
+            }
+          },
+          {
+            "title": "Calibration file",
+            "x": 1024.0,
+            "y": 128.0,
+            "width": 256.0,
+            "height": 128.0,
+            "type": "Text Display",
+            "properties": {
+              "topic": "/SmartDashboard/Demo/Calibration/Source",
+              "period": 0.06,
+              "show_submit_button": false
+            }
+          },
+          {
+            "title": "Calibration points",
+            "x": 0.0,
+            "y": 256.0,
+            "width": 768.0,
+            "height": 128.0,
+            "type": "Text Display",
+            "properties": {
+              "topic": "/SmartDashboard/Demo/Calibration/Points",
+              "period": 0.06,
+              "show_submit_button": false
+            }
+          },
+          {
+            "title": "Calibration message",
+            "x": 768.0,
+            "y": 256.0,
+            "width": 512.0,
+            "height": 128.0,
+            "type": "Text Display",
+            "properties": {
+              "topic": "/SmartDashboard/Demo/Calibration/Message",
+              "period": 0.06,
+              "show_submit_button": false
+            }
+          },
+          {
+            "title": "Model hood deg",
+            "x": 0.0,
+            "y": 384.0,
+            "width": 128.0,
+            "height": 128.0,
+            "type": "Text Display",
+            "properties": {
+              "topic": "/SmartDashboard/Demo/Shot/Model Hood Deg",
+              "period": 0.06,
+              "show_submit_button": false
+            }
+          },
+          {
+            "title": "Model RPS",
+            "x": 128.0,
+            "y": 384.0,
+            "width": 128.0,
+            "height": 128.0,
+            "type": "Text Display",
+            "properties": {
+              "topic": "/SmartDashboard/Demo/Shot/Model Flywheel RPS",
+              "period": 0.06,
+              "show_submit_button": false
+            }
+          },
+          {
+            "title": "Correction hood",
+            "x": 256.0,
+            "y": 384.0,
+            "width": 128.0,
+            "height": 128.0,
+            "type": "Text Display",
+            "properties": {
+              "topic": "/SmartDashboard/Demo/Shot/Correction Hood Deg",
+              "period": 0.06,
+              "show_submit_button": false
+            }
+          },
+          {
+            "title": "Correction RPS",
+            "x": 384.0,
+            "y": 384.0,
+            "width": 128.0,
+            "height": 128.0,
+            "type": "Text Display",
+            "properties": {
+              "topic": "/SmartDashboard/Demo/Shot/Correction Flywheel RPS",
+              "period": 0.06,
+              "show_submit_button": false
+            }
+          },
+          {
+            "title": "Target height m",
+            "x": 512.0,
+            "y": 384.0,
+            "width": 128.0,
+            "height": 128.0,
+            "type": "Text Display",
+            "properties": {
+              "topic": "/SmartDashboard/Demo/Shot/Target Height M",
+              "period": 0.06,
+              "show_submit_button": false
+            }
+          },
+          {
+            "title": "Flight time s",
+            "x": 640.0,
+            "y": 384.0,
+            "width": 128.0,
+            "height": 128.0,
+            "type": "Text Display",
+            "properties": {
+              "topic": "/SmartDashboard/Demo/Shot/Flight Time S",
+              "period": 0.06,
+              "show_submit_button": false
+            }
+          },
+          {
+            "title": "Block reason",
+            "x": 768.0,
+            "y": 384.0,
+            "width": 512.0,
+            "height": 128.0,
+            "type": "Text Display",
+            "properties": {
+              "topic": "/SmartDashboard/Demo/Shot/Block Reason",
+              "period": 0.06,
+              "show_submit_button": false
+            }
+          },
+          {
+            "title": "Hood deg",
+            "x": 0.0,
+            "y": 512.0,
+            "width": 128.0,
+            "height": 128.0,
+            "type": "Text Display",
+            "properties": {
+              "topic": "/SmartDashboard/Demo/Shooter/Hood Deg",
+              "period": 0.06,
+              "show_submit_button": false
+            }
+          },
+          {
+            "title": "Hood target",
+            "x": 128.0,
+            "y": 512.0,
+            "width": 128.0,
+            "height": 128.0,
+            "type": "Text Display",
+            "properties": {
+              "topic": "/SmartDashboard/Demo/Shooter/Hood Setpoint Deg",
+              "period": 0.06,
+              "show_submit_button": false
+            }
+          },
+          {
+            "title": "Turret deg",
+            "x": 256.0,
+            "y": 512.0,
+            "width": 128.0,
+            "height": 128.0,
+            "type": "Text Display",
+            "properties": {
+              "topic": "/SmartDashboard/Demo/Shooter/Turret Deg",
+              "period": 0.06,
+              "show_submit_button": false
+            }
+          },
+          {
+            "title": "Turret target",
+            "x": 384.0,
+            "y": 512.0,
+            "width": 128.0,
+            "height": 128.0,
+            "type": "Text Display",
+            "properties": {
+              "topic": "/SmartDashboard/Demo/Shooter/Turret Setpoint Deg",
+              "period": 0.06,
+              "show_submit_button": false
+            }
+          },
+          {
+            "title": "Hood ready",
+            "x": 512.0,
+            "y": 512.0,
+            "width": 128.0,
+            "height": 128.0,
+            "type": "Boolean Box",
+            "properties": {
+              "topic": "/SmartDashboard/Demo/Shooter/Hood Ready",
+              "period": 0.06
+            }
+          },
+          {
+            "title": "Turret ready",
+            "x": 640.0,
+            "y": 512.0,
+            "width": 128.0,
+            "height": 128.0,
+            "type": "Boolean Box",
+            "properties": {
+              "topic": "/SmartDashboard/Demo/Shooter/Turret Ready",
+              "period": 0.06
+            }
+          },
+          {
+            "title": "Flywheel ready",
+            "x": 768.0,
+            "y": 512.0,
+            "width": 128.0,
+            "height": 128.0,
+            "type": "Boolean Box",
+            "properties": {
+              "topic": "/SmartDashboard/Demo/Shooter/Flywheel Ready",
+              "period": 0.06
+            }
+          },
+          {
+            "title": "Manual feed reason",
+            "x": 896.0,
+            "y": 512.0,
+            "width": 128.0,
+            "height": 128.0,
+            "type": "Text Display",
+            "properties": {
+              "topic": "/SmartDashboard/Demo/Shooter/Manual Feed Reason",
+              "period": 0.06,
+              "show_submit_button": false
+            }
+          },
+          {
+            "title": "Last tag reject",
+            "x": 1024.0,
+            "y": 512.0,
+            "width": 128.0,
+            "height": 128.0,
+            "type": "Text Display",
+            "properties": {
+              "topic": "/SmartDashboard/Demo/Tag/Last Reject",
+              "period": 0.06,
+              "show_submit_button": false
+            }
+          },
+          {
+            "title": "Ambiguity",
+            "x": 1152.0,
+            "y": 512.0,
+            "width": 128.0,
+            "height": 128.0,
+            "type": "Text Display",
+            "properties": {
+              "topic": "/SmartDashboard/Demo/Tag/Ambiguity",
+              "period": 0.06,
+              "show_submit_button": false
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

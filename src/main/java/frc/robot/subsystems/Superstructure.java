@@ -25,6 +25,8 @@ import frc.robot.constants.Constants;
 import frc.robot.constants.FieldConstants;
 import frc.robot.constants.ZoneConstants;
 import frc.robot.constants.ZoneConstants.RectangleZone;
+import frc.robot.demo.DemoConstants;
+import frc.robot.demo.DemoShotSource;
 import frc.robot.lib.BLine.FlippingUtil;
 import frc.robot.lib.util.ConfigLoader;
 import frc.robot.lib.util.ShotKinematicsUtil;
@@ -59,7 +61,9 @@ public class Superstructure extends SubsystemBase {
         TRACKING,
         READY_FOR_SHOT,
         SHOOTING,
-        BUMP
+        BUMP,
+        /** Demo manual fire: fixed hood/flywheel/robot-relative turret from the dashboard. */
+        MANUAL_SHOT
     }
 
     public enum CurrentSystemState {
@@ -69,7 +73,17 @@ public class Superstructure extends SubsystemBase {
         PREPARING_FOR_SHOT,
         READY_FOR_SHOT,
         SHOOTING,
-        BUMP
+        BUMP,
+        MANUAL_SPINUP,
+        MANUAL_SHOOTING
+    }
+
+    /** Why demo manual fire started feeding. */
+    public enum ManualFeedReason {
+        NOT_YET,
+        READY,
+        TIMEOUT,
+        FORCED
     }
 
     public enum DesiredIntakeState {
@@ -121,10 +135,12 @@ public class Superstructure extends SubsystemBase {
         PASS_ALLIANCE_TOP_CORNER,
         PASS_ALLIANCE_BOTTOM_CORNER,
         PASS_NEUTRAL_TOP,
-        PASS_NEUTRAL_BOTTOM;
+        PASS_NEUTRAL_BOTTOM,
+        /** Demo AprilTag target; its location comes from the demo shot source. */
+        DEMO_TAG;
 
         public boolean isPassTarget() {
-            return this != HUB;
+            return this != HUB && this != DEMO_TAG;
         }
 
         public boolean isAlliancePassTarget() {
@@ -174,6 +190,11 @@ public class Superstructure extends SubsystemBase {
     private AlternatingIntakeTarget alternatingIntakeTarget = null;
     private double alternatingTargetSetTimestamp = 0;
     private boolean hasWarnedInvalidTurretRotationMargins = false;
+    private DemoShotSource demoShotSource = null;
+    private double manualSpinupStartTime = 0.0;
+    private ManualFeedReason manualFeedReason = ManualFeedReason.NOT_YET;
+    private Optional<String> demoShotBlockReason = Optional.empty();
+    private Translation3d lastDemoTargetLocation = null;
     
     // Cached shot data for mechanism control after applying guards.
     private ShotData cachedShotData;
@@ -233,7 +254,21 @@ public class Superstructure extends SubsystemBase {
         double maxDistanceMeters,
         boolean passingTarget,
         boolean lineOfSightClear,
-        boolean zoneAllowsTarget
+        boolean zoneAllowsTarget,
+        boolean demoTarget,
+        boolean demoTargetValid
+    ) {}
+
+    public record ShotStatus(
+        boolean readyForShot,
+        boolean shooterReady,
+        boolean distanceInRange,
+        boolean hoodAtSetpoint,
+        boolean turretAtSetpoint,
+        boolean flywheelAtSetpoint,
+        double effectiveDistanceMeters,
+        double minDistanceMeters,
+        double maxDistanceMeters
     ) {}
 
     record TurretRotationMargins(
@@ -305,6 +340,11 @@ public class Superstructure extends SubsystemBase {
 
         cachedShotReadinessData = calculateShotReadinessData(cachedShotComputationContext);
         logShotReadinessData(cachedShotReadinessData);
+        if (demoShotSource != null) {
+            Logger.recordOutput("Superstructure/demo/targetValid", cachedShotComputationContext.demoTargetValid());
+            Logger.recordOutput("Superstructure/demo/shotBlockReason", demoShotBlockReason.orElse(""));
+            Logger.recordOutput("Superstructure/demo/manualFeedReason", manualFeedReason.name());
+        }
 
         handleStateTransitions();
 
@@ -376,6 +416,36 @@ public class Superstructure extends SubsystemBase {
             case BUMP:
                 nextSystemState = CurrentSystemState.BUMP;
                 break;
+
+            case MANUAL_SHOT:
+                if (demoShotSource == null) {
+                    nextSystemState = CurrentSystemState.HOME;
+                    break;
+                }
+                if (currentSystemState != CurrentSystemState.MANUAL_SPINUP
+                    && currentSystemState != CurrentSystemState.MANUAL_SHOOTING) {
+                    nextSystemState = CurrentSystemState.MANUAL_SPINUP;
+                    manualSpinupStartTime = Timer.getTimestamp();
+                    manualFeedReason = ManualFeedReason.NOT_YET;
+                } else if (currentSystemState == CurrentSystemState.MANUAL_SPINUP) {
+                    // Once feeding starts it continues until the trigger is released.
+                    ManualFeedReason reason = decideManualFeed(
+                        demoShotSource.isManualForceFeed(),
+                        shooter.isHoodAtSetpoint(),
+                        shooter.isTurretAtSetpoint(),
+                        shooter.isFlywheelAtSetpoint(),
+                        Timer.getTimestamp() - manualSpinupStartTime,
+                        shooter.getFlywheelVelocityRotationsPerSec(),
+                        shooter.getFlywheelSetpointRPS(),
+                        DemoConstants.MANUAL_SPINUP_TIMEOUT_SEC,
+                        DemoConstants.MANUAL_TIMEOUT_MIN_SPEED_FRACTION
+                    );
+                    if (reason != ManualFeedReason.NOT_YET) {
+                        nextSystemState = CurrentSystemState.MANUAL_SHOOTING;
+                        manualFeedReason = reason;
+                    }
+                }
+                break;
         }
 
         if (nextSystemState == CurrentSystemState.PREPARING_FOR_SHOT
@@ -442,6 +512,12 @@ public class Superstructure extends SubsystemBase {
             case BUMP:
                 handleBumpState();
                 break;
+            case MANUAL_SPINUP:
+                handleManualShotState(false);
+                break;
+            case MANUAL_SHOOTING:
+                handleManualShotState(true);
+                break;
         }
 
         applyIntakeState(currentIntakeState);
@@ -466,6 +542,8 @@ public class Superstructure extends SubsystemBase {
             case PREPARING_FOR_SHOT:
             case READY_FOR_SHOT:
             case SHOOTING:
+            case MANUAL_SPINUP:
+            case MANUAL_SHOOTING:
             case DISABLED:
                 return;
             default:
@@ -485,18 +563,79 @@ public class Superstructure extends SubsystemBase {
     }
 
     private void handleTrackingState() {
+        if (isDemoTargetMissing()) {
+            applyHomeOutputs();
+            return;
+        }
         applyTrackingOutputs();
     }
 
     private void handlePreparingForShotState() {
+        if (isDemoTargetMissing()) {
+            applyHomeOutputs();
+            return;
+        }
         applyDynamicShotOutputs(getPreparingForShotHopperSetpoint(lastStateBeforePreparingForShot));
     }
 
     private void handleReadyForShotState() {
+        if (isDemoTargetMissing()) {
+            applyHomeOutputs();
+            return;
+        }
         applyDynamicShotOutputs(HopperSetpoint.OFF);
     }
 
+    private boolean isDemoTargetMissing() {
+        return cachedShotComputationContext != null
+            && cachedShotComputationContext.demoTarget()
+            && !cachedShotComputationContext.demoTargetValid();
+    }
+
+    private void handleManualShotState(boolean feeding) {
+        if (demoShotSource == null) {
+            applyHomeOutputs();
+            return;
+        }
+        applyDefaultMotionCaps();
+        swerveDrive.setDesiredOmegaOverrideState(SwerveDrive.DesiredOmegaOverrideState.NONE);
+        swerveDrive.setDesiredTranslationOverrideState(SwerveDrive.DesiredTranslationOverrideState.NONE);
+        shooter.setHoodAngle(Rotation2d.fromDegrees(demoShotSource.getManualHoodDegrees()));
+        shooter.setTurretAngle(Rotation2d.fromDegrees(demoShotSource.getManualTurretDegrees()));
+        shooter.setShotVelocity(demoShotSource.getManualFlywheelRps());
+        hopper.setSetpoint(feeding ? HopperSetpoint.FEEDING : HopperSetpoint.OFF);
+    }
+
+    static ManualFeedReason decideManualFeed(
+        boolean forceFeed,
+        boolean hoodAtSetpoint,
+        boolean turretAtSetpoint,
+        boolean flywheelAtSetpoint,
+        double spinupElapsedSeconds,
+        double measuredFlywheelRps,
+        double setpointFlywheelRps,
+        double timeoutSeconds,
+        double minSpeedFraction
+    ) {
+        if (forceFeed) {
+            return ManualFeedReason.FORCED;
+        }
+        if (hoodAtSetpoint && turretAtSetpoint && flywheelAtSetpoint) {
+            return ManualFeedReason.READY;
+        }
+        boolean spunUpEnough = setpointFlywheelRps > 0.0
+            && measuredFlywheelRps >= minSpeedFraction * setpointFlywheelRps;
+        if (spinupElapsedSeconds >= timeoutSeconds && spunUpEnough) {
+            return ManualFeedReason.TIMEOUT;
+        }
+        return ManualFeedReason.NOT_YET;
+    }
+
     private void handleShootingState() {        
+        if (isDemoTargetMissing()) {
+            applyHomeOutputs();
+            return;
+        }
         applyDynamicShotOutputs(HopperSetpoint.FEEDING);
 
         boolean shouldVisualizeShots = Constants.currentMode == Constants.Mode.SIM;
@@ -706,10 +845,14 @@ public class Superstructure extends SubsystemBase {
         double minShotDistance = context.minDistanceMeters();
         double maxShotDistance = context.maxDistanceMeters();
         boolean distanceInRange = isDistanceInRange(effectiveDistance, minShotDistance, maxShotDistance);
+        demoShotBlockReason = context.demoTarget() && context.demoTargetValid() && demoShotSource != null
+            ? demoShotSource.evaluateShotBlock(cachedShotData, context.shooterKinematics(), context.targetLocation())
+            : Optional.empty();
         boolean readyForShot = shooterReady
             && distanceInRange
             // && context.lineOfSightClear()
-            && context.zoneAllowsTarget();
+            && context.zoneAllowsTarget()
+            && demoShotBlockReason.isEmpty();
 
         return new ShotReadinessData(
             effectiveDistance,
@@ -948,7 +1091,9 @@ public class Superstructure extends SubsystemBase {
             context.lerpTable(),
             lcomp,
             shooter.getFlywheelVelocityRotationsPerSec(),
-            shooter::calculateShotExitVelocityMetersPerSec,
+            context.demoTarget() && demoShotSource != null
+                ? demoShotSource::exitSpeedForRps
+                : shooter::calculateShotExitVelocityMetersPerSec,
             rps -> shooter.calculateBackSpinRPM(rps) * 2.0 * Math.PI / 60.0,
             context.shooterKinematics().shooterOffsetFromRobotCenter(),
             context.shooterKinematics().robotHeading()
@@ -963,8 +1108,16 @@ public class Superstructure extends SubsystemBase {
         );
         RobotFieldZone robotFieldZone = getRobotFieldZone();
         TargetState zoneResolvedTarget = resolveTargetForZoneConstraints(desiredTargetState, robotFieldZone);
-        boolean zoneAllowsTarget = isTargetAllowedInZone(zoneResolvedTarget, robotFieldZone, Constants.DEMO_MODE);
-        Translation3d targetLocation = getFieldTargetLocation(zoneResolvedTarget);
+        boolean demoTarget = zoneResolvedTarget == TargetState.DEMO_TAG;
+        Optional<Translation3d> demoTargetLocation = demoTarget ? getDemoTargetLocation() : Optional.empty();
+        boolean demoTargetValid = demoTargetLocation.isPresent();
+        // A demo target with no location is never "allowed", which keeps readiness false.
+        boolean zoneAllowsTarget = demoTarget
+            ? demoTargetValid
+            : isTargetAllowedInZone(zoneResolvedTarget, robotFieldZone, Constants.DEMO_MODE);
+        Translation3d targetLocation = demoTarget
+            ? demoTargetLocation.orElseGet(() -> fallbackDemoTargetLocation(shooterKinematics))
+            : getFieldTargetLocation(zoneResolvedTarget);
         boolean passingTarget = zoneResolvedTarget.isPassTarget();
         Translation2d shooterPosition = shooterKinematics.shooterPosition().toTranslation2d();
         Translation2d targetPosition = targetLocation.toTranslation2d();
@@ -974,6 +1127,7 @@ public class Superstructure extends SubsystemBase {
             ZoneConstants.Tower.EXCLUSION
         );
         boolean lineOfSightClear = Constants.DEMO_MODE
+            || demoTarget
             || (
                 passingTarget
                     ? hasClearLineOfSightWithRectangularBlockers(
@@ -992,15 +1146,22 @@ public class Superstructure extends SubsystemBase {
 
         currentTargetState = zoneResolvedTarget;
 
-        InterpolatingMatrixTreeMap<Double, N3, N1> lerpTable = passingTarget
-            ? shooter.getPassLerpTable()
-            : shooter.getLerpTable();
-        double minDistance = passingTarget
-            ? shooter.getMinPassDistFromShooterMeters()
-            : shooter.getMinShotDistFromShooterMeters();
-        double maxDistance = passingTarget
-            ? shooter.getMaxPassDistFromShooterMeters()
-            : shooter.getMaxShotDistFromShooterMeters();
+        InterpolatingMatrixTreeMap<Double, N3, N1> lerpTable;
+        double minDistance;
+        double maxDistance;
+        if (demoTarget && demoShotSource != null) {
+            lerpTable = demoShotSource.getLerpTable(targetLocation.getZ());
+            minDistance = demoShotSource.getMinShotDistanceMeters();
+            maxDistance = demoShotSource.getMaxShotDistanceMeters();
+        } else {
+            lerpTable = passingTarget ? shooter.getPassLerpTable() : shooter.getLerpTable();
+            minDistance = passingTarget
+                ? shooter.getMinPassDistFromShooterMeters()
+                : shooter.getMinShotDistFromShooterMeters();
+            maxDistance = passingTarget
+                ? shooter.getMaxPassDistFromShooterMeters()
+                : shooter.getMaxShotDistFromShooterMeters();
+        }
 
         Logger.recordOutput("Superstructure/targetStateDesired", desiredTargetState.toString());
         Logger.recordOutput("Superstructure/targetStateCurrent", currentTargetState.toString());
@@ -1018,8 +1179,29 @@ public class Superstructure extends SubsystemBase {
             maxDistance,
             passingTarget,
             lineOfSightClear,
-            zoneAllowsTarget
+            zoneAllowsTarget,
+            demoTarget,
+            demoTargetValid
         );
+    }
+
+    private Optional<Translation3d> getDemoTargetLocation() {
+        if (demoShotSource == null) {
+            return Optional.empty();
+        }
+        Optional<Translation3d> location = demoShotSource.getTargetLocation();
+        location.ifPresent(target -> lastDemoTargetLocation = target);
+        return location;
+    }
+
+    /** Placeholder aim point when the demo has no target; outputs stay home so it is never shot at. */
+    private Translation3d fallbackDemoTargetLocation(ShotKinematicsUtil.ShooterKinematics shooterKinematics) {
+        if (lastDemoTargetLocation != null) {
+            return lastDemoTargetLocation;
+        }
+        Translation2d ahead = shooterKinematics.shooterPosition().toTranslation2d()
+            .plus(new Translation2d(3.0, 0.0).rotateBy(shooterKinematics.robotHeading()));
+        return new Translation3d(ahead.getX(), ahead.getY(), shooterKinematics.shooterPosition().getZ());
     }
 
     private RobotFieldZone getRobotFieldZone() {
@@ -1129,6 +1311,12 @@ public class Superstructure extends SubsystemBase {
     }
 
     private Translation3d getFieldTargetLocation(TargetState targetState) {
+        if (targetState == TargetState.DEMO_TAG) {
+            if (cachedShotComputationContext != null && cachedShotComputationContext.demoTarget()) {
+                return cachedShotComputationContext.targetLocation();
+            }
+            return lastDemoTargetLocation != null ? lastDemoTargetLocation : FieldConstants.Hub.hubCenter;
+        }
         return resolveFieldTargetLocation(targetState, Constants.shouldFlipPath(), Constants.DEMO_MODE);
     }
 
@@ -1158,6 +1346,7 @@ public class Superstructure extends SubsystemBase {
             case PASS_ALLIANCE_BOTTOM_CORNER -> FieldConstants.Passing.allianceBottomCorner;
             case PASS_NEUTRAL_TOP -> FieldConstants.Passing.neutralTop;
             case PASS_NEUTRAL_BOTTOM -> FieldConstants.Passing.neutralBottom;
+            case DEMO_TAG -> throw new IllegalArgumentException("DEMO_TAG location comes from the demo shot source");
         };
         return targetLocation;
     }
@@ -1322,7 +1511,51 @@ public class Superstructure extends SubsystemBase {
     }
 
     public InterpolatingMatrixTreeMap<Double, N3, N1> getCurrentTargetLerpTable() {
+        if (currentTargetState == TargetState.DEMO_TAG && cachedShotComputationContext != null) {
+            return cachedShotComputationContext.lerpTable();
+        }
         return currentTargetState.isPassTarget() ? shooter.getPassLerpTable() : shooter.getLerpTable();
+    }
+
+    public void setDemoShotSource(DemoShotSource source) {
+        demoShotSource = source;
+    }
+
+    public ShotStatus getShotStatus() {
+        ShotReadinessData data = cachedShotReadinessData;
+        return new ShotStatus(
+            data.readyForShot(),
+            data.shooterReady(),
+            data.distanceInRange(),
+            data.hoodAtSetpoint(),
+            data.turretAtSetpoint() && data.turretFieldRelativeAtSetpoint(),
+            data.flywheelAtSetpoint(),
+            data.effectiveDistanceMeters(),
+            data.minShotDistanceMeters(),
+            data.maxShotDistanceMeters()
+        );
+    }
+
+    public Optional<ShotData> getCachedShotData() {
+        return Optional.ofNullable(cachedShotData);
+    }
+
+    public Optional<ShotKinematicsUtil.ShooterKinematics> getCachedShooterKinematics() {
+        return cachedShotComputationContext == null
+            ? Optional.empty()
+            : Optional.of(cachedShotComputationContext.shooterKinematics());
+    }
+
+    public boolean isDemoTargetValid() {
+        return cachedShotComputationContext != null && cachedShotComputationContext.demoTargetValid();
+    }
+
+    public Optional<String> getDemoShotBlockReason() {
+        return demoShotBlockReason;
+    }
+
+    public ManualFeedReason getManualFeedReason() {
+        return manualFeedReason;
     }
 
     @AutoLogOutput(key = "Superstructure/isClimbExtended")

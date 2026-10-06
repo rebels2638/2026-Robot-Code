@@ -167,9 +167,18 @@ public class VisionIOLimelight implements VisionIO {
                 ambiguity,
                 tagCount,
                 averageTagDistance,
-                type
+                type,
+                parsePrimaryTagId(values, tagCount)
             )
         );
+    }
+
+    /** First fiducial ID in a botpose array (raw fiducials start at index 11, 7 values each). */
+    static int parsePrimaryTagId(double[] rawSample, int tagCount) {
+        if (tagCount <= 0 || rawSample.length < 18 || !Double.isFinite(rawSample[11])) {
+            return -1;
+        }
+        return (int) rawSample[11];
     }
 
     private static void collectTagIds(Set<Integer> tagIds, double[] rawSample) {

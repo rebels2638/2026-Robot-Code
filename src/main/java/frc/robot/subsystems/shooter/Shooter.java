@@ -781,6 +781,14 @@ public class Shooter extends SubsystemBase {
         return config.latencyCompensationSeconds;
     }
 
+    public double getHoodMinAngleDeg() {
+        return config.hoodMinAngleDegrees;
+    }
+
+    public double getHoodMaxAngleDeg() {
+        return config.hoodMaxAngleDegrees;
+    }
+
     public double getTurretMinAngleDeg() {
         return config.turretMinAngleDeg;
     }

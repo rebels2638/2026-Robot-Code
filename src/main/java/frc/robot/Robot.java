@@ -109,7 +109,7 @@ public class Robot extends LoggedRobot {
         // for elastic dashboard
         WebServer.start(5800, Filesystem.getDeployDirectory().getPath());
         // startElasticCameraPublishers();
-        Elastic.selectTab("Autonomous"); // this call speeds up load time keep. 
+        Elastic.selectTab(Constants.DEMO_MODE ? "Demo" : "Autonomous"); // this call speeds up load time keep. 
 
         m_robotContainer = RobotContainer.getInstance();
 

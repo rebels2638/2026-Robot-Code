@@ -21,6 +21,7 @@ import frc.robot.subsystems.swerve.SwerveDrive;
 import edu.wpi.first.networktables.NetworkTableInstance;
 import edu.wpi.first.networktables.StructPublisher;
 import java.util.NoSuchElementException;
+import java.util.Optional;
 import org.littletonrobotics.junction.AutoLogOutput;
 import org.littletonrobotics.junction.Logger;
 import org.littletonrobotics.junction.networktables.LoggedNetworkBoolean;
@@ -241,6 +242,11 @@ public class RobotState {
         hasYawSample = true;
 
         poseBuffer.clear();
+    }
+
+    /** Odometry pose at a past timestamp, interpolated from the pose buffer. Empty if outside the buffer. */
+    public Optional<Pose2d> getPoseAtTime(double timestampSeconds) {
+        return poseBuffer.getSample(timestampSeconds);
     }
 
     public void zeroGyro() {
