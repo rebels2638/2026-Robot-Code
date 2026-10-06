@@ -39,7 +39,6 @@ public final class DemoConstants {
     public static final double MIN_TAG_SHOT_DISTANCE_METERS = 1.0;
     public static final double MAX_TAG_SHOT_DISTANCE_METERS = 10.0;
     public static final double TAG_LERP_TABLE_STEP_METERS = 0.25;
-    public static final double DEFAULT_MAX_SPEED_AT_TAG_MPS = 5.5;
     public static final double DEFAULT_CEILING_HEIGHT_METERS = 3.0;
     public static final double CEILING_MARGIN_METERS = 0.25;
     public static final double MIN_TARGET_HEIGHT_METERS = 0.0;

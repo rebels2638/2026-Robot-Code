@@ -13,8 +13,8 @@ class DemoStatusTest {
             .startsWith("NO TARGET"));
         assertTrue(DemoController.describeTagStatus(true, false, 0.4, Optional.empty(), true, true, true, true, false, false)
             .startsWith("OUT OF RANGE"));
-        assertEquals("TOO FAST", DemoController.describeTagStatus(
-            true, true, 3.0, Optional.of("TOO FAST"), true, true, true, true, false, false));
+        assertEquals("CEILING", DemoController.describeTagStatus(
+            true, true, 3.0, Optional.of("CEILING"), true, true, true, true, false, false));
         assertEquals("SHOOTER NOT READY: turret, flywheel", DemoController.describeTagStatus(
             true, true, 3.0, Optional.empty(), false, true, false, false, false, false));
         assertEquals("READY: hold RT", DemoController.describeTagStatus(

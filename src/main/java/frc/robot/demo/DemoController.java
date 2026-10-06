@@ -266,11 +266,6 @@ public final class DemoController extends SubsystemBase implements DemoShotSourc
         lastPrediction = prediction;
         lastPredictionTimestamp = Timer.getTimestamp();
 
-        double maxSpeed = settings.getMaxSpeedAtTagMps();
-        if (maxSpeed > 0.0 && prediction.speedAtTargetMetersPerSec() > maxSpeed) {
-            return Optional.of(String.format("TOO FAST AT TAG: %.1f > %.1f m/s, move closer",
-                prediction.speedAtTargetMetersPerSec(), maxSpeed));
-        }
         double ceiling = settings.getCeilingHeightMeters();
         double peakAboveFloor = shooterKinematics.shooterPosition().getZ() + prediction.peakHeightAboveShooterMeters();
         if (ceiling > 0.0 && peakAboveFloor > ceiling - DemoConstants.CEILING_MARGIN_METERS) {

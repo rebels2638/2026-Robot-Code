@@ -38,8 +38,6 @@ public final class DemoSettings {
     private final LoggedNetworkBoolean heightOverrideEnabled = bool("Tag/Height Override", false);
     private final LoggedNetworkNumber heightOverrideMeters =
         number("Tag/Override Height M", DemoConstants.DEFAULT_PLACE_HEIGHT_METERS);
-    private final LoggedNetworkNumber maxSpeedAtTag =
-        number("Tag/Max Speed At Tag MPS", DemoConstants.DEFAULT_MAX_SPEED_AT_TAG_MPS);
     private final LoggedNetworkNumber ceilingHeight =
         number("Tag/Ceiling Height M", DemoConstants.DEFAULT_CEILING_HEIGHT_METERS);
 
@@ -156,11 +154,6 @@ public final class DemoSettings {
     public double getHeightOverrideMeters() {
         return clampOr(heightOverrideMeters.get(), DemoConstants.MIN_TARGET_HEIGHT_METERS,
             DemoConstants.MAX_TARGET_HEIGHT_METERS, DemoConstants.DEFAULT_PLACE_HEIGHT_METERS);
-    }
-
-    /** Zero or less turns the limit off. */
-    public double getMaxSpeedAtTagMps() {
-        return clampOr(maxSpeedAtTag.get(), 0.0, 30.0, DemoConstants.DEFAULT_MAX_SPEED_AT_TAG_MPS);
     }
 
     /** Zero or less turns the limit off. */

@@ -437,21 +437,8 @@
             }
           },
           {
-            "title": "Max speed at tag",
-            "x": 640.0,
-            "y": 512.0,
-            "width": 128.0,
-            "height": 128.0,
-            "type": "Text Display",
-            "properties": {
-              "topic": "/SmartDashboard/Demo/Tag/Max Speed At Tag MPS",
-              "period": 0.06,
-              "show_submit_button": true
-            }
-          },
-          {
             "title": "Ceiling m",
-            "x": 768.0,
+            "x": 640.0,
             "y": 512.0,
             "width": 128.0,
             "height": 128.0,
@@ -464,9 +451,9 @@
           },
           {
             "title": "Last event",
-            "x": 896.0,
+            "x": 768.0,
             "y": 512.0,
-            "width": 384.0,
+            "width": 512.0,
             "height": 128.0,
             "type": "Text Display",
             "properties": {

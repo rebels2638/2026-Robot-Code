@@ -23,7 +23,7 @@ public interface DemoShotSource {
     /** Ball exit speed for a flywheel speed, from the demo's fitted model. */
     double exitSpeedForRps(double flywheelRps);
 
-    /** Reason this tag shot must not fire (speed at tag, ceiling), or empty when it is allowed. */
+    /** Reason this tag shot must not fire (unreachable, flywheel limit, ceiling), or empty when it is allowed. */
     Optional<String> evaluateShotBlock(ShotData shotData, ShooterKinematics shooterKinematics, Translation3d targetLocation);
 
     double getManualHoodDegrees();
