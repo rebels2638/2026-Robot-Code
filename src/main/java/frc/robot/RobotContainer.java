@@ -14,6 +14,7 @@ import edu.wpi.first.wpilibj2.command.RunCommand;
 import edu.wpi.first.wpilibj2.command.SequentialCommandGroup;
 import edu.wpi.first.wpilibj2.command.WaitUntilCommand;
 import edu.wpi.first.wpilibj2.command.button.Trigger;
+import frc.robot.commands.autos.AutoPathPreview;
 import frc.robot.commands.autos.Autos;
 import frc.robot.constants.Constants;
 import frc.robot.demo.DemoController;
@@ -92,6 +93,7 @@ public class RobotContainer {
 
         autoChooser = Autos.getChooser();
         SmartDashboard.putData("Auto Chooser", autoChooser);
+        new AutoPathPreview(autoChooser);
 
         configureBindings();
     }
@@ -381,11 +383,14 @@ public class RobotContainer {
     }
 
     public Command getAutonomousCommand() {
-        if (demoController != null) {
-            // Demo: autonomous does nothing, so an accidental Auto enable can never run a path.
+        Command selectedAuto = autoChooser.getSelected();
+        if (selectedAuto == null) {
             return Commands.none();
         }
-        Command selectedAuto = autoChooser.getSelected();
-        return selectedAuto != null ? selectedAuto : Commands.none();
+        if (demoController != null && !Autos.isOptimumDemoAuto(selectedAuto)) {
+            // Demo: only the demo path autos run, so an accidental Auto enable can never run a comp path.
+            return Commands.none();
+        }
+        return selectedAuto;
     }
 }

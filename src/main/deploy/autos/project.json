@@ -171,6 +171,11 @@
           }
         ]
       }
+    },
+    {
+      "path_id": "path-2485559a-1459-4ac4-86d5-9285bd4b6b34",
+      "display_name": "optimum-demo-path",
+      "file_name": "optimum-demo-path.json"
     }
   ],
   "path_groups": [],

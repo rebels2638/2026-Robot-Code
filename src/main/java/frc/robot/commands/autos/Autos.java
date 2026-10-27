@@ -3,6 +3,7 @@ package frc.robot.commands.autos;
 import edu.wpi.first.math.geometry.Pose2d;
 import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.math.geometry.Translation2d;
+import edu.wpi.first.wpilibj.DriverStation;
 import edu.wpi.first.wpilibj.smartdashboard.SendableChooser;
 import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.Commands;
@@ -33,12 +34,32 @@ import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.stream.Stream;
 
 public final class Autos {
     private static final String PATH_FILE_EXTENSION = ".json";
 
+    /** Path shared by the demo autos, edited on the fly in BLine Web. */
+    static final String OPTIMUM_DEMO_PATH = "optimum-demo-path";
+    static final String OPTIMUM_DEMO_AUTO = "optimum-demo-path";
+    static final String OPTIMUM_DEMO_AUTO_WITH_RESET = "optimum-demo-path-with-reset";
+
     private Autos() {}
+
+    /** True for the demo path autos, the only ones allowed to run in demo mode. */
+    public static boolean isOptimumDemoAuto(Command auto) {
+        String name = auto.getName();
+        return OPTIMUM_DEMO_AUTO.equals(name) || OPTIMUM_DEMO_AUTO_WITH_RESET.equals(name);
+    }
+
+    /** A fresh copy of the path to preview for an auto; only the demo path autos have one. */
+    static Optional<Path> getPreviewPath(Command auto) {
+        if (!isOptimumDemoAuto(auto)) {
+            return Optional.empty();
+        }
+        return Optional.ofNullable(PreloadedPathsHolder.PRELOADED_PATHS.get(OPTIMUM_DEMO_PATH)).map(Path::copy);
+    }
 
     public static SendableChooser<Command> getChooser() {
         SendableChooser<Command> chooser = new SendableChooser<>();
@@ -67,12 +88,14 @@ public final class Autos {
                 .sorted(Comparator.comparing(pathFile -> pathFile.getFileName().toString()))
                 .forEach(pathFile -> {
                     String pathName = getPathName(pathFile);
-                    Path previousPath = preloadedPaths.put(
-                        pathName,
-                        loadPathFromJson(pathFile, defaultGlobalConstraints)
-                    );
-                    if (previousPath != null) {
+                    if (preloadedPaths.containsKey(pathName)) {
                         throw new IllegalStateException("Duplicate auto path name found while preloading: " + pathName);
+                    }
+                    try {
+                        preloadedPaths.put(pathName, loadPathFromJson(pathFile, defaultGlobalConstraints));
+                    } catch (RuntimeException exception) {
+                        // A bad on-the-fly edit must not take down robot code; autos using it report instead.
+                        DriverStation.reportError("Skipping auto path " + pathName + ": " + exception.getMessage(), false);
                     }
                 });
         } catch (IOException exception) {
@@ -118,6 +141,8 @@ public final class Autos {
 
     private static final class AutoDefinitionsHolder {
         private static final List<AutoDefinition> AUTOS = List.of(
+            auto(OPTIMUM_DEMO_AUTO, optimumDemoPath(false)),
+            auto(OPTIMUM_DEMO_AUTO_WITH_RESET, optimumDemoPath(true)),
             // auto(
             //     "Simple Back",
             //     new Pose2d(new Translation2d(0.0, 0.0), new Rotation2d()),
@@ -417,6 +442,21 @@ public final class Autos {
                 .setEndRotationToleranceDeg(endRotationToleranceDeg)
         );
         return path;
+    }
+
+    /**
+     * Follows the demo path, flipped for the alliance but never mirrored. A missing, empty or
+     * unanchored path only reports a warning, since pre-aligning the modules to it would throw.
+     */
+    private static Command optimumDemoPath(boolean shouldResetPose) {
+        Path path = PreloadedPathsHolder.PRELOADED_PATHS.get(OPTIMUM_DEMO_PATH);
+        if (path == null || !path.isValid()) {
+            return Commands.runOnce(() -> DriverStation.reportWarning(
+                OPTIMUM_DEMO_PATH + " is missing, empty, or does not start and end on a point; draw it in BLine and redeploy",
+                false
+            ));
+        }
+        return firstFollowPath(OPTIMUM_DEMO_PATH, shouldResetPose, false);
     }
 
     public static Command waitSeconds(double seconds) {
