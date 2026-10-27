@@ -1,11 +1,16 @@
 # Optimum demo: shop test checklist
 
-Branch `optimum-demo` (COMP mode, `Constants.DEMO_MODE = true`). Deploy from the main checkout.
+Branch `optimum-demo` (COMP mode). Deploy from the main checkout.
+
+**Demo vs full field:** the *Demo mode (after restart)* toggle (Demo Setup and Autonomous tabs,
+NT `/Preferences/DemoMode`, defaults on) is read once at startup. Flip it, then **Restart Robot Code**
+from the Driver Station; *Demo mode active* shows what is running. Off = comp bindings, full speed,
+vision pose correction and the BLine auto chooser.
 
 ## Setup
 1. `./gradlew deploy`, then set the Driver Station team station to **Blue** and select **TeleOperated**.
    Autonomous does nothing in demo mode on purpose.
-2. Elastic: load the layout from the robot (`elastic-layout.json` in deploy). Tabs: **Demo**, **Demo Setup**.
+2. Elastic: load the layout from the robot (`elastic-layout.json` in deploy). Tabs: **Demo**, **Demo Setup**, **Autonomous**.
 3. Print AprilTag **36h11 ID 26**, black square exactly **6.5 in (165.1 mm)**, mounted flat on stiff board.
 4. Controller on port 3. Map: sticks drive/turn, RT fire, LT/LB/RB intake, X/Y reverse,
    **A = Manual/Tag**, **B = save tag target**. Zero gyro / clear target are dashboard buttons.

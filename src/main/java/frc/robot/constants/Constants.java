@@ -5,6 +5,7 @@
 package frc.robot.constants;
 
 import edu.wpi.first.wpilibj.DriverStation;
+import edu.wpi.first.wpilibj.Preferences;
 
 /**
  * The Constants class provides a convenient place for teams to hold robot-wide
@@ -21,7 +22,19 @@ import edu.wpi.first.wpilibj.DriverStation;
 public final class Constants {
     public static final Mode currentMode = Mode.COMP; // TODO: change this if sim
     public static boolean VERBOSE_LOGGING_ENABLED = false;
+    /**
+     * Set once at startup from the {@value #DEMO_MODE_PREFERENCE_KEY} preference; the value here is
+     * only the default for a roboRIO that has never stored it. Flip it on the dashboard, then
+     * restart robot code.
+     */
     public static boolean DEMO_MODE = true;
+    public static final String DEMO_MODE_PREFERENCE_KEY = "DemoMode";
+
+    /** Reads the persisted demo toggle, creating it with the default the first time. */
+    public static boolean loadDemoModePreference() {
+        Preferences.initBoolean(DEMO_MODE_PREFERENCE_KEY, DEMO_MODE);
+        return Preferences.getBoolean(DEMO_MODE_PREFERENCE_KEY, DEMO_MODE);
+    }
 
     // public static final boolean isSYSID = true; // TODO: change this if sysid
 

@@ -22,6 +22,7 @@ import edu.wpi.first.cscore.HttpCamera;
 import edu.wpi.first.net.WebServer;
 import edu.wpi.first.wpilibj.DriverStation;
 import edu.wpi.first.wpilibj.Filesystem;
+import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
 import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.CommandScheduler;
 import frc.robot.constants.Constants;
@@ -58,6 +59,9 @@ public class Robot extends LoggedRobot {
 
         configurePhoenixLogging();
         SignalLogger.enableAutoLogging(true); // TODO: ABSOLUTELY NEED TO BE HERE FOR COMPS
+        // Demo vs full field comes from a persisted preference, read before anything uses it.
+        Constants.DEMO_MODE = Constants.loadDemoModePreference();
+        Logger.recordMetadata("DemoMode", Boolean.toString(Constants.DEMO_MODE));
         // Record metadata
         // Logger.recordMetadata("ProjectName", BuildConstants.MAVEN_NAME);
         // Logger.recordMetadata("BuildDate", BuildConstants.BUILD_DATE);
@@ -109,7 +113,9 @@ public class Robot extends LoggedRobot {
         // for elastic dashboard
         WebServer.start(5800, Filesystem.getDeployDirectory().getPath());
         // startElasticCameraPublishers();
-        Elastic.selectTab(Constants.DEMO_MODE ? "Demo" : "Autonomous"); // this call speeds up load time keep. 
+        Elastic.selectTab(Constants.DEMO_MODE ? "Demo" : "Autonomous"); // this call speeds up load time keep.
+        // What this run is actually using; the DemoMode preference only applies after a restart.
+        SmartDashboard.putBoolean("Demo Mode Active", Constants.DEMO_MODE);
 
         m_robotContainer = RobotContainer.getInstance();
 
