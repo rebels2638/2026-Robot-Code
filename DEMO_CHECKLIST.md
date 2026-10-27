@@ -7,6 +7,13 @@ NT `/Preferences/DemoMode`, defaults on) is read once at startup. Flip it, then 
 from the Driver Station; *Demo mode active* shows what is running. Off = comp bindings, full speed,
 vision pose correction and the BLine auto chooser.
 
+**Partial field:** *Ignore zone/line-of-sight checks* (Autonomous tab, `/Preferences/IgnoreFieldChecks`,
+defaults off) applies immediately: the hub can be shot from any zone and B passes ignore blockers.
+
+**Before any restart or redeploy:** the hood (70 deg), turret (180 deg), intake pivot (stowed) and climber
+(down) encoders are reset to those positions when robot code starts. Re-enable TeleOp (goes HOME), press
+RB to stow the intake, disable, then restart. Otherwise the mechanisms come up mis-zeroed.
+
 ## Setup
 1. `./gradlew deploy`, then set the Driver Station team station to **Blue** and select **TeleOperated**.
    Autonomous does nothing in demo mode on purpose.

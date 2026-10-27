@@ -1111,10 +1111,11 @@ public class Superstructure extends SubsystemBase {
         boolean demoTarget = zoneResolvedTarget == TargetState.DEMO_TAG;
         Optional<Translation3d> demoTargetLocation = demoTarget ? getDemoTargetLocation() : Optional.empty();
         boolean demoTargetValid = demoTargetLocation.isPresent();
+        boolean ignoreFieldChecks = Constants.shouldIgnoreFieldChecks();
         // A demo target with no location is never "allowed", which keeps readiness false.
         boolean zoneAllowsTarget = demoTarget
             ? demoTargetValid
-            : isTargetAllowedInZone(zoneResolvedTarget, robotFieldZone, Constants.DEMO_MODE);
+            : isTargetAllowedInZone(zoneResolvedTarget, robotFieldZone, ignoreFieldChecks);
         Translation3d targetLocation = demoTarget
             ? demoTargetLocation.orElseGet(() -> fallbackDemoTargetLocation(shooterKinematics))
             : getFieldTargetLocation(zoneResolvedTarget);
@@ -1126,7 +1127,7 @@ public class Superstructure extends SubsystemBase {
             ZoneConstants.Hub.EXCLUSION,
             ZoneConstants.Tower.EXCLUSION
         );
-        boolean lineOfSightClear = Constants.DEMO_MODE
+        boolean lineOfSightClear = ignoreFieldChecks
             || demoTarget
             || (
                 passingTarget
@@ -1169,6 +1170,7 @@ public class Superstructure extends SubsystemBase {
         Logger.recordOutput("Superstructure/targetLocation", targetLocation);
         Logger.recordOutput("Superstructure/passingTarget", passingTarget);
         Logger.recordOutput("Superstructure/demoMode", Constants.DEMO_MODE);
+        Logger.recordOutput("Superstructure/fieldChecksIgnored", ignoreFieldChecks);
 
         return new ShotComputationContext(
             currentTargetState,
@@ -1229,9 +1231,9 @@ public class Superstructure extends SubsystemBase {
     static boolean isTargetAllowedInZone(
         TargetState targetState,
         RobotFieldZone robotFieldZone,
-        boolean demoMode
+        boolean ignoreZones
     ) {
-        if (demoMode) {
+        if (ignoreZones) {
             return true;
         }
         if (targetState == TargetState.HUB) {
@@ -1379,9 +1381,10 @@ public class Superstructure extends SubsystemBase {
             candidates.add(new TargetCandidate(targetState, targetPosition, lineOfSightClear));
         }
 
+        boolean ignoreLineOfSight = Constants.shouldIgnoreFieldChecks();
         Optional<TargetState> selectedTarget = selectClosestLineOfSightTarget(
             shooterPosition,
-            Constants.DEMO_MODE,
+            ignoreLineOfSight,
             candidates.toArray(TargetCandidate[]::new)
         );
         Logger.recordOutput("Superstructure/closestAlliancePassTargetFound", selectedTarget.isPresent());
@@ -1389,7 +1392,7 @@ public class Superstructure extends SubsystemBase {
             "Superstructure/closestAlliancePassTarget",
             selectedTarget.map(Enum::name).orElse("NONE")
         );
-        Logger.recordOutput("Superstructure/closestAlliancePassTargetLineOfSightBypassed", Constants.DEMO_MODE);
+        Logger.recordOutput("Superstructure/closestAlliancePassTargetLineOfSightBypassed", ignoreLineOfSight);
         return selectedTarget;
     }
 

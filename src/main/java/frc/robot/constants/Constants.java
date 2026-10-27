@@ -36,6 +36,16 @@ public final class Constants {
         return Preferences.getBoolean(DEMO_MODE_PREFERENCE_KEY, DEMO_MODE);
     }
 
+    /**
+     * Persisted dashboard switch that skips the hub-zone and pass line-of-sight checks, for partial
+     * fields. Read live, so it applies without a restart. Demo mode always skips them.
+     */
+    public static final String IGNORE_FIELD_CHECKS_PREFERENCE_KEY = "IgnoreFieldChecks";
+
+    public static boolean shouldIgnoreFieldChecks() {
+        return DEMO_MODE || Preferences.getBoolean(IGNORE_FIELD_CHECKS_PREFERENCE_KEY, false);
+    }
+
     // public static final boolean isSYSID = true; // TODO: change this if sysid
 
     public static enum Mode {
