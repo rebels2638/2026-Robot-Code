@@ -233,6 +233,7 @@
       "intermediate_handoff_radius_meters": 0.25
     }
   ],
+  "tank_drive_direction": "forward",
   "constraints": {
     "max_velocity_meters_per_sec": [
       {

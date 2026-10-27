@@ -1,0 +1,178 @@
+{
+  "schema_version": 1,
+  "project_id": "workspace-b8180db8-778a-455c-b6ab-3f3c4147850c",
+  "display_name": "autos",
+  "editor_config": {
+    "gui": {
+      "event_trigger_keys": [
+        "alt",
+        "deploy",
+        "do this stuff",
+        "intake",
+        "lob",
+        "lob_top_corner",
+        "ready",
+        "reverse",
+        "shoot"
+      ],
+      "robot": {
+        "length_meters": 0.8,
+        "width_meters": 0.8
+      },
+      "protrusions": {
+        "enabled": false,
+        "distance_meters": 0,
+        "side": "none",
+        "default_state": "",
+        "show_on_event_keys": [],
+        "hide_on_event_keys": []
+      }
+    },
+    "kinematic_constraints": {
+      "default_auto_velocity_velocity_safety_factor": 1,
+      "default_auto_velocity_acceleration_safety_factor": 1,
+      "default_auto_velocity_merge_tolerance_meters_per_sec": 0.3
+    }
+  },
+  "paths": [
+    {
+      "path_id": "path-96ec01e5-638c-4749-94ae-f23f0f487fa4",
+      "display_name": "bottom_jab_sharp",
+      "file_name": "bottom_jab_sharp.json"
+    },
+    {
+      "path_id": "path-b1e47610-da91-4111-bf9b-9f9df7ffd12d",
+      "display_name": "bottom_sweep_long",
+      "file_name": "bottom_sweep_long.json"
+    },
+    {
+      "path_id": "path-38571a9e-8afb-4e2d-bc00-ff1cd9f3844b",
+      "display_name": "bottom_sweep_over",
+      "file_name": "bottom_sweep_over.json"
+    },
+    {
+      "path_id": "path-e41b066b-8454-48e5-a4f2-e0abf6cabe6d",
+      "display_name": "bottom_sweep_short",
+      "file_name": "bottom_sweep_short.json"
+    },
+    {
+      "path_id": "path-c2bf5b63-4a7b-4a7a-b80e-6e9e10b8a9ba",
+      "display_name": "depo",
+      "file_name": "depo.json"
+    },
+    {
+      "path_id": "path-0b66668d-e677-46b4-93b1-dc9bb1aa1b61",
+      "display_name": "double_swipe_top_depo",
+      "file_name": "double_swipe_top_depo.json"
+    },
+    {
+      "path_id": "path-4b2ae504-c643-4e99-9e3b-43b9e162d32f",
+      "display_name": "fast_depo",
+      "file_name": "fast_depo.json"
+    },
+    {
+      "path_id": "path-a6f44428-df8c-40de-b445-c382de7ba41e",
+      "display_name": "middle_depo",
+      "file_name": "middle_depo.json"
+    },
+    {
+      "path_id": "path-64de0fbf-7c0c-472a-8570-5f072e5970d0",
+      "display_name": "outpost",
+      "file_name": "outpost.json"
+    },
+    {
+      "path_id": "path-4afb1490-6c52-4067-a00e-b83fba9096cb",
+      "display_name": "outpost_tower",
+      "file_name": "outpost_tower.json"
+    },
+    {
+      "path_id": "path-2eb8854d-0c0c-47d4-8433-cbdfab1b3da8",
+      "display_name": "straight",
+      "file_name": "straight.json"
+    },
+    {
+      "path_id": "path-ea17ed42-d8d6-4147-bb97-5f6a8167ad9a",
+      "display_name": "top_sweep_hub",
+      "file_name": "top_sweep_hub.json"
+    },
+    {
+      "path_id": "path-d1883126-aa48-439c-bb85-fb4f83a57465",
+      "display_name": "top_sweep_lob_depo",
+      "file_name": "top_sweep_lob_depo.json"
+    },
+    {
+      "path_id": "path-55e8caaa-52b5-4f35-b6a4-04444b28e570",
+      "display_name": "top_sweep_lob_first",
+      "file_name": "top_sweep_lob_first.json"
+    },
+    {
+      "path_id": "path-8d5c8dad-011d-4eda-bb70-540471b069f9",
+      "display_name": "top_sweep_lob_second",
+      "file_name": "top_sweep_lob_second.json"
+    },
+    {
+      "path_id": "path-b71dbe8e-c4e2-4ab9-a36e-3f101e0e063e",
+      "display_name": "top_sweep_short_depo",
+      "file_name": "top_sweep_short_depo.json"
+    },
+    {
+      "path_id": "path-87dc50b9-8d39-4bca-8044-114c832f02f1",
+      "display_name": "top_sweep_short_first",
+      "file_name": "top_sweep_short_first.json"
+    },
+    {
+      "path_id": "path-ef5e493b-cd60-4fdb-a38d-26369872607d",
+      "display_name": "top_sweep_short_first_deep",
+      "file_name": "top_sweep_short_first_deep.json"
+    },
+    {
+      "path_id": "path-3b00f0e9-0e11-4b31-a209-b6f0430e70af",
+      "display_name": "top_sweep_short_second",
+      "file_name": "top_sweep_short_second.json"
+    },
+    {
+      "path_id": "path-2e76df6f-a74b-4bfd-aa6f-9d2d6743101a",
+      "display_name": "New Path",
+      "file_name": "New Path.json",
+      "editor_metadata": {
+        "preview": {
+          "start_pose": {
+            "x_meters": 8.27,
+            "y_meters": 4.035,
+            "rotation_radians": 0
+          }
+        },
+        "ranged_constraints": [
+          {
+            "key": "max_velocity_meters_per_sec",
+            "value": 2.25,
+            "start_ordinal": 1,
+            "end_ordinal": 1,
+            "source": "auto_velocity",
+            "auto_velocity": {
+              "velocity_safety_factor": 1,
+              "acceleration_safety_factor": 1,
+              "merge_tolerance_meters_per_sec": 0.3,
+              "input_signature": "{\"solverVersion\":17,\"driveType\":\"swerve\",\"preview\":{\"start_pose\":{\"x_meters\":8.27,\"y_meters\":4.035,\"rotation_radians\":0}},\"tankDirection\":null,\"handoffModes\":[\"radius\",\"radius\"],\"pathElements\":[{\"type\":\"translation\",\"xMeters\":13.70221531016791,\"yMeters\":1.000422516324627,\"handoffRadiusMeters\":\"auto\"},{\"type\":\"translation\",\"xMeters\":0.0030274020522375045,\"yMeters\":6.376291394589558,\"handoffRadiusMeters\":\"auto\"}],\"scalarConstraints\":{\"minVelocityMps\":null,\"minVelocityDegPerSec\":null,\"endTranslationTolerance\":null,\"endRotationTolerance\":null,\"maxVelocityMps\":null,\"maxAccelerationMps2\":null,\"maxVelocityDegPerSec\":null,\"maxAccelerationDegPerSec\":null},\"rangedConstraints\":[],\"config\":{\"endTranslationTolerance\":0.03,\"endRotationTolerance\":2,\"maxVelocityMps\":4.5,\"maxAccelerationMps2\":12,\"handoffRadiusMeters\":0.25,\"maxVelocityDegPerSec\":600,\"maxAccelerationDegPerSec\":2000,\"autoVelocityVelocitySafetyFactor\":1,\"autoVelocityAccelerationSafetyFactor\":1},\"options\":{\"velocitySafetyFactor\":1,\"accelerationSafetyFactor\":1,\"sampleStepMeters\":null,\"mergeToleranceMps\":0.3,\"includeGeneratedRadiiInCacheKey\":false}}"
+            }
+          },
+          {
+            "key": "max_velocity_meters_per_sec",
+            "value": 4.5,
+            "start_ordinal": 2,
+            "end_ordinal": 2,
+            "source": "auto_velocity",
+            "auto_velocity": {
+              "velocity_safety_factor": 1,
+              "acceleration_safety_factor": 1,
+              "merge_tolerance_meters_per_sec": 0.3,
+              "input_signature": "{\"solverVersion\":17,\"driveType\":\"swerve\",\"preview\":{\"start_pose\":{\"x_meters\":8.27,\"y_meters\":4.035,\"rotation_radians\":0}},\"tankDirection\":null,\"handoffModes\":[\"radius\",\"radius\"],\"pathElements\":[{\"type\":\"translation\",\"xMeters\":13.70221531016791,\"yMeters\":1.000422516324627,\"handoffRadiusMeters\":\"auto\"},{\"type\":\"translation\",\"xMeters\":0.0030274020522375045,\"yMeters\":6.376291394589558,\"handoffRadiusMeters\":\"auto\"}],\"scalarConstraints\":{\"minVelocityMps\":null,\"minVelocityDegPerSec\":null,\"endTranslationTolerance\":null,\"endRotationTolerance\":null,\"maxVelocityMps\":null,\"maxAccelerationMps2\":null,\"maxVelocityDegPerSec\":null,\"maxAccelerationDegPerSec\":null},\"rangedConstraints\":[],\"config\":{\"endTranslationTolerance\":0.03,\"endRotationTolerance\":2,\"maxVelocityMps\":4.5,\"maxAccelerationMps2\":12,\"handoffRadiusMeters\":0.25,\"maxVelocityDegPerSec\":600,\"maxAccelerationDegPerSec\":2000,\"autoVelocityVelocitySafetyFactor\":1,\"autoVelocityAccelerationSafetyFactor\":1},\"options\":{\"velocitySafetyFactor\":1,\"accelerationSafetyFactor\":1,\"sampleStepMeters\":null,\"mergeToleranceMps\":0.3,\"includeGeneratedRadiiInCacheKey\":false}}"
+            }
+          }
+        ]
+      }
+    }
+  ],
+  "path_groups": [],
+  "linked_targets": []
+}
