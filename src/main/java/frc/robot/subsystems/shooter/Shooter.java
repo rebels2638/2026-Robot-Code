@@ -125,7 +125,13 @@ public class Shooter extends SubsystemBase {
             ConfigLoader.getModeFolder(Constants.SimOnlySubsystems.SHOOTER),
             ShooterConfig.class
         );
-        shooterIO = useSimulation ? new ShooterIOSim(config) : new ShooterIOTalonFX(config);
+        if (useSimulation) {
+            shooterIO = new ShooterIOSim(config);
+        } else if (Constants.currentMode == Constants.Mode.REPLAY) {
+            shooterIO = new ShooterIO() {};
+        } else {
+            shooterIO = new ShooterIOTalonFX(config);
+        }
         enableConnectionAlerts = !useSimulation && Constants.currentMode != Constants.Mode.REPLAY;
         hoodDisconnectedAlert = new Alert("Shooter hood motor is disconnected.", AlertType.kWarning);
         turretDisconnectedAlert = new Alert("Shooter turret motor is disconnected.", AlertType.kWarning);

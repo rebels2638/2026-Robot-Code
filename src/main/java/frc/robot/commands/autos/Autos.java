@@ -359,9 +359,28 @@ public final class Autos {
         return firstFollowPath(pathName, shouldResetPose, false);
     }
 
+    static Path tryLoadValidPreloadedPath(String pathName) {
+        Path preloadedPath = PreloadedPathsHolder.PRELOADED_PATHS.get(pathName);
+        if (preloadedPath == null || !preloadedPath.isValid()) {
+            return null;
+        }
+        return preloadedPath.copy();
+    }
+
+    private static Command invalidPathCommand(String pathName) {
+        return Commands.runOnce(() -> DriverStation.reportWarning(
+            pathName + " is missing, empty, or does not start and end on a point; draw it in BLine and redeploy",
+            false
+        ));
+    }
+
     public static Command followPath(String pathName, boolean shouldResetPose, boolean shouldMirrorPath) {
+        Path path = tryLoadValidPreloadedPath(pathName);
+        if (path == null) {
+            return invalidPathCommand(pathName);
+        }
         return SwerveDrive.getInstance().followPathCommand(
-            loadPreloadedPath(pathName),
+            path,
             shouldResetPose,
             shouldMirrorPath
         );
@@ -372,7 +391,10 @@ public final class Autos {
     }
 
     public static Command firstFollowPath(String pathName, boolean shouldResetPose, boolean shouldMirrorPath) {
-        Path path = loadPreloadedPath(pathName);
+        Path path = tryLoadValidPreloadedPath(pathName);
+        if (path == null) {
+            return invalidPathCommand(pathName);
+        }
         SwerveDrive swerveDrive = SwerveDrive.getInstance();
         return swerveDrive.prepareForPathCommand(path, shouldMirrorPath).andThen(
             swerveDrive.followPathCommand(path, shouldResetPose, shouldMirrorPath)
@@ -385,8 +407,12 @@ public final class Autos {
         boolean shouldMirrorPath,
         boolean shouldFlipPath
     ) {
+        Path path = tryLoadValidPreloadedPath(pathName);
+        if (path == null) {
+            return invalidPathCommand(pathName);
+        }
         return SwerveDrive.getInstance().followPathCommand(
-            loadPreloadedPath(pathName),
+            path,
             shouldResetPose,
             shouldMirrorPath,
             shouldFlipPath
@@ -399,7 +425,10 @@ public final class Autos {
         boolean shouldMirrorPath,
         boolean shouldFlipPath
     ) {
-        Path path = loadPreloadedPath(pathName);
+        Path path = tryLoadValidPreloadedPath(pathName);
+        if (path == null) {
+            return invalidPathCommand(pathName);
+        }
         SwerveDrive swerveDrive = SwerveDrive.getInstance();
         return swerveDrive.prepareForPathCommand(path, shouldMirrorPath, shouldFlipPath).andThen(
             swerveDrive.followPathCommand(

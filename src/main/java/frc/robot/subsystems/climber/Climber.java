@@ -100,7 +100,13 @@ public class Climber extends SubsystemBase {
             ConfigLoader.getModeFolder(Constants.SimOnlySubsystems.CLIMBER),
             ClimberConfig.class
         );
-        climberIO = useSimulation ? new ClimberIOSim(config) : new ClimberIOTalonFX(config);
+        if (useSimulation) {
+            climberIO = new ClimberIOSim(config);
+        } else if (Constants.currentMode == Constants.Mode.REPLAY) {
+            climberIO = new ClimberIO() {};
+        } else {
+            climberIO = new ClimberIOTalonFX(config);
+        }
         enableConnectionAlerts = !useSimulation && Constants.currentMode != Constants.Mode.REPLAY;
         climberDisconnectedAlert = new Alert("Climber motor is disconnected.", AlertType.kWarning);
 

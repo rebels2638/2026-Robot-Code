@@ -56,7 +56,13 @@ public class Intake extends SubsystemBase {
             ConfigLoader.getModeFolder(Constants.SimOnlySubsystems.INTAKE),
             IntakeConfig.class
         );
-        intakeIO = useSimulation ? new IntakeIOSim(config) : new IntakeIOTalonFX(config);
+        if (useSimulation) {
+            intakeIO = new IntakeIOSim(config);
+        } else if (Constants.currentMode == Constants.Mode.REPLAY) {
+            intakeIO = new IntakeIO() {};
+        } else {
+            intakeIO = new IntakeIOTalonFX(config);
+        }
         enableConnectionAlerts = !useSimulation && Constants.currentMode != Constants.Mode.REPLAY;
         rollerDisconnectedAlert = new Alert("Intake roller motor is disconnected.", AlertType.kWarning);
         pivotDisconnectedAlert = new Alert("Intake pivot motor is disconnected.", AlertType.kWarning);

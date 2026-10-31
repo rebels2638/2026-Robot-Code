@@ -299,7 +299,7 @@ public class SwerveDrive extends SubsystemBase {
                 new ModuleIO() {},
                 new ModuleIO() {}
             };
-            gyroIO = new GyroIOPigeon2(swerveConfig.gyro);
+            gyroIO = new GyroIO() {};
         } else {
             modules = new ModuleIO[] {
                 new ModuleIOTalonFX(moduleGeneralConfig, swerveConfig.frontLeft),
@@ -781,11 +781,6 @@ public class SwerveDrive extends SubsystemBase {
     private void handleIdleSystemState() {
         cancelPathCommand();
 
-        // Only cancel running commands, but don't null out finished commands
-        // This prevents re-scheduling when path completes while desired state is still FOLLOW_PATH
-        if (currentPathCommand != null && currentPathCommand.isScheduled()) {
-            currentPathCommand.cancel();
-        }
         driveFieldRelative(new ChassisSpeeds(0, 0, 0));
 
         previousSystemState = CurrentSystemState.IDLE;

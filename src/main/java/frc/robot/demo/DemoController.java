@@ -907,7 +907,10 @@ public final class DemoController extends SubsystemBase implements DemoShotSourc
             steps.add(Commands.waitSeconds(0.1));
         }
         CommandScheduler.getInstance().schedule(
-            Commands.sequence(steps.toArray(Command[]::new)).ignoringDisable(true).withName("DemoRumble")
+            Commands.sequence(steps.toArray(Command[]::new))
+                .finallyDo(() -> controller.setRumble(RumbleType.kBothRumble, 0.0))
+                .ignoringDisable(true)
+                .withName("DemoRumble")
         );
     }
 }

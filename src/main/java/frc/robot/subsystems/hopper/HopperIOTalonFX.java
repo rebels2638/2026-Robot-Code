@@ -34,6 +34,7 @@ public class HopperIOTalonFX implements HopperIO {
     private final StatusSignal<Temperature> hopperTemperature;
 
     private final VelocityVoltage hopperMotorRequest = new VelocityVoltage(0).withSlot(0).withEnableFOC(true);
+    private final VoltageOut hopperVoltageRequest = new VoltageOut(0);
 
     private final TalonFXConfiguration hopperConfig;
 
@@ -111,7 +112,7 @@ public class HopperIOTalonFX implements HopperIO {
 
     @Override
     public void setVoltage(double voltage) {
-        hopperMotor.setControl(new VoltageOut(voltage));
+        hopperMotor.setControl(hopperVoltageRequest.withOutput(voltage));
     }
 
     @Override

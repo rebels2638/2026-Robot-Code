@@ -40,6 +40,7 @@ public class XboxController implements Controller {
         this.rightBumper = new JoystickButton(joystick, BUMPER_RIGHT);
         this.leftStick = new JoystickButton(joystick, BUTTON_LEFT_STICK);
         this.rightStick = new JoystickButton(joystick, BUTTON_RIGHT_STICK);
+        this.rightStickYButton = new Trigger(() -> Math.abs(getRightY()) >= 0.5);
         this.upDpad = new POVButton(joystick, 0);
         this.rightDpad = new POVButton(joystick, 90);
         this.downDpad = new POVButton(joystick, 180);

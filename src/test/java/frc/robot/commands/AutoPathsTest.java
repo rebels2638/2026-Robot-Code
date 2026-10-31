@@ -11,6 +11,7 @@ import edu.wpi.first.math.geometry.Translation2d;
 import frc.robot.commands.autos.AutoPaths;
 import frc.robot.constants.ClimbingConstants;
 import frc.robot.constants.ZoneConstants.RectangleZone;
+import frc.robot.lib.BLine.FlippingUtil;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 
@@ -130,6 +131,24 @@ class AutoPathsTest {
         AutoPaths.AutoClimbPlanningResult result = AutoPaths.planAutoClimb(
             new Pose2d(1.25, 4.0, Rotation2d.fromDegrees(90.0)),
             createTarget(SHARED_INCLUSION_ZONE, SHARED_INCLUSION_ZONE)
+        );
+
+        assertTrue(result.isAccepted());
+        assertNotNull(result.plan());
+        assertEquals("bottom_side", result.plan().side().name());
+        assertEquals(BOTTOM_FINAL_CLIMB_POSE, result.plan().finalWaypoint());
+    }
+
+    @Test
+    void planAutoClimb_normalizesRedAlliancePoseBeforeEvaluatingZonesAndClearance() {
+        Pose2d redAlliancePose = FlippingUtil.flipFieldPose(
+            new Pose2d(3.0, 1.2, Rotation2d.fromDegrees(180.0))
+        );
+
+        AutoPaths.AutoClimbPlanningResult result = AutoPaths.planAutoClimb(
+            redAlliancePose,
+            createTarget(SHARED_INCLUSION_ZONE, SHARED_INCLUSION_ZONE),
+            true
         );
 
         assertTrue(result.isAccepted());

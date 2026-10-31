@@ -4,6 +4,8 @@ import edu.wpi.first.math.MathUtil;
 import edu.wpi.first.math.geometry.Pose2d;
 import edu.wpi.first.math.geometry.Translation2d;
 import frc.robot.constants.ClimbingConstants;
+import frc.robot.constants.Constants;
+import frc.robot.lib.BLine.FlippingUtil;
 import frc.robot.lib.BLine.Path;
 import frc.robot.lib.BLine.Path.PathElement;
 import frc.robot.lib.BLine.Path.PathConstraints;
@@ -45,15 +47,27 @@ public final class AutoPaths {
         Pose2d currentPose,
         ClimbingConstants.AutoClimbTarget target
     ) {
+        return planAutoClimb(currentPose, target, Constants.shouldFlipPath());
+    }
+
+    public static AutoClimbPlanningResult planAutoClimb(
+        Pose2d currentPose,
+        ClimbingConstants.AutoClimbTarget target,
+        boolean shouldFlipForAlliance
+    ) {
         Logger.recordOutput("AutoPaths/AutoClimb/currentPose", currentPose);
         Logger.recordOutput("AutoPaths/AutoClimb/targetName", target.name());
+
+        Pose2d allianceNormalizedPose = shouldFlipForAlliance
+            ? FlippingUtil.flipFieldPose(currentPose)
+            : currentPose;
 
         ArrayList<AutoClimbPlan> validPlans = new ArrayList<>();
         boolean hasTooCloseAndOverrotatedSide = false;
         for (ClimbingConstants.AutoClimbSide side : target.sides()) {
-            boolean withinInclusionZone = ZoneUtil.isPoseInAnyZone(currentPose, side.inclusionZones(), true);
+            boolean withinInclusionZone = ZoneUtil.isPoseInAnyZone(allianceNormalizedPose, side.inclusionZones(), false);
             boolean tooCloseAndOverrotated = isTooCloseAndOverrotated(
-                currentPose,
+                allianceNormalizedPose,
                 side.finalClimbPose(),
                 side.preClimbPose(),
                 ClimbingConstants.ROTATION_CLEARANCE_DISTANCE_METERS,
@@ -72,7 +86,7 @@ public final class AutoPaths {
                 hasTooCloseAndOverrotatedSide = true;
                 continue;
             }
-            validPlans.add(buildPlan(currentPose, side));
+            validPlans.add(buildPlan(allianceNormalizedPose, side));
         }
 
         if (validPlans.isEmpty()) {

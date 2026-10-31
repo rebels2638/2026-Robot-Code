@@ -3,6 +3,7 @@ package frc.robot.commands.autos;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotSame;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -71,5 +72,10 @@ class AutosTest {
     @Test
     void loadPreloadedPath_rejectsUnknownPathName() {
         assertThrows(IllegalArgumentException.class, () -> Autos.loadPreloadedPath("not_a_real_auto_path"));
+    }
+
+    @Test
+    void tryLoadValidPreloadedPath_returnsNullForMissingPathWithoutThrowing() {
+        assertNull(Autos.tryLoadValidPreloadedPath("not_a_real_auto_path"));
     }
 }
