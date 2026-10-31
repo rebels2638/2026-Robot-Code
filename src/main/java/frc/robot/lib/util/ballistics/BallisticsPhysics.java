@@ -256,16 +256,17 @@ public final class BallisticsPhysics {
         State2D state = new State2D(0.0, shooterHeight, vx0, vz0);
         State2D prev = state;
         double elapsed = 0.0;
+        double step = Math.max(1e-6, dt);
 
         while (state.z() >= 0.0 && state.x() <= distance + 0.1 && elapsed < MAX_SIM_TIME) {
             prev = state;
-            state = integrateStep2D(state, spinRateRadPerSec, dt, model);
-            elapsed += dt;
+            state = integrateStep2D(state, spinRateRadPerSec, step, model);
+            elapsed += step;
 
             if (state.x() >= distance) {
                 double t = (distance - prev.x()) / (state.x() - prev.x());
                 double zAtDistance = prev.z() + t * (state.z() - prev.z());
-                double timeAtDistance = (elapsed - dt) + t * dt;
+                double timeAtDistance = (elapsed - step) + t * step;
                 boolean reached = zAtDistance >= -TARGET_REACH_HEIGHT_EPSILON_METERS;
                 return new TrajectoryResult(timeAtDistance, zAtDistance, distance, reached);
             }

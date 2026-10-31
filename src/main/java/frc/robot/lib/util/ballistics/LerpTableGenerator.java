@@ -114,11 +114,12 @@ public final class LerpTableGenerator {
         }
 
         double bestAngle = Math.toRadians(best.hoodAngleDegrees);
+        double bestFlywheelRps = best.flywheelRps;
         for (double angle = bestAngle - Math.toRadians(4.0); angle <= bestAngle + Math.toRadians(4.0); angle += Math.toRadians(0.5)) {
             if (angle < minAngle || angle > maxAngle) {
                 continue;
             }
-            for (double rps = best.flywheelRps - 6.0; rps <= best.flywheelRps + 6.0; rps += 0.5) {
+            for (double rps = bestFlywheelRps - 6.0; rps <= bestFlywheelRps + 6.0; rps += 0.5) {
                 if (rps < minRps || rps > maxRps) {
                     continue;
                 }

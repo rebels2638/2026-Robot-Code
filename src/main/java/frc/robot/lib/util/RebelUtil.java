@@ -63,7 +63,10 @@ public class RebelUtil {
 
     public static ChassisSpeeds scaleSpeeds(double maxTranslationalSpeedMps, ChassisSpeeds speeds) {
         ChassisSpeeds corrected = new ChassisSpeeds();
-        double scaler = Math.sqrt(Math.pow(maxTranslationalSpeedMps,2)/(Math.pow(speeds.vxMetersPerSecond,2) + Math.pow(speeds.vyMetersPerSecond,2)));
+        double magnitude = Math.hypot(speeds.vxMetersPerSecond, speeds.vyMetersPerSecond);
+        double scaler = (magnitude > maxTranslationalSpeedMps && magnitude > EPSILON)
+            ? maxTranslationalSpeedMps / magnitude
+            : 1.0;
         corrected.vxMetersPerSecond = speeds.vxMetersPerSecond * scaler;
         corrected.vyMetersPerSecond = speeds.vyMetersPerSecond * scaler;
         corrected.omegaRadiansPerSecond = speeds.omegaRadiansPerSecond;

@@ -56,7 +56,13 @@ public class Kicker extends SubsystemBase {
             ConfigLoader.getModeFolder(Constants.SimOnlySubsystems.KICKER),
             KickerConfig.class
         );
-        kickerIO = useSimulation ? new KickerIOSim(config) : new KickerIOTalonFX(config);
+        if (useSimulation) {
+            kickerIO = new KickerIOSim(config);
+        } else if (Constants.currentMode == Constants.Mode.REPLAY) {
+            kickerIO = new KickerIO() {};
+        } else {
+            kickerIO = new KickerIOTalonFX(config);
+        }
         enableConnectionAlerts = !useSimulation && Constants.currentMode != Constants.Mode.REPLAY;
         kickerDisconnectedAlert = new Alert("Kicker motor is disconnected.", AlertType.kWarning);
 

@@ -98,7 +98,13 @@ public class Hopper extends SubsystemBase {
             ConfigLoader.getModeFolder(Constants.SimOnlySubsystems.HOPPER),
             HopperConfig.class
         );
-        hopperIO = useSimulation ? new HopperIOSim(config) : new HopperIOTalonFX(config);
+        if (useSimulation) {
+            hopperIO = new HopperIOSim(config);
+        } else if (Constants.currentMode == Constants.Mode.REPLAY) {
+            hopperIO = new HopperIO() {};
+        } else {
+            hopperIO = new HopperIOTalonFX(config);
+        }
         enableConnectionAlerts = !useSimulation && Constants.currentMode != Constants.Mode.REPLAY;
         hopperDisconnectedAlert = new Alert("Hopper motor is disconnected.", AlertType.kWarning);
 

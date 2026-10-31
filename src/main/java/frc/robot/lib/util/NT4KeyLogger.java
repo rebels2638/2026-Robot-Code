@@ -60,7 +60,6 @@ public class NT4KeyLogger {
                     break;
 
                 case kUnassigned:
-                    Logger.recordOutput(path + "/" + key, table.getValue(key).getRaw());
                     break;
 
                 default:

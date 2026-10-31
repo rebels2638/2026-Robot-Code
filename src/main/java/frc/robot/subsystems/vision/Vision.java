@@ -44,7 +44,7 @@ public class Vision extends SubsystemBase {
             List<VisionIO> ioList = new ArrayList<>();
             List<VisionConfig.CameraConfig> cameraConfigs =
                 config.cameras != null ? config.cameras : List.of();
-            if (useSimulation) {
+            if (useSimulation || Constants.currentMode == Constants.Mode.REPLAY) {
                 for (VisionConfig.CameraConfig camera : cameraConfigs) {
                     ioList.add(new VisionIO() {});
                 }
@@ -290,6 +290,7 @@ public class Vision extends SubsystemBase {
                     totalRejectedCount++;
                     if (shouldLogDetailedPoseArrays) {
                         robotPosesRejected.add(observation.pose());
+                        poseTypesRejected.add(observation.type().name());
                     }
                     continue;
                 }

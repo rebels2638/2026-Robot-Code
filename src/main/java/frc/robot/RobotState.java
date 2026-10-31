@@ -220,13 +220,13 @@ public class RobotState {
         )
             && Double.isFinite(visionRotationStdDev)
             ) {
-                lastGyroResetTime = currentTime;
                 if (!shouldSkipRedundantDisabledGyroReset(
                     isDisabled,
                     isZeroGyroHeld,
                     getEstimatedPose().getRotation(),
                     visionRotation
                 )) {
+                    lastGyroResetTime = currentTime;
                     resetPose(new Pose2d(getEstimatedPose().getTranslation(), visionRotation));
                     didResetGyro = true;
                 }
