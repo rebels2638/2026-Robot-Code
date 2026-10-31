@@ -1,5 +1,5 @@
 {
-  "canBusName": "",
+  "canBusName": "rio",
   "hopperCanId": 15,
   "isHopperInverted": false,
   "hopperStatorCurrentLimit": 95.0,

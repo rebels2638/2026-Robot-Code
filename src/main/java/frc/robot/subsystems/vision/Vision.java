@@ -27,9 +27,8 @@ import org.littletonrobotics.junction.Logger;
 
 public class Vision extends SubsystemBase {
     private static final double DETAILED_POSE_LOG_PERIOD_SECONDS = 0.1;
-    private static final double IMU_MODE_REASSERT_PERIOD_SECONDS = 1.0;
-    private static final boolean ENABLE_DETAILED_POSE_LOGGING = true;
-        // Constants.currentMode == Constants.Mode.REPLAY || Constants.VERBOSE_LOGGING_ENABLED;
+    private static final boolean ENABLE_DETAILED_POSE_LOGGING =
+        Constants.currentMode == Constants.Mode.REPLAY || Constants.VERBOSE_LOGGING_ENABLED;
 
     private static Vision instance = null;
     private static final VisionConfig config = ConfigLoader.load(
@@ -78,10 +77,8 @@ public class Vision extends SubsystemBase {
     private final Alert[] disconnectedAlerts;
     private final TimeInterpolatableBuffer<Double> rotationRateBuffer;
     private final ObservationMode[] cameraObservationModes;
-    private final String[] limelightNames;
     private final boolean[] lastConnectedStates;
     private int lastImuMode = Integer.MIN_VALUE;
-    private double lastImuModeWriteTimestampSeconds = Double.NEGATIVE_INFINITY;
     private double lastDetailedPoseLogTimestampSeconds = Double.NEGATIVE_INFINITY;
 
     private Vision(
@@ -112,15 +109,9 @@ public class Vision extends SubsystemBase {
         this.lastConnectedStates = new boolean[io.length];
         this.cameraObservationModes = new ObservationMode[io.length];
 
-        List<String> limelightNameList = new ArrayList<>();
         if (config.cameras != null) {
             for (int i = 0; i < config.cameras.size(); i++) {
                 VisionConfig.CameraConfig camera = config.cameras.get(i);
-                if (camera.name != null
-                    && !camera.name.isBlank()
-                    && !limelightNameList.contains(camera.name)) {
-                    limelightNameList.add(camera.name);
-                }
                 if (i < cameraObservationModes.length) {
                     cameraObservationModes[i] = camera.getObservationMode();
                 }
@@ -131,7 +122,6 @@ public class Vision extends SubsystemBase {
                 cameraObservationModes[i] = ObservationMode.BOTH;
             }
         }
-        this.limelightNames = limelightNameList.toArray(new String[0]);
 
         Logger.recordOutput("Vision/FieldLengthMeters", VisionUtil.getFieldLengthMeters());
         Logger.recordOutput("Vision/FieldWidthMeters", VisionUtil.getFieldWidthMeters());
@@ -157,9 +147,8 @@ public class Vision extends SubsystemBase {
         boolean isDisabled = DriverStation.isDisabled();
         int imuMode = isDisabled ? config.disabledImuMode : config.enabledImuMode;
         boolean wroteImuModeThisCycle = false;
-        if (imuMode != lastImuMode
-            || currentTime - lastImuModeWriteTimestampSeconds >= IMU_MODE_REASSERT_PERIOD_SECONDS) {
-            writeImuMode(imuMode, currentTime);
+        if (imuMode != lastImuMode) {
+            writeImuMode(imuMode);
             wroteImuModeThisCycle = true;
         }
 
@@ -186,7 +175,7 @@ public class Vision extends SubsystemBase {
             }
         }
         if (sawReconnectThisCycle && !wroteImuModeThisCycle) {
-            writeImuMode(imuMode, currentTime);
+            writeImuMode(imuMode);
         }
 
         // Record current rotation rate
@@ -386,12 +375,11 @@ public class Vision extends SubsystemBase {
         Logger.recordOutput("Vision/Summary/RawObservationCount", totalRawObservationCount);
     }
 
-    private void writeImuMode(int imuMode, double currentTime) {
-        for (String cameraName : limelightNames) {
-            LimelightHelpers.SetIMUMode(cameraName, imuMode);
+    private void writeImuMode(int imuMode) {
+        for (VisionIO ioImplementation : io) {
+            ioImplementation.setImuMode(imuMode);
         }
         lastImuMode = imuMode;
-        lastImuModeWriteTimestampSeconds = currentTime;
     }
 
     private double getMaxRotationRateThreshold(PoseObservationType type) {

@@ -44,5 +44,7 @@ public interface VisionIO {
         return false;
     }
 
+    public default void setImuMode(int imuMode) {}
+
     public default void updateInputs(VisionIOInputs inputs) {}
 }

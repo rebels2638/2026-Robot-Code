@@ -28,6 +28,7 @@ import org.littletonrobotics.junction.networktables.LoggedNetworkBoolean;
 
 public class RobotState {
     private static final double OBSERVATION_LOG_PERIOD_SECONDS = 0.1;
+    private static final double DISABLED_GYRO_RESET_MIN_HEADING_DELTA_DEG = 1.0;
 
     private static RobotState instance;
     public static RobotState getInstance() {
@@ -206,23 +207,34 @@ public class RobotState {
         }
 
         double currentTime = Timer.getTimestamp();
+        boolean isDisabled = DriverStation.isDisabled();
+        boolean isZeroGyroHeld = zeroGyroButtonHeld.get();
+        double visionRotationStdDev = observation.visionMeasurementStdDevs().get(2, 0);
+        Rotation2d visionRotation = observation.visionRobotPoseMeters().getRotation();
         boolean didResetGyro = false;
         if (shouldApplyVisionGyroReset(
-            shouldAllowVisionGyroReset(DriverStation.isDisabled(), zeroGyroButtonHeld.get()),
+            shouldAllowVisionGyroReset(isDisabled, isZeroGyroHeld),
             currentTime,
             lastGyroResetTime,
             robotStateConfig.gyroResetTimeoutSeconds
         )
-            // && observation.visionMeasurementStdDevs().get(2,0) < robotStateConfig.gyroResetMaxVisionRotationStdDev
+            && Double.isFinite(visionRotationStdDev)
             ) {
-                resetPose(new Pose2d(getEstimatedPose().getTranslation(), observation.visionRobotPoseMeters().getRotation()));
                 lastGyroResetTime = currentTime;
-                didResetGyro = true;
+                if (!shouldSkipRedundantDisabledGyroReset(
+                    isDisabled,
+                    isZeroGyroHeld,
+                    getEstimatedPose().getRotation(),
+                    visionRotation
+                )) {
+                    resetPose(new Pose2d(getEstimatedPose().getTranslation(), visionRotation));
+                    didResetGyro = true;
+                }
         }
         if (shouldLogObservation || didResetGyro) {
             logGyroResetStatus(
                 didResetGyro,
-                didResetGyro ? observation.visionRobotPoseMeters().getRotation() : null
+                didResetGyro ? visionRotation : null
             );
         }
 
@@ -241,7 +253,9 @@ public class RobotState {
         lastWrappedYawRad = initialPose.getRotation().getRadians();
         hasYawSample = true;
 
+        lastEstimatedPoseUpdateTime = Timer.getTimestamp();
         poseBuffer.clear();
+        poseBuffer.addSample(lastEstimatedPoseUpdateTime, initialPose);
     }
 
     /** Odometry pose at a past timestamp, interpolated from the pose buffer. Empty if outside the buffer. */
@@ -269,6 +283,19 @@ public class RobotState {
     ) {
         return allowVisionGyroReset
             && currentTimeSeconds - lastGyroResetTimeSeconds > gyroResetTimeoutSeconds;
+    }
+
+    static boolean shouldSkipRedundantDisabledGyroReset(
+        boolean isDisabled,
+        boolean zeroGyroButtonHeld,
+        Rotation2d currentRotation,
+        Rotation2d visionRotation
+    ) {
+        if (!isDisabled || zeroGyroButtonHeld || currentRotation == null || visionRotation == null) {
+            return false;
+        }
+        return Math.abs(currentRotation.minus(visionRotation).getDegrees())
+            <= DISABLED_GYRO_RESET_MIN_HEADING_DELTA_DEG;
     }
 
     @AutoLogOutput(key = "RobotState/estimatedPose")
@@ -337,7 +364,7 @@ public class RobotState {
     private void logGyroResetStatus(boolean didReset, Rotation2d rotation) {
         Logger.recordOutput("RobotState/vision/gyroReset", didReset);
         if (didReset && rotation != null) {
-            Logger.recordOutput("RobotState/vision/gyroRestRotation", rotation);
+            Logger.recordOutput("RobotState/vision/gyroResetRotation", rotation);
         }
     }
 

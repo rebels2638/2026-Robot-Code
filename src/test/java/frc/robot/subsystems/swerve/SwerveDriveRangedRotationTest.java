@@ -565,6 +565,35 @@ class SwerveDriveRangedRotationTest {
     }
 
     @Test
+    void getSafeOdometrySampleCount_returnsMinimumAcrossAllModulesAndArrays() {
+        frc.robot.subsystems.swerve.module.ModuleIO.ModuleIOInputs m0 =
+            new frc.robot.subsystems.swerve.module.ModuleIO.ModuleIOInputs();
+        m0.odometryTimestampsSeconds = new double[] {1.0, 1.004, 1.008};
+        m0.odometryDrivePositionsMeters = new double[] {0.1, 0.2, 0.3};
+        m0.odometrySteerPositions = new edu.wpi.first.math.geometry.Rotation2d[] {
+            new edu.wpi.first.math.geometry.Rotation2d(),
+            new edu.wpi.first.math.geometry.Rotation2d(),
+            new edu.wpi.first.math.geometry.Rotation2d()
+        };
+        frc.robot.subsystems.swerve.module.ModuleIO.ModuleIOInputs m1 =
+            new frc.robot.subsystems.swerve.module.ModuleIO.ModuleIOInputs();
+        m1.odometryTimestampsSeconds = new double[] {1.0, 1.004};
+        m1.odometryDrivePositionsMeters = new double[] {0.1, 0.2, 0.3};
+        m1.odometrySteerPositions = new edu.wpi.first.math.geometry.Rotation2d[] {
+            new edu.wpi.first.math.geometry.Rotation2d(),
+            new edu.wpi.first.math.geometry.Rotation2d()
+        };
+        assertEquals(
+            2,
+            SwerveDrive.getSafeOdometrySampleCount(
+                new frc.robot.subsystems.swerve.module.ModuleIO.ModuleIOInputs[] {m0, m1}
+            )
+        );
+        assertEquals(0, SwerveDrive.getSafeOdometrySampleCount(null));
+        assertEquals(0, SwerveDrive.getSafeOdometrySampleCount(new frc.robot.subsystems.swerve.module.ModuleIO.ModuleIOInputs[0]));
+    }
+
+    @Test
     void normalizeWrappedDegrees_isPeriodicEveryFullTurn() {
         double expected = SwerveDrive.normalizeWrappedDegrees(33.0);
 

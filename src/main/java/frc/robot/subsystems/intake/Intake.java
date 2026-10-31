@@ -47,6 +47,7 @@ public class Intake extends SubsystemBase {
 
     private double rollerSetpointRPS = 0.0;
     private double pivotSetpointRotations = 0.0;
+    private boolean lastPivotMovingUp = true;
 
     private Intake() {
         boolean useSimulation = Constants.shouldUseSimulation(Constants.SimOnlySubsystems.INTAKE);
@@ -111,11 +112,30 @@ public class Intake extends SubsystemBase {
         intakeIO.setVelocity(velocityRotationsPerSec);
     }
 
+    static boolean resolvePivotMovingUp(
+        double targetAngleRotations,
+        double currentAngleRotations,
+        double toleranceRotations,
+        boolean previousMovingUp
+    ) {
+        double delta = targetAngleRotations - currentAngleRotations;
+        if (Math.abs(delta) <= Math.max(0.0, toleranceRotations)) {
+            return previousMovingUp;
+        }
+        return delta > 0.0;
+    }
+
     private void setPivotAngle(double angleRotations) {
         pivotSetpointRotations = angleRotations;
         Logger.recordOutput("Intake/pivotAngleSetpointRotations", angleRotations);
 
-        boolean movingUp = angleRotations > intakeInputs.pivotAngleRotations;
+        boolean movingUp = resolvePivotMovingUp(
+            angleRotations,
+            intakeInputs.pivotAngleRotations,
+            config.pivotAngleToleranceRotations,
+            lastPivotMovingUp
+        );
+        lastPivotMovingUp = movingUp;
         double velocity = movingUp ? config.pivotUpMaxVelocityRotationsPerSec : config.pivotDownMaxVelocityRotationsPerSec;
         double acceleration = movingUp ? config.pivotUpMaxAccelerationRotationsPerSec2 : config.pivotDownMaxAccelerationRotationsPerSec2;
         double jerk = movingUp ? config.pivotUpMaxJerkRotationsPerSec3 : config.pivotDownMaxJerkRotationsPerSec3;

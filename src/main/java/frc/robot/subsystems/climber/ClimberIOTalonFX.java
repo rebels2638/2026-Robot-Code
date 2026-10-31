@@ -37,6 +37,7 @@ public class ClimberIOTalonFX implements ClimberIO {
 
     private final DynamicMotionMagicVoltage climberMotorRequest =
         new DynamicMotionMagicVoltage(0, 0, 0).withSlot(0).withEnableFOC(true);
+    private final VoltageOut climberVoltageRequest = new VoltageOut(0);
 
     private final ClimberConfig config;
     private final TalonFXConfiguration climberConfig;
@@ -136,7 +137,7 @@ public class ClimberIOTalonFX implements ClimberIO {
 
     @Override
     public void setVoltage(double voltage) {
-        climberMotor.setControl(new VoltageOut(voltage));
+        climberMotor.setControl(climberVoltageRequest.withOutput(voltage));
     }
 
     @Override

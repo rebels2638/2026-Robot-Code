@@ -58,6 +58,7 @@ public class Robot extends LoggedRobot {
     @Override
     public void robotInit() {
 
+        DriverStation.silenceJoystickConnectionWarning(true);
         configurePhoenixLogging();
         SignalLogger.enableAutoLogging(true); // TODO: ABSOLUTELY NEED TO BE HERE FOR COMPS
         // Demo vs full field comes from a persisted preference, read before anything uses it.

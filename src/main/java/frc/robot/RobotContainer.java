@@ -239,7 +239,7 @@ public class RobotContainer {
         return new SequentialCommandGroup(
             new InstantCommand(() -> superstructure.setDesiredIntakeState(Superstructure.DesiredIntakeState.INTAKING)),
             new ParallelDeadlineGroup(
-                new WaitUntilCommand(() -> intake.getPivotAngleRotations() / 360 > 10),
+                new WaitUntilCommand(() -> intake.getPivotAngleRotations() * 360.0 > 10.0),
                 new InstantCommand(() -> superstructure.setDesiredIntakeState(Superstructure.DesiredIntakeState.STOWED))
             ),
             new InstantCommand(() -> superstructure.setDesiredIntakeState(Superstructure.DesiredIntakeState.INTAKING))

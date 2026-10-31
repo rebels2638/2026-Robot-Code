@@ -12,7 +12,7 @@ import com.ctre.phoenix6.BaseStatusSignal;
 import com.ctre.phoenix6.CANBus;
 import com.ctre.phoenix6.StatusSignal;
 import com.ctre.phoenix6.configs.TalonFXConfiguration;
-import com.ctre.phoenix6.controls.MotionMagicVoltage;
+import com.ctre.phoenix6.controls.DynamicMotionMagicVoltage;
 import com.ctre.phoenix6.controls.VelocityVoltage;
 import com.ctre.phoenix6.controls.VoltageOut;
 import com.ctre.phoenix6.hardware.TalonFX;
@@ -45,9 +45,12 @@ public class IntakeIOTalonFX implements IntakeIO {
     private final StatusSignal<Voltage> pivotMotorVoltage;
     private final StatusSignal<Current> pivotTorqueCurrent;
     private final StatusSignal<Temperature> pivotTemperature;
+    private final StatusSignal<Double> pivotClosedLoopReference;
 
     private final VelocityVoltage rollerMotorRequest = new VelocityVoltage(0).withSlot(0).withEnableFOC(true);
-    private final MotionMagicVoltage pivotMotorRequest = new MotionMagicVoltage(0).withSlot(0).withEnableFOC(true);
+    private final VoltageOut rollerVoltageRequest = new VoltageOut(0);
+    private final DynamicMotionMagicVoltage pivotMotorRequest =
+        new DynamicMotionMagicVoltage(0, 0, 0).withSlot(0).withEnableFOC(true);
 
     private final TalonFXConfiguration rollerConfig;
     private final TalonFXConfiguration pivotConfig;
@@ -116,6 +119,10 @@ public class IntakeIOTalonFX implements IntakeIO {
         pivotConfig.SoftwareLimitSwitch.ReverseSoftLimitEnable = true;
         pivotConfig.SoftwareLimitSwitch.ReverseSoftLimitThreshold = config.pivotMinAngleRotations;
 
+        pivotConfig.MotionMagic.MotionMagicCruiseVelocity = config.pivotUpMaxVelocityRotationsPerSec;
+        pivotConfig.MotionMagic.MotionMagicAcceleration = config.pivotUpMaxAccelerationRotationsPerSec2;
+        pivotConfig.MotionMagic.MotionMagicJerk = config.pivotUpMaxJerkRotationsPerSec3;
+
         pivotConfig.FutureProofConfigs = false;
 
         pivotMotor = new TalonFX(config.pivotCanId, new CANBus(config.canBusName));
@@ -132,12 +139,13 @@ public class IntakeIOTalonFX implements IntakeIO {
         pivotPositionStatusSignal = pivotMotor.getPosition().clone();
         pivotVelocityStatusSignal = pivotMotor.getVelocity().clone();
         pivotMotorVoltage = pivotMotor.getMotorVoltage().clone();
+        pivotClosedLoopReference = pivotMotor.getClosedLoopReference().clone();
 
         BaseStatusSignal.setUpdateFrequencyForAll(50,
             rollerTorqueCurrent, rollerTemperature,
             rollerVelocityStatusSignal, rollerMotorVoltage,
             pivotTorqueCurrent, pivotTemperature,
-            pivotPositionStatusSignal, pivotVelocityStatusSignal, pivotMotorVoltage);
+            pivotPositionStatusSignal, pivotVelocityStatusSignal, pivotMotorVoltage, pivotClosedLoopReference);
 
         PhoenixUtil.registerSignals(
             config.canBusName,
@@ -149,7 +157,8 @@ public class IntakeIOTalonFX implements IntakeIO {
             pivotTemperature,
             pivotPositionStatusSignal,
             pivotVelocityStatusSignal,
-            pivotMotorVoltage
+            pivotMotorVoltage,
+            pivotClosedLoopReference
         );
 
         rollerMotor.optimizeBusUtilization();
@@ -183,7 +192,7 @@ public class IntakeIOTalonFX implements IntakeIO {
         inputs.pivotTorqueCurrent = pivotTorqueCurrent.getValue().in(Amps);
         inputs.pivotTemperatureFahrenheit = pivotTemperature.getValue().in(Fahrenheit);
 
-        Logger.recordOutput("Intake/pivotTalonSetpoint", pivotMotor.getClosedLoopReference().getValueAsDouble());
+        Logger.recordOutput("Intake/pivotTalonSetpoint", pivotClosedLoopReference.getValueAsDouble());
     }
 
     @Override
@@ -193,22 +202,16 @@ public class IntakeIOTalonFX implements IntakeIO {
 
     @Override
     public void setVoltage(double voltage) {
-        rollerMotor.setControl(new VoltageOut(voltage));
+        rollerMotor.setControl(rollerVoltageRequest.withOutput(voltage));
     }
 
     @Override
     public void setPivotAngle(double angleRotations, double maxVelocity, double maxAcceleration, double maxJerk) {
-        if (pivotConfig.MotionMagic.MotionMagicCruiseVelocity != maxVelocity
-                || pivotConfig.MotionMagic.MotionMagicAcceleration != maxAcceleration
-                || pivotConfig.MotionMagic.MotionMagicJerk != maxJerk) {
-            pivotConfig.MotionMagic.MotionMagicCruiseVelocity = maxVelocity;
-            pivotConfig.MotionMagic.MotionMagicAcceleration = maxAcceleration;
-            pivotConfig.MotionMagic.MotionMagicJerk = maxJerk;
-            pivotMotor.getConfigurator().apply(pivotConfig.MotionMagic, 0.01);
-        }
-
         double clampedAngle = Math.max(config.pivotMinAngleRotations,
             Math.min(config.pivotMaxAngleRotations, angleRotations));
+        pivotMotorRequest.Velocity = Math.abs(maxVelocity);
+        pivotMotorRequest.Acceleration = Math.abs(maxAcceleration);
+        pivotMotorRequest.Jerk = Math.abs(maxJerk);
         pivotMotor.setControl(pivotMotorRequest.withPosition(clampedAngle));
     }
 

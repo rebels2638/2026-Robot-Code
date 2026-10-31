@@ -41,6 +41,9 @@ import frc.robot.lib.util.PhoenixUtil;
 import frc.robot.subsystems.swerve.SwerveDrive;
 
 public class ModuleIOTalonFX implements ModuleIO {
+    private static final double MIN_ACCELERATION_DT_SECONDS = 1.0e-4;
+    private static final double MAX_ACCELERATION_DT_SECONDS = 0.25;
+
     private final TalonFX driveMotor;
     private final TalonFX steerMotor;
     private final CANcoder steerEncoder;
@@ -310,15 +313,36 @@ public class ModuleIOTalonFX implements ModuleIO {
         return values;
     }
 
+    public static double calculateDriveAccelerationMetersPerSec2(
+        double currentSpeedMetersPerSec,
+        double lastSpeedMetersPerSec,
+        double dtSeconds
+    ) {
+        if (!Double.isFinite(currentSpeedMetersPerSec)
+            || !Double.isFinite(lastSpeedMetersPerSec)
+            || !Double.isFinite(dtSeconds)
+            || dtSeconds <= MIN_ACCELERATION_DT_SECONDS
+            || dtSeconds > MAX_ACCELERATION_DT_SECONDS) {
+            return 0.0;
+        }
+        return (currentSpeedMetersPerSec - lastSpeedMetersPerSec) / dtSeconds;
+    }
+
     @Override
     public void setState(SwerveModuleState state) {
+        double now = Timer.getFPGATimestamp();
+        double accelerationMetersPerSec2 = calculateDriveAccelerationMetersPerSec2(
+            state.speedMetersPerSecond,
+            lastRequestedState.speedMetersPerSecond,
+            now - lastRequestedStateTime
+        );
         driveMotor.setControl(driveMotorRequest.withVelocity(
                 RebelUtil.constrain(
                     state.speedMetersPerSecond,
                     -generalConfig.driveMaxVelocityMetersPerSec,
                     generalConfig.driveMaxVelocityMetersPerSec
                 ) * state.angle.minus(lastSteerAngleRad).getCos()
-            ).withAcceleration((state.speedMetersPerSecond - lastRequestedState.speedMetersPerSecond) / (Timer.getFPGATimestamp() - lastRequestedStateTime))
+            ).withAcceleration(accelerationMetersPerSec2)
         );
         
         steerMotor.setControl(
@@ -328,7 +352,7 @@ public class ModuleIOTalonFX implements ModuleIO {
         );
 
         lastRequestedState = state;
-        lastRequestedStateTime = Timer.getFPGATimestamp();
+        lastRequestedStateTime = now;
     }
 
     @Override
@@ -344,7 +368,7 @@ public class ModuleIOTalonFX implements ModuleIO {
                     -generalConfig.driveMaxVelocityMetersPerSec,
                     generalConfig.driveMaxVelocityMetersPerSec
                 )
-            )
+            ).withAcceleration(0.0)
         );
     }
 

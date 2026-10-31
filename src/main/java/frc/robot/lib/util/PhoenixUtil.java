@@ -25,9 +25,21 @@ public class PhoenixUtil {
     }
   }
 
+  /** Normalizes Phoenix CAN bus names so RoboRIO bus aliases (null, "", "rio") share a single batch. */
+  public static String normalizeNetworkName(String network) {
+    if (network == null) {
+      return "rio";
+    }
+    String trimmed = network.trim();
+    if (trimmed.isEmpty() || trimmed.equalsIgnoreCase("rio")) {
+      return "rio";
+    }
+    return trimmed;
+  }
+
   /** Registers a set of signals for synchronized refresh on a specific Phoenix network. */
   public static synchronized void registerSignals(String network, BaseStatusSignal... signals) {
-    String normalizedNetwork = network == null ? "" : network;
+    String normalizedNetwork = normalizeNetworkName(network);
     BaseStatusSignal[] registeredSignals =
         registeredSignalsByNetwork.getOrDefault(normalizedNetwork, new BaseStatusSignal[0]);
     BaseStatusSignal[] newSignals = new BaseStatusSignal[registeredSignals.length + signals.length];

@@ -489,7 +489,8 @@ public class SwerveDrive extends SubsystemBase {
         Logger.recordOutput("SwerveDrive/odometry/isRejectingTiltedOdometry", isRejectingTiltedOdometry);
 
         double[] odometryTimestampsSeconds = moduleInputs[0].odometryTimestampsSeconds;
-        for (int i = 0; i < odometryTimestampsSeconds.length; i++) {
+        int odometrySampleCount = getSafeOdometrySampleCount(moduleInputs);
+        for (int i = 0; i < odometrySampleCount; i++) {
             Rotation3d odometryGyroOrientation = getOdometryGyroOrientation(i);
             boolean shouldRejectOdometrySample = gyroInputs.isConnected
                 && getAngleToFloorDegrees(odometryGyroOrientation) > drivetrainConfig.maxOdometryTiltAngleDegrees;
@@ -499,8 +500,8 @@ public class SwerveDrive extends SubsystemBase {
                 new OdometryObservation(
                     odometryTimestampsSeconds[i],
                     gyroInputs.isConnected,
-                    filteredOdometryModulePositions,
-                    filteredOdometryModuleStates,
+                    filteredOdometryModulePositions.clone(),
+                    filteredOdometryModuleStates.clone(),
                     gyroInputs.isConnected ?
                         odometryGyroOrientation :
                         new Rotation3d(),
@@ -559,6 +560,25 @@ public class SwerveDrive extends SubsystemBase {
         }
 
         hasInitializedFilteredOdometry = true;
+    }
+
+    static int getSafeOdometrySampleCount(ModuleIO.ModuleIOInputs[] inputs) {
+        if (inputs == null || inputs.length == 0) {
+            return 0;
+        }
+        int sampleCount = Integer.MAX_VALUE;
+        for (ModuleIO.ModuleIOInputs moduleInput : inputs) {
+            if (moduleInput == null
+                    || moduleInput.odometryTimestampsSeconds == null
+                    || moduleInput.odometryDrivePositionsMeters == null
+                    || moduleInput.odometrySteerPositions == null) {
+                return 0;
+            }
+            sampleCount = Math.min(sampleCount, moduleInput.odometryTimestampsSeconds.length);
+            sampleCount = Math.min(sampleCount, moduleInput.odometryDrivePositionsMeters.length);
+            sampleCount = Math.min(sampleCount, moduleInput.odometrySteerPositions.length);
+        }
+        return sampleCount == Integer.MAX_VALUE ? 0 : sampleCount;
     }
 
     private Rotation3d getOdometryGyroOrientation(int odometrySampleIndex) {
